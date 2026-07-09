@@ -1,27 +1,198 @@
+@import "tw-animate-css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --radius: 1.25rem;
+
+    /* Light, soft-neutral palette */
+    --ink: oklch(0.2 0.02 250);
+    --ink-2: oklch(0.35 0.02 250);
+    --amber: oklch(0.66 0.19 35);
+    --amber-soft: oklch(0.58 0.18 35);
+    --teal: oklch(0.55 0.08 210);
+    --teal-soft: oklch(0.96 0.02 180);
+
+    --background: oklch(0.975 0 0); /* #f4f4f5 */
+    --foreground: oklch(0.22 0.02 250);
+
+    --surface: oklch(1 0 0);
+    --surface-2: oklch(0.98 0.005 255);
+    --hairline: oklch(0.92 0.006 255);
+
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.22 0.02 250);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.22 0.02 250);
+
+    --primary: oklch(0.2 0.02 250); /* Dark slate for primary buttons */
+    --font-display: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+    --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+:root {
+  /* Colors */
+  --surface: oklab(1 0 0);
+  --surface-2: oklab(0.98 0 0);
+  --background: oklab(0.97 0 0); /* very light gray */
+  
+  --foreground: oklab(0.2 0 0);
+  --muted-foreground: oklab(0.5 0 0);
+  --muted: oklab(0.95 0 0);
+  --hairline: oklab(0.92 0 0);
+  
+  --ink: oklab(0.15 0 0);
+  
+  /* Brand accents */
+  --teal: oklab(0.65 -0.1 0.05);
+  --teal-soft: oklab(0.96 -0.02 0.01); /* #eaf3f1 */
+  --amber: oklab(0.75 0.1 0.15);
+  --amber-soft: oklab(0.94 0.05 0.08);
+  --danger: oklab(0.65 0.15 0.1);
+  --danger-soft: oklab(0.96 0.04 0.02);
+
+  --radius: 1rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-hairline: var(--hairline);
+  --color-ink: var(--ink);
+
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+@utility text-kannada {
+  font-family: "Noto Serif Kannada", var(--font-sans);
+  font-feature-settings: "kern";
+}
+
+@utility text-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-hairline);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+
+  .scrb-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-color: var(--background);
+  }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  /* Soft card — the workhorse surface */
+  .glass {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-card);
   }
+
+  .glass-strong {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-lift);
+  }
+
+  .glass-teal {
+    background: color-mix(in oklab, var(--teal) 10%, white);
+    border: 1px solid color-mix(in oklab, var(--teal) 22%, var(--hairline));
+    color: var(--foreground);
+  }
+
+  /* Dark contrast card — like the reference income tracker hero */
+  .glass-ink {
+    background: oklch(0.2 0.02 250);
+    border: 1px solid oklch(0.28 0.02 250);
+    color: white;
+  }
+
+  .glass-amber {
+    background: color-mix(in oklab, var(--amber) 12%, white);
+    border: 1px solid color-mix(in oklab, var(--amber) 30%, var(--hairline));
+    color: var(--amber-soft);
+  }
+
+  .text-mono {
+    @apply font-mono;
+    letter-spacing: -0.01em;
+  }
+
+  .text-kannada {
+    font-family: "Noto Serif Kannada", ui-serif, Georgia, serif;
+    font-feature-settings: "kern";
+  }
+
+  .text-display {
+    @apply font-serif;
+    letter-spacing: -0.015em;
+  }
+}
+
+/* Minimalist Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Hide Google Translate Banner and Popups */
+body {
+  top: 0 !important;
+}
+.goog-te-banner-frame.skiptranslate {
+  display: none !important;
+}
+.goog-te-balloon-frame {
+  display: none !important;
+}
+.goog-text-highlight {
+  background-color: transparent !important;
+  box-shadow: none !important;
 }
