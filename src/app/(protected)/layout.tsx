@@ -1,5 +1,5 @@
 import { Header, Sidebar } from "@/components/scrb/shell";
-import { FloatingCopilot } from "@/components/scrb/floating-copilot";
+import { Toaster } from "@/components/ui/sonner";
 
 export default function ProtectedLayout({
   children,
@@ -17,7 +17,6 @@ export default function ProtectedLayout({
           </div>
         </main>
       </div>
-      <FloatingCopilot />
     </div>
   );
 }

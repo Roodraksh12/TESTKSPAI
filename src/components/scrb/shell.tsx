@@ -157,24 +157,6 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
           const active = pathname === to || pathname.startsWith(to + "/");
-          const isCopilot = label === "Copilot";
-          
-          if (isCopilot) {
-            return (
-              <button
-                key={label}
-                onClick={(e) => {
-                  e.preventDefault();
-                  useCopilotStore.getState().openCopilot();
-                }}
-                className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-amber-500 hover:bg-white/10 dark:text-amber-500 dark:hover:bg-surface/50"
-              >
-                <Icon className="h-5 w-5 shrink-0 text-amber-500 group-hover:text-amber-400" />
-                {label}
-              </button>
-            );
-          }
-          
           return (
             <Link
               key={to}
@@ -195,8 +177,8 @@ export function Sidebar() {
       </nav>
 
       {/* User & Settings */}
-      <div className="flex shrink-0 items-center border-t border-ink-2 p-4 dark:border-hairline">
-        <Link href="/settings" className="group flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-white/10 dark:hover:bg-surface/50">
+      <div className="flex shrink-0 items-center justify-between border-t border-ink-2 p-4 dark:border-hairline">
+        <Link href="/settings" className="group flex flex-1 min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium transition-colors hover:bg-white/10 dark:hover:bg-surface/50">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20 text-white dark:bg-surface dark:text-ink">
             <User className="h-4 w-4" />
           </div>
@@ -209,6 +191,13 @@ export function Sidebar() {
             </span>
           </div>
         </Link>
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white dark:text-muted-foreground dark:hover:bg-surface-2 dark:hover:text-foreground"
+          title="Sign out"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
       </div>
     </aside>
   );

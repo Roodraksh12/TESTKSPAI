@@ -188,15 +188,40 @@
 
 /* Hide Google Translate Banner and Popups */
 body {
-  top: 0 !important;
+  top: 0px !important;
+  position: static !important;
 }
-.goog-te-banner-frame.skiptranslate {
+html {
+  top: 0px !important;
+}
+
+/* Hide the main banner iframe */
+iframe.goog-te-banner-frame {
   display: none !important;
 }
+
+/* Hide any skiptranslate iframe (which is usually the banner) */
+.skiptranslate > iframe {
+  display: none !important;
+}
+
+/* Hide the weird auto-generated container for the new translate widget */
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf {
+  display: none !important;
+}
+.VIpgJd-ZVi9od-ORHb-OEVmcd {
+  display: none !important;
+}
+
+/* Hide tooltips and highlights */
 .goog-te-balloon-frame {
+  display: none !important;
+}
+.goog-tooltip, .goog-tooltip:hover {
   display: none !important;
 }
 .goog-text-highlight {
   background-color: transparent !important;
+  border: none !important;
   box-shadow: none !important;
 }
