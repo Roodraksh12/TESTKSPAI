@@ -80,6 +80,9 @@ const config = {
       },
     },
   },
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 } satisfies Config
 
 export default config

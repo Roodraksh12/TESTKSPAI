@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, X, FileText, Users, Share2, Image as ImageIcon, GitBranch } from "lucide-react";
-import { GlassPanel, GlassPill, GlassButton, IconOrb, SectionLabel } from "@/components/scrb/primitives";
+import { Card, Badge, Button, IconOrb, SectionLabel } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
+import { useCopilotStore } from "@/lib/store";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: FileText },
@@ -16,6 +17,12 @@ const TABS = [
 
 export default function CaseDossierClient({ caseData }: { caseData: any }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
+  const { setPageContext } = useCopilotStore();
+
+  useEffect(() => {
+    setPageContext(JSON.stringify(caseData, null, 2));
+    return () => setPageContext('');
+  }, [caseData, setPageContext]);
 
   // Map Prisma data to expected UI shape
   const c = {
@@ -39,14 +46,14 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           <ArrowLeft className="h-3.5 w-3.5" /> All cases
         </Link>
         <div className="flex flex-wrap items-center gap-2">
-          <GlassPill tone={c.status === "OPEN" || c.status === "UNDER_INVESTIGATION" ? "teal" : "amber"}>
+          <Badge tone={c.status === "OPEN" || c.status === "UNDER_INVESTIGATION" ? "teal" : "amber"}>
             {c.status.replace("_", " ")}
-          </GlassPill>
-          <GlassPill tone="muted"><span className="text-mono">{c.firNumber}</span></GlassPill>
+          </Badge>
+          <Badge tone="muted"><span className="text-mono">{c.firNumber}</span></Badge>
         </div>
       </div>
 
-      <GlassPanel strong className="p-6 sm:p-8">
+      <Card strong className="p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <SectionLabel>{c.station} · {c.location}</SectionLabel>
@@ -54,8 +61,8 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
             <p className="mt-1 text-sm text-muted-foreground">{c.crimeType} · Reported {c.date}</p>
           </div>
           <div className="flex gap-2">
-            <GlassButton variant="glass" size="md">Export dossier</GlassButton>
-            <GlassButton variant="primary" size="md">Draft update</GlassButton>
+            <Button variant="glass" size="md">Export dossier</Button>
+            <Button variant="primary" size="md">Draft update</Button>
           </div>
         </div>
 
@@ -82,10 +89,12 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           {tab === "evidence" && <Evidence />}
           {tab === "matches" && <Matches matches={c.matches} />}
         </div>
-      </GlassPanel>
+      </Card>
     </div>
   );
 }
+
+import { PredictiveNextSteps } from "@/components/scrb/predictive-steps";
 
 function Overview({ c, rawExtractedText }: { c: any, rawExtractedText?: string }) {
   return (
@@ -105,16 +114,20 @@ function Overview({ c, rawExtractedText }: { c: any, rawExtractedText?: string }
           </div>
         )}
       </div>
-      <div className="glass rounded-3xl p-5">
-        <SectionLabel>Entities</SectionLabel>
-        <ul className="mt-2 space-y-2">
-          {c.entities.map((e: string, i: number) => (
-            <li key={i} className="glass rounded-2xl px-3 py-2 text-mono text-xs">{e}</li>
-          ))}
-          {c.entities.length === 0 && (
-            <li className="text-xs text-muted-foreground">No entities extracted.</li>
-          )}
-        </ul>
+      <div className="space-y-4">
+        <PredictiveNextSteps caseId={c.id} />
+        
+        <div className="glass rounded-3xl p-5">
+          <SectionLabel>Entities</SectionLabel>
+          <ul className="mt-2 space-y-2">
+            {c.entities.map((e: string, i: number) => (
+              <li key={i} className="glass rounded-2xl px-3 py-2 text-mono text-xs">{e}</li>
+            ))}
+            {c.entities.length === 0 && (
+              <li className="text-xs text-muted-foreground">No entities extracted.</li>
+            )}
+          </ul>
+        </div>
       </div>
     </div>
   );
@@ -145,7 +158,7 @@ function Connections() {
     <div className="glass rounded-3xl p-4">
       <p className="text-sm text-muted-foreground">Interactive graph available on the Network canvas.</p>
       <Link href="/network" className="mt-3 inline-flex">
-        <GlassButton variant="glass" size="sm">Open network canvas</GlassButton>
+        <Button variant="glass" size="sm">Open network canvas</Button>
       </Link>
     </div>
   );

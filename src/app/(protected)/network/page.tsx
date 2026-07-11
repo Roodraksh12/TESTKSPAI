@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTheme } from "next-themes";
 import { NETWORK, type NetworkNode } from "@/lib/scrb/mock";
-import { GlassPanel, GlassPill, SectionLabel } from "@/components/scrb/primitives";
+import { Card, Badge, SectionLabel } from "@/components/scrb/primitives";
 import { Car, User, MapPin, FileText, X, Search, Maximize2, Layers, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -11,11 +12,11 @@ type Kind = NetworkNode["kind"];
 const KIND_ICON: Record<Kind, typeof User> = { Person: User, Vehicle: Car, Location: MapPin, Case: FileText };
 
 // Palette per kind: fill (soft), ring (border), dot (solid)
-const KIND_STYLE: Record<Kind, { fill: string; ring: string; dot: string; text: string; label: string }> = {
-  Case:     { fill: "#FEF3E4", ring: "#F0B26B", dot: "#C97A1F", text: "#7A3E00", label: "Case / FIR" },
-  Vehicle:  { fill: "#E6F1F3", ring: "#7FB4BE", dot: "#3D7C88", text: "#1F4A52", label: "Vehicle" },
-  Person:   { fill: "#EEEBFA", ring: "#A99AE0", dot: "#6650C4", text: "#3A2D80", label: "Person" },
-  Location: { fill: "#E8F1E7", ring: "#8CBB87", dot: "#4C8C46", text: "#265022", label: "Location" },
+const KIND_STYLE: Record<Kind, { fill: string; ring: string; dot: string; text: string; darkText: string; label: string }> = {
+  Case:     { fill: "#FEF3E4", ring: "#F0B26B", dot: "#C97A1F", text: "#7A3E00", darkText: "#F0B26B", label: "Case / FIR" },
+  Vehicle:  { fill: "#E6F1F3", ring: "#7FB4BE", dot: "#3D7C88", text: "#1F4A52", darkText: "#7FB4BE", label: "Vehicle" },
+  Person:   { fill: "#EEEBFA", ring: "#A99AE0", dot: "#6650C4", text: "#3A2D80", darkText: "#A99AE0", label: "Person" },
+  Location: { fill: "#E8F1E7", ring: "#8CBB87", dot: "#4C8C46", text: "#265022", darkText: "#8CBB87", label: "Location" },
 };
 
 // ViewBox in 1000 units for precision
@@ -26,6 +27,8 @@ function toXY(n: NetworkNode) {
 }
 
 export default function NetworkPage() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -74,7 +77,7 @@ export default function NetworkPage() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_320px] max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
       {/* Canvas */}
-      <GlassPanel strong className="relative overflow-hidden p-5 flex flex-col h-[calc(100vh-10rem)]">
+      <Card strong className="relative overflow-hidden p-5 flex flex-col h-[calc(100vh-10rem)]">
         <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div>
             <SectionLabel>Entity Network</SectionLabel>
@@ -96,20 +99,20 @@ export default function NetworkPage() {
           </div>
         </div>
 
-        <div className="relative mt-5 flex-1 w-full overflow-hidden rounded-3xl border border-hairline bg-[radial-gradient(ellipse_at_top,theme(colors.white),theme(colors.slate.50))]">
+        <div className="relative mt-5 flex-1 w-full overflow-hidden rounded-3xl border border-hairline bg-surface-2">
           {/* dotted grid */}
-          <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-60" aria-hidden>
+          <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-60 text-foreground" aria-hidden>
             <defs>
               <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
-                <circle cx="1" cy="1" r="1" fill="#0f172a" fillOpacity="0.06" />
+                <circle cx="1" cy="1" r="1" fill="currentColor" fillOpacity="0.1" />
               </pattern>
               <radialGradient id="vignette" cx="50%" cy="50%" r="60%">
-                <stop offset="60%" stopColor="white" stopOpacity="0" />
-                <stop offset="100%" stopColor="white" stopOpacity="0.7" />
+                <stop offset="60%" stopColor="currentColor" stopOpacity="0" />
+                <stop offset="100%" stopColor="currentColor" stopOpacity="0.05" />
               </radialGradient>
             </defs>
             <rect width="100%" height="100%" fill="url(#dots)" />
-            <rect width="100%" height="100%" fill="url(#vignette)" />
+            <rect width="100%" height="100%" fill="url(#vignette)" className="text-background" />
           </svg>
 
           {/* graph */}
@@ -140,8 +143,8 @@ export default function NetworkPage() {
                 const isActive = !focusId || e.from === focusId || e.to === focusId;
                 const pathId = `edge-${i}`;
                 return (
-                  <g key={i} className="transition-opacity" style={{ opacity: isActive ? 1 : 0.15 }}>
-                    <path id={pathId} d={path} fill="none" stroke="#0f172a" strokeOpacity={isActive ? 0.35 : 0.2} strokeWidth={isActive ? 1.4 : 1} strokeLinecap="round" />
+                  <g key={i} className="transition-opacity text-foreground" style={{ opacity: isActive ? 1 : 0.15 }}>
+                    <path id={pathId} d={path} fill="none" stroke="currentColor" strokeOpacity={isActive ? 0.35 : 0.2} strokeWidth={isActive ? 1.4 : 1} strokeLinecap="round" />
                     {/* animated pulse dot */}
                     {isActive && (
                       <circle r="3" fill="#C97A1F">
@@ -149,7 +152,7 @@ export default function NetworkPage() {
                       </circle>
                     )}
                     {/* label */}
-                    <text fontSize="10" fill="#475569" className="text-mono" textAnchor="middle" dy="-4">
+                    <text fontSize="10" fill="currentColor" className="text-mono text-muted-foreground" textAnchor="middle" dy="-4">
                       <textPath href={`#${pathId}`} startOffset="50%">{e.label}</textPath>
                     </text>
                   </g>
@@ -180,7 +183,7 @@ export default function NetworkPage() {
                         <animate attributeName="r" values={`${r + 10};${r + 18};${r + 10}`} dur="2.4s" repeatCount="indefinite" />
                       </circle>
                     )}
-                    <circle r={r + 4} fill="white" />
+                    <circle r={r + 4} className="fill-surface-2" />
                     <circle r={r} fill={s.fill} stroke={s.ring} strokeWidth={isFocus ? 2.5 : 1.5} />
                     {/* corner dot indicating kind */}
                     <circle cx={r * 0.7} cy={-r * 0.7} r="4" fill={s.dot} />
@@ -202,13 +205,13 @@ export default function NetworkPage() {
                 className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-opacity"
                 style={{ left: `${n.x}%`, top: `${n.y}%`, opacity: isConnected ? 1 : 0.35 }}
               >
-                <Icon className="h-4 w-4" style={{ color: s.text }} />
+                <Icon className="h-4 w-4" style={{ color: isDark ? s.darkText : s.text }} />
                 <div
                   className={cn(
-                    "mt-8 rounded-full border bg-white px-2 py-0.5 text-[10px] font-medium whitespace-nowrap shadow-sm transition",
+                    "mt-8 rounded-full border bg-surface px-2 py-0.5 text-[10px] font-medium whitespace-nowrap shadow-sm transition",
                     isFocus && "scale-105",
                   )}
-                  style={{ color: s.text, borderColor: s.ring }}
+                  style={{ color: isDark ? s.darkText : s.text, borderColor: s.ring }}
                 >
                   {n.label}
                 </div>
@@ -217,7 +220,7 @@ export default function NetworkPage() {
           })}
 
           {/* Legend */}
-          <div className="absolute bottom-4 left-4 flex flex-wrap items-center gap-1.5 rounded-2xl border border-hairline bg-white/90 p-1.5 shadow-sm backdrop-blur">
+          <div className="absolute bottom-4 left-4 flex flex-wrap items-center gap-1.5 rounded-2xl border border-hairline bg-surface/90 p-1.5 shadow-sm backdrop-blur">
             {(Object.keys(KIND_STYLE) as Kind[]).map((k) => {
               const s = KIND_STYLE[k];
               const active = activeKinds[k];
@@ -229,7 +232,7 @@ export default function NetworkPage() {
                     "flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[11px] font-medium transition",
                     active ? "hover:bg-muted" : "opacity-40",
                   )}
-                  style={{ color: s.text }}
+                  style={{ color: isDark ? s.darkText : s.text }}
                 >
                   <span className="inline-block h-2 w-2 rounded-full" style={{ background: s.dot }} />
                   {s.label}
@@ -240,16 +243,16 @@ export default function NetworkPage() {
           </div>
 
           {/* Stats chip */}
-          <div className="absolute top-4 right-4 flex items-center gap-2 rounded-2xl border border-hairline bg-white/90 px-3 py-1.5 text-[11px] shadow-sm backdrop-blur">
+          <div className="absolute top-4 right-4 flex items-center gap-2 rounded-2xl border border-hairline bg-surface/90 px-3 py-1.5 text-[11px] shadow-sm backdrop-blur">
             <Activity className="h-3 w-3 text-amber" />
             <span className="text-mono text-muted-foreground">{visibleNodes.length} nodes · {visibleEdges.length} links</span>
           </div>
         </div>
-      </GlassPanel>
+      </Card>
 
       {/* Right rail */}
       <div className="flex flex-col gap-4 overflow-y-auto">
-        <GlassPanel className="p-5 shrink-0">
+        <Card className="p-5 shrink-0">
           <SectionLabel>Overview</SectionLabel>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <StatTile label="Entities" value={NETWORK.nodes.length} />
@@ -257,9 +260,9 @@ export default function NetworkPage() {
             <StatTile label="Cases" value={kindCounts.Case} tone="amber" />
             <StatTile label="Suspects" value={kindCounts.Person} />
           </div>
-        </GlassPanel>
+        </Card>
 
-        <GlassPanel className="p-5 shrink-0">
+        <Card className="p-5 shrink-0">
           <div className="flex items-center justify-between">
             <SectionLabel>Selection</SectionLabel>
             {selected && (
@@ -310,13 +313,13 @@ export default function NetworkPage() {
               </div>
             </div>
           )}
-        </GlassPanel>
+        </Card>
 
-        <GlassPanel className="p-5 shrink-0">
+        <Card className="p-5 shrink-0">
           <SectionLabel>Filters</SectionLabel>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {(Object.keys(KIND_STYLE) as Kind[]).map((k) => (
-              <GlassPill
+              <Badge
                 key={k}
                 tone={activeKinds[k] ? "neutral" : "muted"}
                 className={cn("cursor-pointer transition", !activeKinds[k] && "opacity-50")}
@@ -325,10 +328,10 @@ export default function NetworkPage() {
                   <span className="h-1.5 w-1.5 rounded-full" style={{ background: KIND_STYLE[k].dot }} />
                   {k}
                 </button>
-              </GlassPill>
+              </Badge>
             ))}
           </div>
-        </GlassPanel>
+        </Card>
       </div>
     </div>
   );

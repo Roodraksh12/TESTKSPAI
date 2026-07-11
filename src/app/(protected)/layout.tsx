@@ -1,4 +1,5 @@
-import { TopNav, Dock, LeftRail } from "@/components/scrb/shell";
+import { Header, Sidebar } from "@/components/scrb/shell";
+import { FloatingCopilot } from "@/components/scrb/floating-copilot";
 
 export default function ProtectedLayout({
   children,
@@ -6,13 +7,17 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative min-h-screen">
-      <TopNav />
-      <LeftRail />
-      <main className="mx-auto max-w-[1400px] px-4 pt-24 pb-28 sm:px-6 md:pl-24 lg:pl-24">
-        {children}
-      </main>
-      <Dock />
+    <div className="flex h-screen overflow-hidden bg-background relative">
+      <Sidebar />
+      <div className="flex flex-1 flex-col min-w-0">
+        <Header />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <div className="mx-auto max-w-7xl h-full pb-24">
+            {children}
+          </div>
+        </main>
+      </div>
+      <FloatingCopilot />
     </div>
   );
 }

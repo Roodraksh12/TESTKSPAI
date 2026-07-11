@@ -5,57 +5,59 @@
 
 @layer base {
   :root {
-    --radius: 1.25rem;
+    --radius: 0.5rem;
 
-    /* Light, soft-neutral palette */
-    --ink: oklch(0.2 0.02 250);
-    --ink-2: oklch(0.35 0.02 250);
-    --amber: oklch(0.66 0.19 35);
-    --amber-soft: oklch(0.58 0.18 35);
-    --teal: oklch(0.55 0.08 210);
-    --teal-soft: oklch(0.96 0.02 180);
+    /* Professional Solid Palette */
+    --background: oklch(0.97 0 0); /* Slate 50/100ish */
+    --foreground: oklch(0.25 0 0); /* Dark slate grey */
+    --muted: oklch(0.94 0 0);
+    --muted-foreground: oklch(0.45 0 0);
+    --hairline: oklch(0.88 0 0); /* Darker border for clear separation */
+    
+    --surface: oklch(1 0 0); /* Pure white */
+    --surface-2: oklch(0.98 0 0);
 
-    --background: oklch(0.975 0 0); /* #f4f4f5 */
-    --foreground: oklch(0.22 0.02 250);
+    /* Deep authoritative blue for Police theme */
+    --ink: oklch(0.3 0.1 260); /* Navy / Police Blue */
+    --ink-2: oklch(0.4 0.1 260);
+    
+    --teal: oklch(0.55 0.1 210);
+    --teal-soft: oklch(0.92 0.05 210);
+    
+    --amber: oklch(0.65 0.18 45);
+    --amber-soft: oklch(0.95 0.1 50);
 
-    --surface: oklch(1 0 0);
-    --surface-2: oklch(0.98 0.005 255);
-    --hairline: oklch(0.92 0.006 255);
+    --danger: oklch(0.55 0.2 25);
+    --danger-soft: oklch(0.95 0.08 25);
 
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.22 0.02 250);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.22 0.02 250);
-
-    --primary: oklch(0.2 0.02 250); /* Dark slate for primary buttons */
     --font-display: "Montserrat", ui-sans-serif, system-ui, sans-serif;
     --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   }
-}
 
-:root {
-  /* Colors */
-  --surface: oklab(1 0 0);
-  --surface-2: oklab(0.98 0 0);
-  --background: oklab(0.97 0 0); /* very light gray */
-  
-  --foreground: oklab(0.2 0 0);
-  --muted-foreground: oklab(0.5 0 0);
-  --muted: oklab(0.95 0 0);
-  --hairline: oklab(0.92 0 0);
-  
-  --ink: oklab(0.15 0 0);
-  
-  /* Brand accents */
-  --teal: oklab(0.65 -0.1 0.05);
-  --teal-soft: oklab(0.96 -0.02 0.01); /* #eaf3f1 */
-  --amber: oklab(0.75 0.1 0.15);
-  --amber-soft: oklab(0.94 0.05 0.08);
-  --danger: oklab(0.65 0.15 0.1);
-  --danger-soft: oklab(0.96 0.04 0.02);
+  .dark {
+    --background: oklch(0.12 0.01 260); /* Deeper slate */
+    --foreground: oklch(0.95 0 0); /* Off white */
+    --muted: oklch(0.18 0.02 260);
+    --muted-foreground: oklch(0.65 0.02 260);
+    --hairline: oklch(0.22 0.02 260); 
+    
+    --surface: oklch(0.15 0.01 260); /* Slightly lighter than background */
+    --surface-2: oklch(0.20 0.01 260);
 
-  --radius: 1rem;
+    /* Keep accents deep but slightly more luminous for dark mode */
+    --ink: oklch(0.45 0.12 260); 
+    --ink-2: oklch(0.35 0.12 260);
+    
+    --teal: oklch(0.55 0.12 210);
+    --teal-soft: oklch(0.85 0.08 210); /* Soft teal text/bg */
+    
+    --amber: oklch(0.65 0.18 45);
+    --amber-soft: oklch(0.85 0.12 50);
+
+    --danger: oklch(0.55 0.2 25);
+    --danger-soft: oklch(0.85 0.1 25);
+  }
 }
 
 @theme inline {
@@ -104,7 +106,7 @@
 
   h1, h2, h3, h4 {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     font-weight: 700;
   }
 
@@ -117,36 +119,38 @@
 }
 
 @layer utilities {
-  /* Soft card — the workhorse surface */
+  /* Solid professional card */
   .glass {
     background: var(--surface);
     border: 1px solid var(--hairline);
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   }
 
   .glass-strong {
     background: var(--surface);
     border: 1px solid var(--hairline);
-    box-shadow: var(--shadow-lift);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   }
 
   .glass-teal {
-    background: color-mix(in oklab, var(--teal) 10%, white);
-    border: 1px solid color-mix(in oklab, var(--teal) 22%, var(--hairline));
+    background: var(--surface);
+    border: 1px solid color-mix(in oklab, var(--teal) 40%, var(--hairline));
     color: var(--foreground);
+    border-left: 4px solid var(--teal);
   }
 
-  /* Dark contrast card — like the reference income tracker hero */
+  /* Dark contrast card */
   .glass-ink {
-    background: oklch(0.2 0.02 250);
-    border: 1px solid oklch(0.28 0.02 250);
+    background: var(--ink);
+    border: 1px solid var(--ink-2);
     color: white;
   }
 
   .glass-amber {
-    background: color-mix(in oklab, var(--amber) 12%, white);
-    border: 1px solid color-mix(in oklab, var(--amber) 30%, var(--hairline));
-    color: var(--amber-soft);
+    background: var(--surface);
+    border: 1px solid color-mix(in oklab, var(--amber) 40%, var(--hairline));
+    color: var(--foreground);
+    border-left: 4px solid var(--amber);
   }
 
   .text-mono {
@@ -174,12 +178,12 @@
   background: var(--background);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--surface);
+  background: var(--muted-foreground);
   border: 1px solid var(--hairline);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
+  background: var(--ink);
 }
 
 /* Hide Google Translate Banner and Popups */

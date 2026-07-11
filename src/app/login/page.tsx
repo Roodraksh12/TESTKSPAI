@@ -5,9 +5,9 @@ import { signIn } from "next-auth/react";
 import { Fingerprint, ShieldCheck, ArrowRight, Lock, Sparkles, FileSearch, Radio, Scale } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
-  GlassButton,
-  GlassInput,
-  GlassSelect,
+  Button,
+  Input,
+  Select,
 } from "@/components/scrb/primitives";
 import { SealMark } from "@/components/scrb/insignia";
 
@@ -106,21 +106,21 @@ export default function LoginPage() {
                     <label className="mb-1 block text-[11px] font-medium tracking-wide text-muted-foreground">
                       District
                     </label>
-                    <GlassSelect value={district} onChange={(e) => setDistrict(e.target.value)}>
+                    <Select value={district} onChange={(e) => setDistrict(e.target.value)}>
                       {DISTRICTS.map((d) => (
                         <option key={d} value={d}>{d}</option>
                       ))}
-                    </GlassSelect>
+                    </Select>
                   </div>
                   <div>
                     <label className="mb-1 block text-[11px] font-medium tracking-wide text-muted-foreground">
                       Station
                     </label>
-                    <GlassSelect value={station} onChange={(e) => setStation(e.target.value)}>
+                    <Select value={station} onChange={(e) => setStation(e.target.value)}>
                       {STATIONS.map((s) => (
                         <option key={s} value={s}>{s}</option>
                       ))}
-                    </GlassSelect>
+                    </Select>
                   </div>
                 </div>
 
@@ -129,7 +129,7 @@ export default function LoginPage() {
                     Badge ID
                   </label>
                   <div className="relative">
-                    <GlassInput
+                    <Input
                       value={badgeId}
                       onChange={(e) => setBadgeId(e.target.value)}
                       placeholder="KA-00000"
@@ -144,7 +144,7 @@ export default function LoginPage() {
                     Password
                   </label>
                   <div className="relative">
-                    <GlassInput
+                    <Input
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -159,9 +159,9 @@ export default function LoginPage() {
 
                 <div className="pt-2">
                   <MagneticButton>
-                    <GlassButton variant="primary" size="lg" className="w-full" disabled={submitting}>
+                    <Button variant="primary" size="lg" className="w-full" disabled={submitting}>
                       {submitting ? "Verifying badge…" : (<>Enter workspace <ArrowRight className="h-4 w-4" /></>)}
-                    </GlassButton>
+                    </Button>
                   </MagneticButton>
                   <button
                     type="button"

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Clock, FileText, MapPin } from "lucide-react";
 import { CASES, type CaseRecord, type CaseStatus } from "@/lib/scrb/mock";
-import { GlassPill } from "./primitives";
+import { Badge } from "./primitives";
 import { cn } from "@/lib/utils";
 
 const STATUS_TONE: Record<CaseStatus, "teal" | "amber" | "muted" | "danger"> = {
@@ -13,7 +13,7 @@ const STATUS_TONE: Record<CaseStatus, "teal" | "amber" | "muted" | "danger"> = {
 
 export function CaseLedger({ compact = false, cases = CASES }: { compact?: boolean, cases?: any[] }) {
   return (
-    <div className="bg-white flex h-[calc(100vh-13rem)] min-h-[560px] flex-col rounded-3xl p-5 min-w-0 border border-hairline shadow-sm">
+    <div className="bg-surface flex h-[calc(100vh-13rem)] min-h-[560px] flex-col rounded-3xl p-5 min-w-0 border border-hairline shadow-sm">
       <div className="flex items-center justify-between px-1">
         <div>
           <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
@@ -21,7 +21,7 @@ export function CaseLedger({ compact = false, cases = CASES }: { compact?: boole
           </p>
           <p className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">Assigned to you</p>
         </div>
-        <GlassPill tone="muted">{cases.length} cases</GlassPill>
+        <Badge tone="muted">{cases.length} cases</Badge>
       </div>
       <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1 custom-scrollbar">
         {cases.map((c) => <CaseCard key={c.id} c={c} compact={compact} />)}
@@ -65,7 +65,7 @@ export function CaseCard({ c, compact }: { c: any; compact?: boolean }) {
           <p className="text-mono text-[11px] tracking-wider text-muted-foreground">{firNumber}</p>
           <p className="mt-1 truncate text-sm font-medium">{title}</p>
         </div>
-        <GlassPill tone={statusTone}>{statusText}</GlassPill>
+        <Badge tone={statusTone}>{statusText}</Badge>
       </div>
       {!compact && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">

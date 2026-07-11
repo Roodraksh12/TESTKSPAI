@@ -54,7 +54,7 @@ export default function ChargesheetPage({ params }: { params: { id: string } }) 
             </div>
           </div>
           {!isGenerating && !error && (
-            <Button onClick={handlePrint} className="bg-white text-[var(--deep-green)] hover:bg-[var(--soft-stone)] flex items-center gap-2 h-12 px-6 rounded-[8px] text-[16px] font-medium">
+            <Button onClick={handlePrint} className="bg-surface text-[var(--deep-green)] hover:bg-[var(--soft-stone)] flex items-center gap-2 h-12 px-6 rounded-[8px] text-[16px] font-medium">
               <Printer className="w-5 h-5" /> Print / Export PDF
             </Button>
           )}
@@ -65,7 +65,7 @@ export default function ChargesheetPage({ params }: { params: { id: string } }) 
       <div className="max-w-4xl mx-auto p-8 relative z-10 pb-32">
         {isGenerating ? (
           <div className="surface-stone rounded-[24px] p-24 flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-8 shadow-sm">
+            <div className="w-20 h-20 bg-surface rounded-full flex items-center justify-center mb-8 shadow-sm">
               <Loader2 className="w-10 h-10 text-[var(--action-blue)] animate-spin" />
             </div>
             <h2 className="text-[24px] font-medium text-[var(--ink)] mb-4 tracking-tight">Drafting Legal Document...</h2>
@@ -93,7 +93,7 @@ export default function ChargesheetPage({ params }: { params: { id: string } }) 
               </div>
             </div>
 
-            <div className="bg-white p-12 rounded-[8px] border border-[var(--border-light)] shadow-sm prose prose-slate max-w-none text-[16px] leading-[1.8] print:shadow-none print:border-none print:p-0 font-serif">
+            <div className="bg-surface p-12 rounded-[8px] border border-[var(--border-light)] shadow-sm prose prose-slate max-w-none text-[16px] leading-[1.8] print:shadow-none print:border-none print:p-0 font-serif">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {chargesheet}
               </ReactMarkdown>

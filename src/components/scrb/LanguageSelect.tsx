@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GlassSelect, GlassButton } from "./primitives";
+import { Select, Button } from "./primitives";
 
 export function LanguageSelect() {
   const [lang, setLang] = useState("EN");
@@ -31,14 +31,14 @@ export function LanguageSelect() {
 
   return (
     <div className="flex items-center gap-3">
-      <GlassSelect value={lang} onChange={handleChange} className="flex-1">
+      <Select value={lang} onChange={handleChange} className="flex-1">
         <option value="EN" className="bg-surface text-foreground">English</option>
         <option value="KN" className="bg-surface text-foreground">ಕನ್ನಡ · Kannada</option>
-      </GlassSelect>
+      </Select>
       {hasChanges && (
-        <GlassButton variant="primary" onClick={applyLanguage}>
+        <Button variant="primary" onClick={applyLanguage}>
           Apply
-        </GlassButton>
+        </Button>
       )}
     </div>
   );

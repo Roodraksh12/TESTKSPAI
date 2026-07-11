@@ -14,16 +14,20 @@ export const metadata: Metadata = {
   description: "Intelligent Conversational AI for KSP Crime Database",
 };
 
+import { ThemeProvider } from "@/components/theme-provider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", montserrat.variable)}>
-      <body className="antialiased bg-[#f4f4f5]">
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", montserrat.variable)}>
+      <body className="antialiased bg-background text-foreground">
         <NextTopLoader color="#0D9488" showSpinner={false} shadow="0 0 10px #0D9488,0 0 5px #0D9488" />
-        <Providers>{children}</Providers>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+          <Providers>{children}</Providers>
+        </ThemeProvider>
         <Script
           src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
           strategy="afterInteractive"

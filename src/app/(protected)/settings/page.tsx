@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
-import { GlassPanel, GlassPill, SectionLabel, GlassSelect } from "@/components/scrb/primitives"
+import { Card, Badge, SectionLabel, Select } from "@/components/scrb/primitives"
 import { LanguageSelect } from "@/components/scrb/LanguageSelect"
 import { Scale, ShieldCheck, Globe, ClipboardList } from "lucide-react"
 
@@ -24,14 +24,14 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
-      <GlassPanel strong className="p-6 sm:p-8">
+      <Card strong className="p-6 sm:p-8">
         <SectionLabel>Settings</SectionLabel>
         <h1 className="text-display mt-1 text-3xl">Workspace preferences</h1>
         <p className="mt-1 text-sm text-muted-foreground">Language, jurisdiction, audit, and fairness statement.</p>
-      </GlassPanel>
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <GlassPanel strong className="p-6">
+        <Card strong className="p-6">
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-teal-soft" />
             <SectionLabel>Language</SectionLabel>
@@ -40,22 +40,22 @@ export default async function SettingsPage() {
           <div className="mt-4 max-w-xs">
             <LanguageSelect />
           </div>
-        </GlassPanel>
+        </Card>
 
-        <GlassPanel strong className="p-6">
+        <Card strong className="p-6">
           <div className="flex items-center gap-2">
             <Scale className="h-4 w-4 text-amber-soft" />
             <SectionLabel>Jurisdiction</SectionLabel>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">Restrict queries and results to your assigned station and district.</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <GlassPill tone="teal">{officer?.station.district.name || "District"}</GlassPill>
-            <GlassPill tone="muted">{officer?.station.name || "Station"}</GlassPill>
-            <GlassPill tone="amber">{officer?.role || "OFFICER"}</GlassPill>
+            <Badge tone="teal">{officer?.station.district.name || "District"}</Badge>
+            <Badge tone="muted">{officer?.station.name || "Station"}</Badge>
+            <Badge tone="amber">{officer?.role || "OFFICER"}</Badge>
           </div>
-        </GlassPanel>
+        </Card>
 
-        <GlassPanel strong className="p-6 lg:col-span-2 flex flex-col max-h-[400px]">
+        <Card strong className="p-6 lg:col-span-2 flex flex-col max-h-[400px]">
           <div className="flex items-center gap-2 shrink-0">
             <ClipboardList className="h-4 w-4 text-teal-soft" />
             <SectionLabel>Audit trail</SectionLabel>
@@ -80,9 +80,9 @@ export default async function SettingsPage() {
               })
             )}
           </div>
-        </GlassPanel>
+        </Card>
 
-        <GlassPanel strong className="p-6 lg:col-span-2">
+        <Card strong className="p-6 lg:col-span-2">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-amber-soft" />
             <SectionLabel>Fairness &amp; oversight</SectionLabel>
@@ -90,7 +90,7 @@ export default async function SettingsPage() {
           <p className="mt-3 text-sm leading-relaxed text-foreground">
             SCRB Sahayak surfaces suggestions to support — never replace — an investigator's judgement. All AI-generated conclusions cite source records and expose a confidence score. No arrest, detention or coercive action may be initiated on an AI suggestion alone; human confirmation is required. Every query, source view and confirmation is written to an immutable audit log accessible to supervisory officers and oversight bodies.
           </p>
-        </GlassPanel>
+        </Card>
       </div>
     </div>
   );
