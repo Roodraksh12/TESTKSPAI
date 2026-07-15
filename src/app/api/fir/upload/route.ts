@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import Tesseract from "tesseract.js";
 import OpenAI from "openai";
 import { z } from "zod";
-import prisma from "@/lib/prisma";
+import { findIdentityMatches, findMoSimilarCases } from "@/lib/scrb/intake-intel";
 
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -86,48 +86,48 @@ export async function POST(req: Request) {
       extractedData = extractedDataSchema.parse(JSON.parse(retryCompletion.choices[0].message.content || "{}"));
     }
 
-    // 3. Simple fuzzy match for suggestions
-    const possibleMatches = [];
-    if (extractedData.accusedNames.length > 0) {
-      // Basic check for existing persons with similar names
-      const existingPersons = await prisma.person.findMany({
-        where: {
-          role: "ACCUSED",
-        }
-      });
+    // 3. Identity + MO leads (preview before save; full match persists on case create)
+    const identity = await findIdentityMatches({
+      names: [
+        ...extractedData.accusedNames,
+        ...(extractedData.victimName ? [extractedData.victimName] : []),
+      ],
+      stationId: session.user.stationId,
+    });
 
-      for (const name of extractedData.accusedNames) {
-        for (const person of existingPersons) {
-          if (person.name.toLowerCase().includes(name.toLowerCase().split(' ')[0])) { // Very loose match for demo
-            possibleMatches.push({
-              personId: person.id,
-              name: person.name,
-              reason: `Name similarity: ${name} matches existing record ${person.name}`
-            });
-          }
-        }
-      }
-    }
+    const moSimilar = await findMoSimilarCases({
+      stationId: session.user.stationId,
+      crimeType: extractedData.crimeType,
+      summary: extractedData.narrativeSummary,
+      modusOperandi: extractedData.modusOperandi,
+      take: 4,
+    });
 
-    // 4. M.O. (Modus Operandi) Signature Match (Mocked Predictive AI)
-    if (extractedData.modusOperandi && extractedData.modusOperandi.length > 10) {
-      const moLower = extractedData.modusOperandi.toLowerCase();
-      // If it's a robbery or snatching, simulate finding a serial behavioral pattern
-      if (moLower.includes("bike") || moLower.includes("motorcycle") || moLower.includes("chain") || moLower.includes("weapon")) {
-        possibleMatches.push({
-          personId: null, // Unknown serial offender
-          name: "Unidentified Serial Cluster (East Zone)",
-          reason: `92% Behavioral Signature Match: The described M.O. ('${extractedData.modusOperandi}') closely matches 3 other unsolved cases in this jurisdiction.`,
-          isMoMatch: true
-        });
-      }
-    }
+    const possibleMatches = [
+      ...identity.map((m) => ({
+        personId: m.personId,
+        name: m.name,
+        reason: m.reason,
+        confidenceScore: m.confidenceScore,
+        priorFirNumbers: m.priorFirNumbers,
+        isMoMatch: false,
+      })),
+      ...moSimilar.map((m) => ({
+        personId: null as string | null,
+        matchedCaseId: m.caseId,
+        name: m.firNumber,
+        reason: `MO_SIMILAR: ${m.reason}`,
+        confidenceScore: m.similarityScore,
+        isMoMatch: true,
+      })),
+    ];
 
-    // Return the extracted data to frontend for confirmation
     return NextResponse.json({
       rawText,
       extractedData,
       possibleMatches,
+      identityPreview: identity,
+      moSimilarPreview: moSimilar,
     });
 
   } catch (error) {

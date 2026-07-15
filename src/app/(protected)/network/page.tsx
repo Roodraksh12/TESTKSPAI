@@ -80,8 +80,8 @@ export default function NetworkPage() {
       <Card strong className="relative overflow-hidden p-5 flex flex-col h-[calc(100vh-10rem)]">
         <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div>
-            <SectionLabel>Entity Network</SectionLabel>
-            <h1 className="text-display mt-1 text-2xl">Cross-case linkage canvas</h1>
+            <SectionLabel className="mb-2">Entity Network</SectionLabel>
+            <h1 className="text-display text-2xl">Cross-case linkage canvas</h1>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -252,9 +252,9 @@ export default function NetworkPage() {
 
       {/* Right rail */}
       <div className="flex flex-col gap-4 overflow-y-auto">
-        <Card className="p-5 shrink-0">
-          <SectionLabel>Overview</SectionLabel>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+        <Card accent="teal" className="p-5 shrink-0">
+          <SectionLabel className="mb-3">Overview</SectionLabel>
+          <div className="grid grid-cols-2 gap-2">
             <StatTile label="Entities" value={NETWORK.nodes.length} />
             <StatTile label="Links" value={NETWORK.edges.length} />
             <StatTile label="Cases" value={kindCounts.Case} tone="amber" />
@@ -262,8 +262,8 @@ export default function NetworkPage() {
           </div>
         </Card>
 
-        <Card className="p-5 shrink-0">
-          <div className="flex items-center justify-between">
+        <Card accent="amber" className="p-5 shrink-0">
+          <div className="flex items-center justify-between mb-3">
             <SectionLabel>Selection</SectionLabel>
             {selected && (
               <button onClick={() => setSelectedId(null)} className="rounded-full p-1 text-muted-foreground hover:bg-muted">
@@ -281,7 +281,7 @@ export default function NetworkPage() {
             <div className="mt-3">
               <div className="flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-full" style={{ background: KIND_STYLE[selected.kind].dot }} />
-                <SectionLabel>{selected.kind}</SectionLabel>
+                <SectionLabel className="mb-1">{selected.kind}</SectionLabel>
               </div>
               <p className="text-display mt-1 text-xl leading-tight">{selected.label}</p>
               <p className="mt-2 text-xs text-muted-foreground">
@@ -289,7 +289,7 @@ export default function NetworkPage() {
               </p>
 
               <div className="mt-4 space-y-1.5 max-h-[300px] overflow-y-auto">
-                <SectionLabel>Edges</SectionLabel>
+                <SectionLabel className="mb-2">Edges</SectionLabel>
                 {NETWORK.edges
                   .filter((e) => e.from === selected.id || e.to === selected.id)
                   .map((e, i) => {
@@ -316,8 +316,8 @@ export default function NetworkPage() {
         </Card>
 
         <Card className="p-5 shrink-0">
-          <SectionLabel>Filters</SectionLabel>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <SectionLabel className="mb-3">Filters</SectionLabel>
+          <div className="flex flex-wrap gap-1.5">
             {(Object.keys(KIND_STYLE) as Kind[]).map((k) => (
               <Badge
                 key={k}

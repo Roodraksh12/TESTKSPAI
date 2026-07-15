@@ -1,25 +1,80 @@
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
+type AccentTone = "default" | "teal" | "amber" | "danger" | "ink";
+
+const accentBorders: Record<AccentTone, string> = {
+  default: "",
+  teal: "border-l-4 border-l-teal",
+  amber: "border-l-4 border-l-amber",
+  danger: "border-l-4 border-l-danger",
+  ink: "border-l-4 border-l-ink",
+};
+
 export function Card({
   children,
   className,
+  strong,
+  accent,
 }: {
   children: ReactNode;
   className?: string;
+  strong?: boolean;
+  accent?: AccentTone;
 }) {
   return (
-    <div className={cn("bg-surface border border-hairline shadow-sm rounded-xl", className)}>
+    <div className={cn(
+      "bg-surface border border-hairline shadow-sm rounded-2xl",
+      strong && "shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),_0_2px_4px_-2px_rgb(0_0_0_/_0.1)]",
+      accent && accent !== "default" && accentBorders[accent],
+      className
+    )}>
       {children}
     </div>
   );
+}
+
+export function StatCard({
+  icon: Icon,
+  label,
+  value,
+  tone = "default",
+  className,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | number;
+  tone?: AccentTone;
+  className?: string;
+}) {
+  return (
+    <div className={cn(
+      "flex items-center gap-3 rounded-2xl border border-hairline bg-surface p-4 shadow-sm",
+      className
+    )}>
+      <div className={cn(
+        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+        tone === "teal" ? "bg-teal/10 text-teal" : tone === "amber" ? "bg-amber/10 text-amber" : tone === "danger" ? "bg-danger/10 text-danger" : "bg-surface-2 text-muted-foreground"
+      )}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
+        <p className="text-xl font-bold text-foreground tracking-tight">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+export function Divider({ className }: { className?: string }) {
+  return <div className={cn("border-t border-hairline", className)} />;
 }
 
 export function ActionCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
       className={cn(
-        "bg-surface border border-hairline shadow-sm rounded-xl p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
+        "bg-surface border border-hairline shadow-sm rounded-2xl p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
         className,
       )}
     >
@@ -155,9 +210,40 @@ export function IconOrb({
   );
 }
 
-export function SectionLabel({ children }: { children: ReactNode }) {
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("animate-pulse rounded-xl bg-muted", className)} />;
+}
+
+export function CardSkeleton() {
   return (
-    <h2 className="text-sm font-semibold tracking-wide text-foreground uppercase border-b border-hairline pb-2 mb-4">
+    <div className="bg-surface border border-hairline rounded-2xl p-5 space-y-4">
+      <Skeleton className="h-4 w-1/3" />
+      <Skeleton className="h-8 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <div className="pt-2 space-y-2">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-5/6" />
+      </div>
+    </div>
+  );
+}
+
+export function StatSkeleton() {
+  return (
+    <div className="bg-surface border border-hairline rounded-2xl p-6 space-y-3">
+      <Skeleton className="h-10 w-10 rounded-full" />
+      <Skeleton className="h-3 w-1/2" />
+      <Skeleton className="h-8 w-1/3" />
+    </div>
+  );
+}
+
+export function SectionLabel({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <h2 className={cn(
+      "text-xs font-semibold tracking-[0.08em] text-muted-foreground uppercase",
+      className
+    )}>
       {children}
     </h2>
   );

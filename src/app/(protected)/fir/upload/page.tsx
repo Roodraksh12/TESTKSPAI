@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { UploadCloud, FileText, Check, AlertCircle, Save, Loader2, RefreshCw, ChevronRight, ScanSearch, Sparkles } from "lucide-react";
+import { UploadCloud, FileText, Check, AlertCircle, ChevronRight, ScanSearch, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Card, Badge, Button, Input, IconOrb, SectionLabel } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
+import { useCopilotStore } from "@/lib/store";
 
 const STEPS = [
   { id: "read", label: "Reading document", icon: FileText },
@@ -27,6 +28,7 @@ export default function FIRUploadPage() {
   const [isSaving, setIsSaving] = useState(false);
   
   const router = useRouter();
+  const seedIntakeBrief = useCopilotStore((s) => s.seedIntakeBrief);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -136,8 +138,24 @@ export default function FIRUploadPage() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save case");
-      
-      router.push(`/cases/${data.caseId}/tactical`);
+
+      // Seed Investigation Copilot with post-upload intake brief
+      if (data.intake?.markdown) {
+        seedIntakeBrief({
+          caseId: data.caseId,
+          markdown: data.intake.markdown,
+          actionPrompts: data.intake.actionPrompts,
+          pageContext: JSON.stringify({
+            activeCaseId: data.caseId,
+            firNumber: data.firNumber || data.intake.firNumber,
+            crimeType: data.intake.crimeType,
+            source: "FIR_INTAKE",
+          }),
+        });
+        router.push("/dashboard?intake=1");
+      } else {
+        router.push(`/cases/${data.caseId}`);
+      }
     } catch (err: any) {
       setError(err.message);
       setIsSaving(false);
@@ -157,10 +175,10 @@ export default function FIRUploadPage() {
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
       {phase === "idle" && (
-        <Card strong className="p-8 sm:p-10">
+        <Card accent="amber" className="p-8 sm:p-10">
           <div className="text-center">
-            <SectionLabel>FIR Intake</SectionLabel>
-            <h1 className="text-display mt-1 text-3xl">Upload a First Information Report</h1>
+            <SectionLabel className="mb-2">FIR Intake</SectionLabel>
+            <h1 className="text-display text-3xl">Upload a First Information Report</h1>
             <p className="mt-2 text-sm text-muted-foreground">Sahayak will read, extract entities, search for prior matches and draft a summary.</p>
           </div>
 
@@ -243,9 +261,9 @@ export default function FIRUploadPage() {
       )}
 
       {phase === "running" && (
-        <Card strong className="p-6">
-          <SectionLabel>Extraction pipeline</SectionLabel>
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        <Card accent="teal" className="p-6">
+          <SectionLabel className="mb-4">Extraction pipeline</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             {STEPS.map((s, i) => {
               const active = i === currentStep;
               const done = i < currentStep;
@@ -259,7 +277,7 @@ export default function FIRUploadPage() {
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <IconOrb tone={done ? "teal" : active ? "amber" : "glass"} size="sm">
+                    <IconOrb tone={done ? "teal" : active ? "amber" : "neutral"} size="sm">
                       {done ? <Check className="h-3.5 w-3.5" /> : <s.icon className="h-3.5 w-3.5" />}
                     </IconOrb>
                     <p className="text-sm font-medium">{s.label}</p>
@@ -275,14 +293,14 @@ export default function FIRUploadPage() {
       )}
 
       {phase === "done" && extractedData && (
-        <Card strong className="p-6 sm:p-8">
+        <Card accent="teal" className="p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <SectionLabel>Extracted fields · Editable</SectionLabel>
-              <h2 className="text-display mt-1 text-xl">Draft FIR record</h2>
+              <SectionLabel className="mb-2">Extracted fields · Editable</SectionLabel>
+              <h2 className="text-display text-xl">Draft FIR record</h2>
             </div>
             <div className="flex gap-2">
-              <Button variant="glass" size="sm" onClick={resetForm} disabled={isSaving}>Reject</Button>
+              <Button variant="secondary" size="sm" onClick={resetForm} disabled={isSaving}>Reject</Button>
               <Button variant="primary" size="sm" onClick={handleSave} disabled={isSaving}>
                 {isSaving ? "Saving..." : "Confirm & save"}
               </Button>
@@ -336,17 +354,29 @@ export default function FIRUploadPage() {
                 className="w-full bg-surface border border-hairline rounded-[16px] focus:outline-none focus:ring-1 focus:ring-amber p-4 text-sm leading-relaxed"
               />
             </div>
+            <div className="md:col-span-2">
+              <label className="text-mono mb-1 block text-[10px] tracking-widest text-muted-foreground uppercase">Modus operandi</label>
+              <Input
+                value={extractedData.modusOperandi || ""}
+                onChange={e => setExtractedData({ ...extractedData, modusOperandi: e.target.value })}
+                placeholder="e.g. two-wheeler snatch on arterial road at night"
+              />
+            </div>
           </form>
 
           {possibleMatches.length > 0 && (
             <div className="glass-amber mt-5 rounded-3xl p-4">
               <p className="text-xs text-amber-soft flex items-center gap-1 font-semibold">
-                <AlertCircle className="w-3 h-3" /> System Alerts
+                <AlertCircle className="w-3 h-3" /> Pre-save leads (confirm after save in Copilot / Matches)
               </p>
               <ul className="mt-2 space-y-2">
                 {possibleMatches.map((match, i) => (
                   <li key={i} className="text-sm">
-                    <strong>{match.name}:</strong> {match.reason}
+                    <strong>{match.name}</strong>
+                    {match.confidenceScore != null && (
+                      <span className="text-mono text-[11px] text-muted-foreground"> · {match.confidenceScore}%</span>
+                    )}
+                    : {match.reason}
                   </li>
                 ))}
               </ul>

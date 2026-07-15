@@ -21,20 +21,20 @@ export default async function HotspotsPage() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
-      <Card strong className="relative overflow-hidden p-6 flex flex-col h-[calc(100vh-10rem)]">
-        <SectionLabel>Live Hotspots</SectionLabel>
-        <h1 className="text-display mt-1 text-2xl">Risk map</h1>
+      <Card accent="danger" className="relative overflow-hidden p-6 flex flex-col h-[calc(100vh-10rem)]">
+        <SectionLabel className="mb-2">Live Hotspots</SectionLabel>
+        <h1 className="text-display text-2xl">Risk map</h1>
         <p className="mt-2 text-sm text-muted-foreground">Predictive risk assessment and spatial anomalies.</p>
         
         <div className="relative mt-5 flex-1 w-full overflow-hidden rounded-3xl border border-hairline bg-surface/50 flex flex-col">
-          <HotspotMap alerts={alerts} />
+          <HotspotMap />
         </div>
       </Card>
 
       <div className="space-y-6">
-        <Card strong className="p-6">
-          <SectionLabel>Risk ranking</SectionLabel>
-          <div className="mt-4 space-y-3">
+        <Card accent="amber" className="p-6">
+          <SectionLabel className="mb-3">Risk ranking</SectionLabel>
+          <div className="space-y-3">
             {alerts.length === 0 ? (
               <p className="text-sm text-muted-foreground">No active hotspot alerts for your jurisdiction.</p>
             ) : (
@@ -63,9 +63,9 @@ export default async function HotspotsPage() {
           </div>
         </Card>
 
-        <Card strong className="p-6">
-          <SectionLabel>7-day trend</SectionLabel>
-          <svg viewBox="0 0 200 60" className="mt-4 h-24 w-full">
+        <Card className="p-6">
+          <SectionLabel className="mb-3">7-day trend</SectionLabel>
+          <svg viewBox="0 0 200 60" className="h-24 w-full">
             <defs>
               <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
                 <stop offset="0%" stopColor="rgba(46,143,143,0.55)" />

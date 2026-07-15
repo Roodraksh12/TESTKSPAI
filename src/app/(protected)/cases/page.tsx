@@ -94,11 +94,14 @@ export default async function CasesPage({
       <CasesFilter stations={stations} />
 
       {formattedCases.length === 0 ? (
-        <div className="flex h-64 items-center justify-center rounded-2xl border border-hairline bg-surface shadow-sm">
-          <p className="text-muted-foreground">No cases found matching your filters.</p>
+        <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-hairline bg-surface-2 shadow-sm">
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">No cases found matching your filters.</p>
+            <p className="text-xs text-muted-foreground/60">Try adjusting your search or filter criteria.</p>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
           {formattedCases.map((c) => (
             <CaseCard key={c.id} c={c} />
           ))}

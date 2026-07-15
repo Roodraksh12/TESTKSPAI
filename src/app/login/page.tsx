@@ -10,6 +10,7 @@ import {
   Select,
 } from "@/components/scrb/primitives";
 import { SealMark } from "@/components/scrb/insignia";
+import { ModeToggle } from "@/components/scrb/mode-toggle";
 
 const DISTRICTS = [
   "Bengaluru City",
@@ -60,7 +61,8 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
+    <main className="relative min-h-screen overflow-hidden bg-background text-foreground transition-colors">
+      <ModeToggle className="fixed right-6 top-6" />
       <AmbientCursor />
       <div className="relative mx-auto grid min-h-screen max-w-[1400px] grid-cols-1 items-center gap-10 px-6 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-12">
         {/* LEFT — interactive hero */}
@@ -233,10 +235,10 @@ function AmbientCursor() {
         }}
       />
       <div
-        className="absolute inset-0 opacity-[0.5]"
+        className="absolute inset-0 opacity-[0.08] dark:opacity-10 text-[#0f172a] dark:text-white"
         style={{
           backgroundImage:
-            "radial-gradient(rgba(15,23,42,0.08) 1px, transparent 1px)",
+            "radial-gradient(currentColor 1px, transparent 1px)",
           backgroundSize: "22px 22px",
           maskImage:
             "radial-gradient(ellipse 60% 60% at var(--mx) var(--my), black 20%, transparent 75%)",

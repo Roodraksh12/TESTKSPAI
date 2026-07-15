@@ -24,16 +24,16 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
-      <Card strong className="p-6 sm:p-8">
-        <SectionLabel>Settings</SectionLabel>
-        <h1 className="text-display mt-1 text-3xl">Workspace preferences</h1>
+      <Card className="p-6 sm:p-8">
+        <SectionLabel className="mb-2">Settings</SectionLabel>
+        <h1 className="text-display text-3xl">Workspace preferences</h1>
         <p className="mt-1 text-sm text-muted-foreground">Language, jurisdiction, audit, and fairness statement.</p>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card strong className="p-6">
-          <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-teal-soft" />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <Card accent="teal" className="p-6">
+          <div className="flex items-center gap-2 border-b border-hairline pb-2 mb-4">
+            <Globe className="h-4 w-4 text-teal" />
             <SectionLabel>Language</SectionLabel>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">Interface language for menus, prompts and generated summaries.</p>
@@ -42,9 +42,9 @@ export default async function SettingsPage() {
           </div>
         </Card>
 
-        <Card strong className="p-6">
-          <div className="flex items-center gap-2">
-            <Scale className="h-4 w-4 text-amber-soft" />
+        <Card accent="amber" className="p-6">
+          <div className="flex items-center gap-2 border-b border-hairline pb-2 mb-4">
+            <Scale className="h-4 w-4 text-amber" />
             <SectionLabel>Jurisdiction</SectionLabel>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">Restrict queries and results to your assigned station and district.</p>
@@ -55,9 +55,9 @@ export default async function SettingsPage() {
           </div>
         </Card>
 
-        <Card strong className="p-6 lg:col-span-2 flex flex-col max-h-[400px]">
-          <div className="flex items-center gap-2 shrink-0">
-            <ClipboardList className="h-4 w-4 text-teal-soft" />
+        <Card accent="teal" className="p-6 lg:col-span-2 flex flex-col max-h-[400px]">
+          <div className="flex items-center gap-2 shrink-0 border-b border-hairline pb-2 mb-4">
+            <ClipboardList className="h-4 w-4 text-teal" />
             <SectionLabel>Audit trail</SectionLabel>
           </div>
           <div className="mt-4 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
@@ -82,9 +82,9 @@ export default async function SettingsPage() {
           </div>
         </Card>
 
-        <Card strong className="p-6 lg:col-span-2">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-amber-soft" />
+        <Card className="p-6 lg:col-span-2">
+          <div className="flex items-center gap-2 border-b border-hairline pb-2 mb-4">
+            <ShieldCheck className="h-4 w-4 text-amber" />
             <SectionLabel>Fairness &amp; oversight</SectionLabel>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-foreground">

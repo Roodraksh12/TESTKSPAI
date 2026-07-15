@@ -296,7 +296,7 @@ ANALYSIS COMPLETE.`;
                           animate={{ opacity: 1, x: 0 }}
                           className={`text-sm ${i === investigationStep ? 'text-white' : 'text-green-600'}`}
                         >
-                          > {log}
+                          {'>'} {log}
                         </motion.p>
                       ))}
                     </div>

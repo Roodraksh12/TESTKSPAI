@@ -25,7 +25,7 @@ export function CopilotSidebar({ open, onClose }: { open: boolean; onClose: () =
         content: "Namaskara. I am the SCRB Investigation Copilot. I can see the page you are viewing. How can I assist you?",
       }
     ]
-  });
+  } as any) as any;
 
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -117,7 +117,7 @@ export function CopilotSidebar({ open, onClose }: { open: boolean; onClose: () =
 
         {/* Messages */}
         <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
-          {messages.map((m) => <MessageBubble key={m.id} m={m} />)}
+          {messages.map((m: any) => <MessageBubble key={m.id} m={m} />)}
           {isLoading && messages[messages.length - 1]?.role === "user" && <TypingShimmer />}
           <div ref={endRef} />
         </div>
@@ -148,8 +148,9 @@ export function CopilotSidebar({ open, onClose }: { open: boolean; onClose: () =
               id="scrb-file-upload" 
               className="hidden" 
               onChange={(e) => {
-                if (e.target.files && e.target.files.length > 0) {
-                  setInput((prev) => (prev ? prev + " " : "") + `[Attached: ${e.target.files[0].name}] `);
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  setInput((prev: any) => (prev ? prev + " " : "") + `[Attached: ${files[0].name}] `);
                 }
               }}
             />

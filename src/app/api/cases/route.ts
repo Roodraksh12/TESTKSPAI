@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import {
+  buildCaseIntakeBrief,
+  packSummaryWithMo,
+  persistIntakeMatches,
+} from "@/lib/scrb/intake-intel";
 
 export async function POST(req: Request) {
   try {
@@ -11,18 +16,23 @@ export async function POST(req: Request) {
     }
 
     const data = await req.json();
-    
-    // Generate a new FIR Number (mock generation logic)
+
     const count = await prisma.case.count({ where: { stationId: session.user.stationId } });
     const year = new Date().getFullYear();
-    const firNumber = `FIR/${year}/${String(count + 1).padStart(4, '0')}`;
-    
+    const firNumber = `FIR/${year}/${String(count + 1).padStart(4, "0")}`;
+
     let incidentDate = new Date();
     try {
-      if (data.incidentDate && data.incidentDate !== 'Unknown') {
+      if (data.incidentDate && data.incidentDate !== "Unknown") {
         incidentDate = new Date(data.incidentDate);
       }
-    } catch (e) {}
+    } catch {
+      /* keep now */
+    }
+
+    const narrative = data.narrativeSummary || data.summary || "";
+    const modusOperandi = data.modusOperandi || null;
+    const summary = packSummaryWithMo(narrative, modusOperandi);
 
     const newCase = await prisma.case.create({
       data: {
@@ -31,45 +41,42 @@ export async function POST(req: Request) {
         crimeType: data.crimeType || "Unknown",
         status: "OPEN",
         incidentDate,
-        summary: data.narrativeSummary,
+        summary,
         rawExtractedText: data.rawText,
         createdFromScan: true,
-      }
+      },
     });
 
-    // Process People (Accused and Victim)
-    const accusedPersonIds = [];
+    const accusedPersonIds: string[] = [];
     for (const name of data.accusedNames || []) {
-      if (!name.trim()) continue;
-      
-      // 1. Entity Resolution: Check if person already exists
+      if (!name?.trim()) continue;
+
       let person = await prisma.person.findFirst({
-        where: { name: { equals: name, mode: 'insensitive' } }
+        where: { name: { equals: name, mode: "insensitive" } },
       });
 
       if (!person) {
         person = await prisma.person.create({
-          data: { name, role: "ACCUSED" }
+          data: { name, role: "ACCUSED" },
         });
       }
 
       await prisma.casePerson.create({
-        data: { caseId: newCase.id, personId: person.id, role: "ACCUSED" }
+        data: { caseId: newCase.id, personId: person.id, role: "ACCUSED" },
       });
-      
+
       accusedPersonIds.push(person.id);
     }
 
-    // 2. Create connections (CO_ACCUSED) between all accused in this case
     for (let i = 0; i < accusedPersonIds.length; i++) {
       for (let j = i + 1; j < accusedPersonIds.length; j++) {
         const existingConn = await prisma.connection.findFirst({
           where: {
             OR: [
               { personAId: accusedPersonIds[i], personBId: accusedPersonIds[j] },
-              { personAId: accusedPersonIds[j], personBId: accusedPersonIds[i] }
-            ]
-          }
+              { personAId: accusedPersonIds[j], personBId: accusedPersonIds[i] },
+            ],
+          },
         });
 
         if (!existingConn) {
@@ -78,57 +85,59 @@ export async function POST(req: Request) {
               personAId: accusedPersonIds[i],
               personBId: accusedPersonIds[j],
               relationType: "CO_ACCUSED",
-              sourceCaseId: newCase.id
-            }
+              sourceCaseId: newCase.id,
+            },
           });
         }
       }
     }
 
-    if (data.victimName && data.victimName !== 'null') {
+    if (data.victimName && data.victimName !== "null") {
       let person = await prisma.person.findFirst({
-        where: { name: { equals: data.victimName, mode: 'insensitive' } }
+        where: { name: { equals: data.victimName, mode: "insensitive" } },
       });
 
       if (!person) {
         person = await prisma.person.create({
-          data: { name: data.victimName, role: "VICTIM" }
+          data: { name: data.victimName, role: "VICTIM" },
         });
       }
-      
+
       await prisma.casePerson.create({
-        data: { caseId: newCase.id, personId: person.id, role: "VICTIM" }
+        data: { caseId: newCase.id, personId: person.id, role: "VICTIM" },
       });
     }
 
-    // Process Matches
-    if (data.possibleMatches && data.possibleMatches.length > 0) {
-      for (const match of data.possibleMatches) {
-        await prisma.caseMatch.create({
-          data: {
-            caseId: newCase.id,
-            matchedPersonId: match.personId || null,
-            confidenceScore: match.isMoMatch ? 92 : 75,
-            status: "PENDING",
-            reason: match.reason
-          }
-        });
-      }
-    }
+    // Server-side identity + MO matching (real DB) — authoritative
+    await persistIntakeMatches({
+      caseId: newCase.id,
+      stationId: session.user.stationId,
+      accusedNames: data.accusedNames || [],
+      victimName: data.victimName,
+      crimeType: data.crimeType || "Unknown",
+      summary,
+      modusOperandi,
+    });
 
-    // Log the audit
     await prisma.auditLog.create({
       data: {
         officerId: session.user.id,
         action: "CREATE_CASE",
         targetType: "CASE",
         targetId: newCase.id,
-        details: `Created via FIR Scan: ${firNumber}`
-      }
+        details: `Created via FIR Scan: ${firNumber}`,
+      },
     });
 
-    return NextResponse.json({ success: true, caseId: newCase.id });
+    const isSp = session.user.role === "SP";
+    const intake = await buildCaseIntakeBrief(newCase.id, session.user.stationId, { isSp });
 
+    return NextResponse.json({
+      success: true,
+      caseId: newCase.id,
+      firNumber,
+      intake: "error" in intake ? null : intake,
+    });
   } catch (error) {
     console.error("Create Case Error:", error);
     return NextResponse.json({ error: "Failed to save the case." }, { status: 500 });
