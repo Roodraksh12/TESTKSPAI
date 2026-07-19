@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+httpx
+PyJWT
+python-dotenv
+pytest
+python-multipart
+pytesseract
+pillow
+pymupdf
+psycopg[binary]
+psycopg_pool
+bcrypt

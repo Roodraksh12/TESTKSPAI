@@ -1,0 +1,364 @@
+/**
+ * English / Kannada strings for the interface.
+ *
+ * Deliberately a local dictionary rather than a translation service: this app
+ * displays case records, and routing that text through a third party to render
+ * a menu label is not an acceptable trade for a police system. It also means
+ * the language toggle keeps working with no network at all.
+ *
+ * Scope is the interface only. Record content — case summaries, names, FIR
+ * numbers, OCR text — is shown exactly as entered, because it is evidence and
+ * must not be silently altered by a translation layer.
+ */
+
+export type Language = "EN" | "KN";
+
+export const LANGUAGES: { value: Language; label: string }[] = [
+  { value: "EN", label: "English" },
+  { value: "KN", label: "ಕನ್ನಡ · Kannada" },
+];
+
+// Key naming: <area>.<thing>. Keep keys stable; they are referenced from JSX.
+export const translations: Record<Language, Record<string, string>> = {
+  EN: {
+    // Navigation
+    "nav.command": "Command",
+    "nav.records": "Records",
+    "nav.dashboard": "Dashboard",
+    "nav.copilot": "Copilot",
+    "nav.analytics": "Analytics",
+    "nav.hotspots": "Hotspots",
+    "nav.deadlines": "Deadlines",
+    "nav.cases": "Cases",
+    "nav.network": "Network",
+    "nav.firIntake": "FIR Intake",
+    "nav.auditTrail": "Audit Trail",
+    "nav.settings": "Settings",
+    "nav.signOut": "Sign out",
+
+    // Header
+    "header.searchPlaceholder": "Search cases, entities, hotspots...",
+    "header.notifications": "Notifications",
+    "brand.subtitle": "Karnataka Police",
+
+    // Dashboard / Copilot
+    "copilot.title": "Investigation Copilot",
+    "copilot.subtitle": "Intake · Matches · Checklist · Drafts",
+    "copilot.history": "History",
+    "copilot.new": "New",
+    "copilot.exportPdf": "Export PDF",
+    "copilot.exporting": "Exporting…",
+    "copilot.activeCase": "Active case",
+    "copilot.askPlaceholder": "Ask about a FIR, intake, matches, hotspots…",
+    "copilot.askCasePlaceholder": "Ask about this case...",
+    "copilot.conversations": "Conversations",
+    "copilot.newConversation": "New conversation",
+    "copilot.noConversations": "No saved conversations yet. Ask the copilot something and it will appear here.",
+    "copilot.historyPrivacy": "Conversations are stored against your badge and visible only to you. Every query is separately recorded in the audit trail.",
+    "copilot.listen": "Listen",
+    "copilot.stop": "Stop",
+
+    // Dashboard panel
+    "dash.rank": "Rank",
+    "dash.station": "Station",
+    "dash.district": "District",
+    "dash.dataVisible": "Data visible",
+    "dash.needsAttention": "Needs attention",
+    "dash.actionDue": "Action due",
+    "dash.nothingPending": "No lapsed clocks or pending confirmations. Nothing needs you right now.",
+    "dash.chargesheetLapsed": "Charge-sheet window lapsed",
+    "dash.dueWithin15": "Due within 15 days",
+    "dash.leadsAwaiting": "Leads awaiting your decision",
+    "dash.highRiskZones": "High-risk zones",
+    "dash.openInvestigations": "Open Investigations",
+    "dash.clearanceRate": "Clearance Rate",
+    "dash.totalCases": "Total Cases",
+    "dash.recentCases": "Recent Cases",
+    "dash.viewAll": "View all",
+    "dash.noRecentCases": "No recent cases",
+    "dash.quickActions": "Quick Actions",
+    "dash.newFirIntake": "New FIR Intake",
+    "dash.viewHotspots": "View Hotspots",
+    "dash.entityNetwork": "Entity Network",
+    "dash.securedSession": "Secured Session",
+    "dash.auditLogged": "Every query audit logged",
+
+    // Roles
+    "role.SP": "Superintendent of Police",
+    "role.INSPECTOR": "Inspector",
+    "role.CONSTABLE": "Constable",
+
+    // Deadlines
+    "deadlines.label": "Default-Bail Shield",
+    "deadlines.title": "Statutory Deadline Tracker",
+    "deadlines.riskList": "Risk list · worst first",
+    "deadlines.overdue": "Overdue",
+    "deadlines.urgent": "Urgent",
+    "deadlines.watch": "Watch",
+    "deadlines.onTrack": "On track",
+    "deadlines.filed": "Charge sheet filed",
+    "deadlines.draftChargesheet": "Draft charge sheet",
+    "deadlines.noCases": "No cases in your jurisdiction yet.",
+    "deadlines.intro": "Under BNSS Section 187(3), if the charge sheet isn't filed within 60 days — 90 days for grave offences — the accused becomes automatically entitled to default bail, even on day 61. This board tracks that clock for every case in your jurisdiction so it never slips on paper.",
+    "deadlines.chargeSheetFiling": "Charge sheet filing",
+    "deadlines.victimUpdate": "Victim progress update",
+    "deadlines.grave": "Grave · 90-day",
+
+    // Analytics
+    "analytics.label": "District Intelligence",
+    "analytics.title": "Command Center",
+    "analytics.liveSync": "Live Data Sync",
+    "analytics.totalActive": "Total Active Investigations",
+    "analytics.clearanceYtd": "Clearance Rate (YTD)",
+    "analytics.highRiskZones": "High Risk Zones",
+    "analytics.caseMix": "Caseload by Crime Type",
+    "analytics.browseCases": "Browse all cases",
+    "analytics.noCases": "No cases in your jurisdiction yet.",
+    "analytics.crimeTrend": "6-Month Crime Trend",
+    "analytics.riskForecast": "7-Day Risk Forecast",
+    "analytics.earlyWarning": "Early Warning System",
+    "analytics.dataDriven": "Data-Driven",
+
+    // Hotspots
+    "hotspots.label": "Live Hotspots",
+    "hotspots.title": "Risk map",
+    "hotspots.subtitle": "Predictive risk assessment and spatial anomalies.",
+    "hotspots.riskRanking": "Risk ranking",
+    "hotspots.noAlerts": "No active hotspot alerts for your jurisdiction.",
+    "hotspots.sevenDayTrend": "7-day trend",
+
+    // Network
+    "network.label": "Entity Network",
+    "network.title": "Cross-case linkage canvas",
+    "network.explore": "Explore",
+    "network.findPath": "Find path",
+    "network.briefCopilot": "Brief copilot",
+    "network.searchPlaceholder": "Search a case, suspect, or vehicle to start…",
+    "network.keyPlayers": "Key players",
+    "network.detectedRings": "Detected rings",
+    "network.selection": "Selection",
+    "network.connections": "Connections",
+    "network.evidenceBoard": "Evidence board",
+    "network.exportBoard": "Export board (PDF)",
+    "network.connectionChain": "Connection chain",
+    "network.shown": "shown",
+    "network.total": "total",
+
+    // Legal sections
+    "legal.expectedSections": "Expected sections",
+    "legal.conditional": "Conditional",
+    "legal.evidenceToSecure": "Evidence to secure",
+    "legal.cognizable": "Cognizable",
+    "legal.nonCognizable": "Non-cognizable",
+    "legal.bailable": "Bailable",
+    "legal.nonBailable": "Non-bailable",
+    "legal.punishment": "Punishment",
+    "legal.noMatch": "No section template matched these facts.",
+
+    // FIR intake
+    "fir.label": "Extracted fields · Editable",
+    "fir.title": "Draft FIR record",
+    "fir.reject": "Reject",
+    "fir.confirmSave": "Confirm & save",
+    "fir.saving": "Saving...",
+    "fir.crimeType": "Crime Type",
+    "fir.incidentDate": "Incident Date",
+    "fir.location": "Location",
+    "fir.accused": "Accused",
+    "fir.victim": "Victim",
+    "fir.narrative": "Narrative",
+    "fir.modusOperandi": "Modus operandi",
+
+    // Settings
+    "settings.label": "Settings",
+    "settings.title": "Workspace preferences",
+    "settings.subtitle": "Language, jurisdiction, audit, and fairness statement.",
+    "settings.language": "Language",
+    "settings.languageHelp": "Interface language for menus, prompts and generated summaries.",
+    "settings.jurisdiction": "Jurisdiction",
+    "settings.jurisdictionHelp": "Restrict queries and results to your assigned station and district.",
+    "settings.auditTrail": "Audit trail",
+    "settings.auditHelp": "Every query, upload, match decision, and export — RBAC-scoped to your role.",
+    "settings.fairness": "Fairness & oversight",
+    "settings.apply": "Apply",
+
+    // Common
+    "common.loading": "Loading…",
+    "common.cancel": "Cancel",
+    "common.close": "Close",
+    "common.delete": "Delete",
+    "common.save": "Save",
+    "common.justNow": "just now",
+  },
+
+  KN: {
+    // Navigation
+    "nav.command": "ಕಮಾಂಡ್",
+    "nav.records": "ದಾಖಲೆಗಳು",
+    "nav.dashboard": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+    "nav.copilot": "ಸಹಾಯಕ",
+    "nav.analytics": "ವಿಶ್ಲೇಷಣೆ",
+    "nav.hotspots": "ಅಪಾಯದ ತಾಣಗಳು",
+    "nav.deadlines": "ಗಡುವುಗಳು",
+    "nav.cases": "ಪ್ರಕರಣಗಳು",
+    "nav.network": "ಜಾಲ",
+    "nav.firIntake": "ಎಫ್‌ಐಆರ್ ದಾಖಲು",
+    "nav.auditTrail": "ಲೆಕ್ಕಪರಿಶೋಧನೆ",
+    "nav.settings": "ಸಂಯೋಜನೆಗಳು",
+    "nav.signOut": "ನಿರ್ಗಮಿಸಿ",
+
+    // Header
+    "header.searchPlaceholder": "ಪ್ರಕರಣ, ವ್ಯಕ್ತಿ, ಅಪಾಯದ ತಾಣ ಹುಡುಕಿ...",
+    "header.notifications": "ಅಧಿಸೂಚನೆಗಳು",
+    "brand.subtitle": "ಕರ್ನಾಟಕ ಪೊಲೀಸ್",
+
+    // Dashboard / Copilot
+    "copilot.title": "ತನಿಖಾ ಸಹಾಯಕ",
+    "copilot.subtitle": "ದಾಖಲು · ಹೊಂದಾಣಿಕೆ · ಪರಿಶೀಲನಾಪಟ್ಟಿ · ಕರಡು",
+    "copilot.history": "ಇತಿಹಾಸ",
+    "copilot.new": "ಹೊಸದು",
+    "copilot.exportPdf": "ಪಿಡಿಎಫ್ ರಫ್ತು",
+    "copilot.exporting": "ರಫ್ತು ಮಾಡುತ್ತಿದೆ…",
+    "copilot.activeCase": "ಸಕ್ರಿಯ ಪ್ರಕರಣ",
+    "copilot.askPlaceholder": "ಎಫ್‌ಐಆರ್, ದಾಖಲು, ಹೊಂದಾಣಿಕೆ ಬಗ್ಗೆ ಕೇಳಿ…",
+    "copilot.askCasePlaceholder": "ಈ ಪ್ರಕರಣದ ಬಗ್ಗೆ ಕೇಳಿ...",
+    "copilot.conversations": "ಸಂಭಾಷಣೆಗಳು",
+    "copilot.newConversation": "ಹೊಸ ಸಂಭಾಷಣೆ",
+    "copilot.noConversations": "ಇನ್ನೂ ಯಾವುದೇ ಸಂಭಾಷಣೆ ಉಳಿಸಿಲ್ಲ. ಸಹಾಯಕನಿಗೆ ಪ್ರಶ್ನೆ ಕೇಳಿದರೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.",
+    "copilot.historyPrivacy": "ಸಂಭಾಷಣೆಗಳು ನಿಮ್ಮ ಬ್ಯಾಡ್ಜ್‌ಗೆ ಸಂಬಂಧಿಸಿ ಉಳಿಸಲಾಗಿದ್ದು ನಿಮಗೆ ಮಾತ್ರ ಕಾಣುತ್ತವೆ. ಪ್ರತಿ ಪ್ರಶ್ನೆಯೂ ಲೆಕ್ಕಪರಿಶೋಧನಾ ದಾಖಲೆಯಲ್ಲಿ ಪ್ರತ್ಯೇಕವಾಗಿ ದಾಖಲಾಗುತ್ತದೆ.",
+    "copilot.listen": "ಆಲಿಸಿ",
+    "copilot.stop": "ನಿಲ್ಲಿಸಿ",
+
+    // Dashboard panel
+    "dash.rank": "ಹುದ್ದೆ",
+    "dash.station": "ಠಾಣೆ",
+    "dash.district": "ಜಿಲ್ಲೆ",
+    "dash.dataVisible": "ಗೋಚರ ಮಾಹಿತಿ",
+    "dash.needsAttention": "ಗಮನ ಅಗತ್ಯ",
+    "dash.actionDue": "ಕ್ರಮ ಬಾಕಿ",
+    "dash.nothingPending": "ಯಾವುದೇ ಗಡುವು ಮೀರಿಲ್ಲ, ಬಾಕಿ ಇಲ್ಲ. ಸದ್ಯಕ್ಕೆ ಏನೂ ಅಗತ್ಯವಿಲ್ಲ.",
+    "dash.chargesheetLapsed": "ದೋಷಾರೋಪಣೆ ಗಡುವು ಮೀರಿದೆ",
+    "dash.dueWithin15": "15 ದಿನಗಳಲ್ಲಿ ಬಾಕಿ",
+    "dash.leadsAwaiting": "ನಿರ್ಧಾರಕ್ಕೆ ಕಾಯುತ್ತಿರುವ ಸುಳಿವುಗಳು",
+    "dash.highRiskZones": "ಹೆಚ್ಚು ಅಪಾಯದ ವಲಯಗಳು",
+    "dash.openInvestigations": "ನಡೆಯುತ್ತಿರುವ ತನಿಖೆಗಳು",
+    "dash.clearanceRate": "ಇತ್ಯರ್ಥ ಪ್ರಮಾಣ",
+    "dash.totalCases": "ಒಟ್ಟು ಪ್ರಕರಣಗಳು",
+    "dash.recentCases": "ಇತ್ತೀಚಿನ ಪ್ರಕರಣಗಳು",
+    "dash.viewAll": "ಎಲ್ಲವನ್ನೂ ನೋಡಿ",
+    "dash.noRecentCases": "ಇತ್ತೀಚಿನ ಪ್ರಕರಣಗಳಿಲ್ಲ",
+    "dash.quickActions": "ತ್ವರಿತ ಕ್ರಮಗಳು",
+    "dash.newFirIntake": "ಹೊಸ ಎಫ್‌ಐಆರ್ ದಾಖಲು",
+    "dash.viewHotspots": "ಅಪಾಯದ ತಾಣಗಳನ್ನು ನೋಡಿ",
+    "dash.entityNetwork": "ವ್ಯಕ್ತಿ ಜಾಲ",
+    "dash.securedSession": "ಸುರಕ್ಷಿತ ಅಧಿವೇಶನ",
+    "dash.auditLogged": "ಪ್ರತಿ ಪ್ರಶ್ನೆಯೂ ದಾಖಲಾಗಿದೆ",
+
+    // Roles
+    "role.SP": "ಪೊಲೀಸ್ ವರಿಷ್ಠಾಧಿಕಾರಿ",
+    "role.INSPECTOR": "ನಿರೀಕ್ಷಕ",
+    "role.CONSTABLE": "ಪೇದೆ",
+
+    // Deadlines
+    "deadlines.label": "ಡೀಫಾಲ್ಟ್ ಜಾಮೀನು ರಕ್ಷಣೆ",
+    "deadlines.title": "ಶಾಸನಬದ್ಧ ಗಡುವು ನಿಗಾ",
+    "deadlines.riskList": "ಅಪಾಯ ಪಟ್ಟಿ · ಗಂಭೀರವಾದದ್ದು ಮೊದಲು",
+    "deadlines.overdue": "ಮೀರಿದೆ",
+    "deadlines.urgent": "ತುರ್ತು",
+    "deadlines.watch": "ನಿಗಾ",
+    "deadlines.onTrack": "ಸರಿಯಾಗಿದೆ",
+    "deadlines.filed": "ದೋಷಾರೋಪಣೆ ಸಲ್ಲಿಸಲಾಗಿದೆ",
+    "deadlines.draftChargesheet": "ದೋಷಾರೋಪಣೆ ಕರಡು",
+    "deadlines.noCases": "ನಿಮ್ಮ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಇನ್ನೂ ಪ್ರಕರಣಗಳಿಲ್ಲ.",
+    "deadlines.intro": "ಬಿಎನ್‌ಎಸ್‌ಎಸ್ ಕಲಂ 187(3) ಪ್ರಕಾರ, 60 ದಿನಗಳಲ್ಲಿ — ಗಂಭೀರ ಅಪರಾಧಗಳಿಗೆ 90 ದಿನಗಳಲ್ಲಿ — ದೋಷಾರೋಪಣೆ ಸಲ್ಲಿಸದಿದ್ದರೆ ಆರೋಪಿಗೆ 61ನೇ ದಿನವೇ ಡೀಫಾಲ್ಟ್ ಜಾಮೀನು ಹಕ್ಕು ಸಿಗುತ್ತದೆ. ಈ ಫಲಕ ನಿಮ್ಮ ವ್ಯಾಪ್ತಿಯ ಪ್ರತಿ ಪ್ರಕರಣದ ಗಡುವನ್ನು ನಿಗಾ ಇಡುತ್ತದೆ.",
+    "deadlines.chargeSheetFiling": "ದೋಷಾರೋಪಣೆ ಸಲ್ಲಿಕೆ",
+    "deadlines.victimUpdate": "ಸಂತ್ರಸ್ತರಿಗೆ ಪ್ರಗತಿ ಮಾಹಿತಿ",
+    "deadlines.grave": "ಗಂಭೀರ · 90 ದಿನ",
+
+    // Analytics
+    "analytics.label": "ಜಿಲ್ಲಾ ಗುಪ್ತಚರ",
+    "analytics.title": "ಕಮಾಂಡ್ ಕೇಂದ್ರ",
+    "analytics.liveSync": "ನೇರ ಮಾಹಿತಿ ಸಿಂಕ್",
+    "analytics.totalActive": "ಒಟ್ಟು ಸಕ್ರಿಯ ತನಿಖೆಗಳು",
+    "analytics.clearanceYtd": "ಇತ್ಯರ್ಥ ಪ್ರಮಾಣ (ವರ್ಷದಿಂದ)",
+    "analytics.highRiskZones": "ಹೆಚ್ಚು ಅಪಾಯದ ವಲಯಗಳು",
+    "analytics.caseMix": "ಅಪರಾಧ ಪ್ರಕಾರವಾರು ಪ್ರಕರಣಗಳು",
+    "analytics.browseCases": "ಎಲ್ಲಾ ಪ್ರಕರಣಗಳನ್ನು ನೋಡಿ",
+    "analytics.noCases": "ನಿಮ್ಮ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಇನ್ನೂ ಪ್ರಕರಣಗಳಿಲ್ಲ.",
+    "analytics.crimeTrend": "6 ತಿಂಗಳ ಅಪರಾಧ ಪ್ರವೃತ್ತಿ",
+    "analytics.riskForecast": "7 ದಿನಗಳ ಅಪಾಯ ಮುನ್ಸೂಚನೆ",
+    "analytics.earlyWarning": "ಮುನ್ನೆಚ್ಚರಿಕೆ ವ್ಯವಸ್ಥೆ",
+    "analytics.dataDriven": "ದತ್ತಾಂಶ ಆಧಾರಿತ",
+
+    // Hotspots
+    "hotspots.label": "ನೇರ ಅಪಾಯದ ತಾಣಗಳು",
+    "hotspots.title": "ಅಪಾಯ ನಕ್ಷೆ",
+    "hotspots.subtitle": "ಮುನ್ಸೂಚಕ ಅಪಾಯ ಮೌಲ್ಯಮಾಪನ ಮತ್ತು ಸ್ಥಳ ವೈಪರೀತ್ಯಗಳು.",
+    "hotspots.riskRanking": "ಅಪಾಯ ಶ್ರೇಣಿ",
+    "hotspots.noAlerts": "ನಿಮ್ಮ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಸಕ್ರಿಯ ಎಚ್ಚರಿಕೆಗಳಿಲ್ಲ.",
+    "hotspots.sevenDayTrend": "7 ದಿನಗಳ ಪ್ರವೃತ್ತಿ",
+
+    // Network
+    "network.label": "ವ್ಯಕ್ತಿ ಜಾಲ",
+    "network.title": "ಪ್ರಕರಣಗಳ ನಡುವಿನ ಸಂಪರ್ಕ ಫಲಕ",
+    "network.explore": "ಅನ್ವೇಷಿಸಿ",
+    "network.findPath": "ಮಾರ್ಗ ಹುಡುಕಿ",
+    "network.briefCopilot": "ಸಹಾಯಕನಿಗೆ ವಿವರಿಸಿ",
+    "network.searchPlaceholder": "ಪ್ರಕರಣ, ಆರೋಪಿ ಅಥವಾ ವಾಹನ ಹುಡುಕಿ…",
+    "network.keyPlayers": "ಪ್ರಮುಖ ವ್ಯಕ್ತಿಗಳು",
+    "network.detectedRings": "ಪತ್ತೆಯಾದ ಜಾಲಗಳು",
+    "network.selection": "ಆಯ್ಕೆ",
+    "network.connections": "ಸಂಪರ್ಕಗಳು",
+    "network.evidenceBoard": "ಸಾಕ್ಷ್ಯ ಫಲಕ",
+    "network.exportBoard": "ಫಲಕ ರಫ್ತು (ಪಿಡಿಎಫ್)",
+    "network.connectionChain": "ಸಂಪರ್ಕ ಸರಪಳಿ",
+    "network.shown": "ತೋರಿಸಲಾಗಿದೆ",
+    "network.total": "ಒಟ್ಟು",
+
+    // Legal sections
+    "legal.expectedSections": "ನಿರೀಕ್ಷಿತ ಕಲಂಗಳು",
+    "legal.conditional": "ಷರತ್ತುಬದ್ಧ",
+    "legal.evidenceToSecure": "ಸಂಗ್ರಹಿಸಬೇಕಾದ ಸಾಕ್ಷ್ಯ",
+    "legal.cognizable": "ಸಂಜ್ಞೇಯ",
+    "legal.nonCognizable": "ಅಸಂಜ್ಞೇಯ",
+    "legal.bailable": "ಜಾಮೀನು ಸಾಧ್ಯ",
+    "legal.nonBailable": "ಜಾಮೀನು ರಹಿತ",
+    "legal.punishment": "ಶಿಕ್ಷೆ",
+    "legal.noMatch": "ಈ ಸಂಗತಿಗಳಿಗೆ ಯಾವುದೇ ಕಲಂ ಹೊಂದಿಕೆಯಾಗಲಿಲ್ಲ.",
+
+    // FIR intake
+    "fir.label": "ಹೊರತೆಗೆದ ವಿವರಗಳು · ಸಂಪಾದಿಸಬಹುದು",
+    "fir.title": "ಎಫ್‌ಐಆರ್ ಕರಡು ದಾಖಲೆ",
+    "fir.reject": "ತಿರಸ್ಕರಿಸಿ",
+    "fir.confirmSave": "ಖಚಿತಪಡಿಸಿ ಮತ್ತು ಉಳಿಸಿ",
+    "fir.saving": "ಉಳಿಸುತ್ತಿದೆ...",
+    "fir.crimeType": "ಅಪರಾಧದ ಬಗೆ",
+    "fir.incidentDate": "ಘಟನೆಯ ದಿನಾಂಕ",
+    "fir.location": "ಸ್ಥಳ",
+    "fir.accused": "ಆರೋಪಿ",
+    "fir.victim": "ಸಂತ್ರಸ್ತ",
+    "fir.narrative": "ವಿವರಣೆ",
+    "fir.modusOperandi": "ಅಪರಾಧ ವಿಧಾನ",
+
+    // Settings
+    "settings.label": "ಸಂಯೋಜನೆಗಳು",
+    "settings.title": "ಕಾರ್ಯಕ್ಷೇತ್ರ ಆದ್ಯತೆಗಳು",
+    "settings.subtitle": "ಭಾಷೆ, ವ್ಯಾಪ್ತಿ, ಲೆಕ್ಕಪರಿಶೋಧನೆ ಮತ್ತು ನ್ಯಾಯಸಮ್ಮತತೆ ಹೇಳಿಕೆ.",
+    "settings.language": "ಭಾಷೆ",
+    "settings.languageHelp": "ಮೆನು, ಸೂಚನೆ ಮತ್ತು ಸಾರಾಂಶಗಳ ಭಾಷೆ.",
+    "settings.jurisdiction": "ವ್ಯಾಪ್ತಿ",
+    "settings.jurisdictionHelp": "ನಿಮಗೆ ನಿಯೋಜಿಸಲಾದ ಠಾಣೆ ಮತ್ತು ಜಿಲ್ಲೆಗೆ ಫಲಿತಾಂಶಗಳನ್ನು ಸೀಮಿತಗೊಳಿಸಿ.",
+    "settings.auditTrail": "ಲೆಕ್ಕಪರಿಶೋಧನಾ ದಾಖಲೆ",
+    "settings.auditHelp": "ಪ್ರತಿ ಪ್ರಶ್ನೆ, ಅಪ್‌ಲೋಡ್, ನಿರ್ಧಾರ ಮತ್ತು ರಫ್ತು — ನಿಮ್ಮ ಹುದ್ದೆಗೆ ಅನುಗುಣವಾಗಿ.",
+    "settings.fairness": "ನ್ಯಾಯಸಮ್ಮತತೆ ಮತ್ತು ಮೇಲ್ವಿಚಾರಣೆ",
+    "settings.apply": "ಅನ್ವಯಿಸಿ",
+
+    // Common
+    "common.loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
+    "common.cancel": "ರದ್ದುಮಾಡಿ",
+    "common.close": "ಮುಚ್ಚಿ",
+    "common.delete": "ಅಳಿಸಿ",
+    "common.save": "ಉಳಿಸಿ",
+    "common.justNow": "ಈಗಷ್ಟೇ",
+  },
+};
