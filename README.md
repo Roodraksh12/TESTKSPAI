@@ -19,9 +19,12 @@ SCRB Sahayak isn't just a database; it's an intelligent agent assisting officers
 - **Voice-to-Text & Text-to-Speech:** Integrated Web Speech API and advanced TTS services allow hands-free interaction. Ask questions like *"Show me all burglary cases from Vijayanagar"* out loud, and get spoken responses.
 - **English & Kannada Support:** Full native support for Kannada language, ensuring grassroots officers can interact naturally.
 - **Context-Aware Memory:** The copilot remembers the case context across multiple interactions, eliminating the need to repeat details.
+- **Transcript Export:** Chat histories and case queries can be instantly exported to formal PDF transcripts for record-keeping.
 
 ### 📄 2. Automated FIR Ingestion & Smart Parsing
 - **Zero-Data-Entry Workflow:** Upload a raw FIR text or image, and the system automatically extracts Suspects, Victims, Vehicles, Modus Operandi (MO), and Locations.
+- **Optical Character Recognition (OCR):** Uses Tesseract OCR to read and ingest scanned FIR documents and handwritten Kannada/English text.
+- **Asynchronous Background Processing:** FIR uploads are processed via a resilient background queue with real-time UI polling.
 - **Explainable AI (XAI):** Extracted entities are visually linked back to the exact sentence in the original FIR, ensuring evidence integrity for court verification.
 - **One-Click PDF Dossiers:** Generate comprehensive, court-ready case files and intelligent summaries instantly.
 
@@ -70,8 +73,8 @@ SCRB Sahayak isn't just a database; it's an intelligent agent assisting officers
 
 | Component | Technology | Description |
 |---|---|---|
-| **Frontend** | React 18, TypeScript, Tailwind CSS, Recharts, Framer Motion, Leaflet | Responsive Single Page App (SPA) optimized for quick navigations and real-time visualization. |
-| **Backend** | FastAPI (Python 3.11+), Pydantic, Python-Jose (JWT) | High-performance async REST API with strict request validation and RBAC enforcement. |
+| **Frontend** | React 18, Vite, TypeScript, Tailwind CSS, Recharts, Framer Motion, Lucide icons, Leaflet | Responsive Single Page App (SPA) utilizing a Cohere-inspired enterprise AI design system for clean, controlled interfaces. |
+| **Backend** | FastAPI (Python 3.11+), Pydantic, Python-Jose (JWT), Passlib (Bcrypt), PyTesseract (OCR) | High-performance async REST API with strict request validation, RBAC enforcement, and OCR for document ingestion. |
 | **Database** | PostgreSQL (hosted on Supabase) | Relational DB optimized for entity matching, audit logs, and jurisdictional queries. |
 | **AI/LLM** | OpenRouter (Gemini 1.5 Pro) | Context-aware routing, automated summaries, multi-lingual processing, and legal intelligence. |
 
@@ -113,6 +116,12 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .\.venv\Scripts\activate
 pip install -r requirements.txt
+```
+Install System Dependencies for OCR (Tesseract):
+- **macOS**: `brew install tesseract tesseract-lang`
+- **Ubuntu/Debian**: `sudo apt-get install tesseract-ocr tesseract-ocr-kan`
+
+```bash
 cp .env.example .env       # Fill in DATABASE_URL, OPENROUTER_API_KEY, etc.
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
