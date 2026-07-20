@@ -50,6 +50,16 @@ class MatchUpdateRequest(BaseModel):
     status: str
 
 
+class ChargesheetUpdateRequest(BaseModel):
+    """Body for saving an edited charge-sheet draft.
+
+    Was referenced by the PUT handler but never declared, so every save was
+    rejected with a 422 before reaching the database.
+    """
+
+    chargesheetDraft: str
+
+
 def _find_or_create_person(name: str, role: str) -> dict:
     person = fetch_one(
         'SELECT * FROM "Person" WHERE LOWER(name) = LOWER(%(name)s) LIMIT 1',
