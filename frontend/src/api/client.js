@@ -21,17 +21,9 @@ export function clearAuthStorage() {
   localStorage.removeItem(USER_KEY)
 }
 
-export async function apiRequest(path, options = {}) {
-  const headers = new Headers(options.headers)
-  if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
-    headers.set("Content-Type", "application/json")
-  }
+const apiCache = new Map()
 
-  const token = getToken()
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`)
-  }
-
+async function performFetch(path, options, headers) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
@@ -57,6 +49,38 @@ export async function apiRequest(path, options = {}) {
     error.status = response.status
     error.payload = payload
     throw error
+  }
+
+  return payload
+}
+
+export async function apiRequest(path, options = {}) {
+  const method = options.method || "GET"
+  const isGet = method.toUpperCase() === "GET"
+
+  const headers = new Headers(options.headers)
+  if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  const token = getToken()
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`)
+  }
+
+  if (isGet && apiCache.has(path)) {
+    // SWR: Fetch in background to update cache, but return immediately
+    performFetch(path, options, headers)
+      .then(payload => apiCache.set(path, payload))
+      .catch(console.error)
+
+    return apiCache.get(path)
+  }
+
+  const payload = await performFetch(path, options, headers)
+
+  if (isGet) {
+    apiCache.set(path, payload)
   }
 
   return payload

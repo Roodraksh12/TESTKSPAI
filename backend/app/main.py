@@ -16,6 +16,7 @@ from app.routers import (
     legal,
     network,
     search,
+    tts,
 )
 from app.routers import settings as settings_router
 
@@ -46,6 +47,13 @@ def create_app() -> FastAPI:
     app.include_router(audit.router)
     app.include_router(legal.router)
     app.include_router(chat_sessions.router)
+    app.include_router(tts.router)
+
+    @app.on_event("startup")
+    def startup_event():
+        from app.services.db import get_pool
+        get_pool()
+
     return app
 
 

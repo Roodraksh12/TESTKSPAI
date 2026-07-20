@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from "react";
 const KANNADA_RANGE = /[ಀ-೿]/;
 
 function stripMarkdown(text: string): string {
-  return text
+  let clean = text
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
@@ -14,48 +14,58 @@ function stripMarkdown(text: string): string {
     .replace(/\n+/g, ". ")
     .replace(/\s+/g, " ")
     .trim();
-}
 
-function pickVoice(lang: string): SpeechSynthesisVoice | undefined {
-  if (!isSpeechSupported()) return undefined;
-  const voices = window.speechSynthesis.getVoices();
-  const exact = voices.find((v) => v.lang === lang);
-  if (exact) return exact;
-  const prefix = lang.split("-")[0];
-  return voices.find((v) => v.lang.startsWith(prefix));
+  // Fix common police acronyms so the TTS spells them out instead of reading them as words
+  // Note: Using spaces instead of periods so Azure TTS doesn't read the word "dot".
+  clean = clean.replace(/\bFIR\b/gi, "F I R");
+  clean = clean.replace(/\bCrPC\b/gi, "C R P C");
+  clean = clean.replace(/\bBNS\b/gi, "B N S");
+  clean = clean.replace(/\bBNSS\b/gi, "B N S S");
+  clean = clean.replace(/\bSHO\b/gi, "S H O");
+  clean = clean.replace(/\bSP\b/gi, "S P");
+  clean = clean.replace(/\bIPC\b/gi, "I P C");
+  clean = clean.replace(/\bMO\b/g, "M O"); // Case sensitive so it doesn't break words containing 'mo'
+
+  return clean;
 }
 
 export function isSpeechSupported(): boolean {
-  return typeof window !== "undefined" && "speechSynthesis" in window;
+  // Backend Edge-TTS endpoint is always available when the API is up.
+  return true;
 }
 
 /** Per-message play/stop toggle for TTS playback of assistant replies. */
 export function useSpeech() {
   const [speakingId, setSpeakingId] = useState<string | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const stop = useCallback(() => {
-    if (isSpeechSupported()) window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
     setSpeakingId(null);
   }, []);
 
   const speak = useCallback((id: string, text: string) => {
-    if (!isSpeechSupported()) return;
-    window.speechSynthesis.cancel();
+    stop();
     const clean = stripMarkdown(text);
     if (!clean) return;
 
     const lang = KANNADA_RANGE.test(clean) ? "kn-IN" : "en-IN";
-    const utterance = new SpeechSynthesisUtterance(clean);
-    utterance.lang = lang;
-    const voice = pickVoice(lang);
-    if (voice) utterance.voice = voice;
-    utterance.onend = () => setSpeakingId((current) => (current === id ? null : current));
-    utterance.onerror = () => setSpeakingId((current) => (current === id ? null : current));
-    utteranceRef.current = utterance;
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+    const audioUrl = `${API_BASE_URL}/api/tts?text=${encodeURIComponent(clean)}&lang=${lang}`;
+    const audio = new Audio(audioUrl);
+
+    audio.onended = () => setSpeakingId((current) => (current === id ? null : current));
+    audio.onerror = () => setSpeakingId((current) => (current === id ? null : current));
+
+    audioRef.current = audio;
     setSpeakingId(id);
-    window.speechSynthesis.speak(utterance);
-  }, []);
+    audio.play().catch(console.error);
+  }, [stop]);
 
   const toggle = useCallback(
     (id: string, text: string) => {
@@ -68,5 +78,5 @@ export function useSpeech() {
     [speakingId, speak, stop]
   );
 
-  return { speakingId, speak, stop, toggle, isSupported: isSpeechSupported() };
+  return { speakingId, speak, stop, toggle, isSupported: true };
 }

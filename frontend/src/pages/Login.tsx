@@ -22,11 +22,31 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   
+  const [district, setDistrict] = useState("Bengaluru City");
+  const [station, setStation] = useState("Cubbon Park");
   const [badgeId, setBadgeId] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  // Sample data for the dropdowns
+  const DISTRICTS = [
+    "Bengaluru City",
+    "Mysuru City",
+    "Mangaluru City",
+    "Hubballi-Dharwad City",
+    "Belagavi City",
+  ];
+
+  const STATIONS: Record<string, string[]> = {
+    "Bengaluru City": ["Cubbon Park", "Vidhana Soudha", "High Grounds", "Halasuru", "Indiranagar"],
+    "Mysuru City": ["Devaraja", "Krishnaraja", "Lashkar", "Mandi", "Narasimharaja"],
+    "Mangaluru City": ["Barke", "Bunder", "Kadri", "Kankanady", "Pandeshwar"],
+    "Hubballi-Dharwad City": ["Suburban", "Town", "Vidyanagar", "Gokul Road", "Keshwapur"],
+    "Belagavi City": ["Camp", "Khadebazar", "Market", "Shahapur", "Tilakwadi"],
+  };
+
+  const availableStations = STATIONS[district] || ["Select Station"];
   const handleSignIn = async (useDemo: boolean) => {
     setSubmitting(true);
     setError("");
@@ -90,6 +110,49 @@ export default function LoginPage() {
                 }}
                 className="mt-6 space-y-3"
               >
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium tracking-wide text-muted-foreground">
+                      District
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={district}
+                        onChange={(e) => {
+                          setDistrict(e.target.value);
+                          setStation(STATIONS[e.target.value]?.[0] || "");
+                        }}
+                        className="flex h-11 w-full rounded-2xl border border-hairline bg-surface-2 px-4 py-2 text-sm text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                      >
+                        {DISTRICTS.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                        <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium tracking-wide text-muted-foreground">
+                      Station
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={station}
+                        onChange={(e) => setStation(e.target.value)}
+                        className="flex h-11 w-full rounded-2xl border border-hairline bg-surface-2 px-4 py-2 text-sm text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
+                      >
+                        {availableStations.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                        <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div>
                   <label className="mb-1 block text-[11px] font-medium tracking-wide text-muted-foreground">
                     Badge ID

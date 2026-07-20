@@ -88,9 +88,13 @@ export function Header() {
           <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-amber ring-2 ring-surface" />
         </button>
         <ModeToggle />
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[11px] font-bold text-white dark:bg-foreground dark:text-background">
+        <Link
+          to="/profile"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-[11px] font-bold text-white dark:bg-foreground dark:text-background"
+          aria-label={officerName}
+        >
           {initials}
-        </div>
+        </Link>
       </div>
     </header>
   );
@@ -191,7 +195,7 @@ export function Sidebar() {
         collapsed && "flex flex-col items-center gap-2"
       )}>
         <Link
-          to="/settings"
+          to="/profile"
           className={cn(
             "flex items-center rounded-xl transition-colors hover:bg-white/5",
             collapsed ? "justify-center h-10 w-10" : "gap-3 px-3 py-2"

@@ -15,6 +15,7 @@ import FirUpload from "./pages/FirUpload.tsx"
 import Settings from "./pages/Settings.tsx"
 import Deadlines from "./pages/Deadlines.tsx"
 import Audit from "./pages/Audit.tsx"
+import Profile from "./pages/Profile.tsx"
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/deadlines" element={<Deadlines />} />
           <Route path="/audit" element={<Audit />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

@@ -35,6 +35,7 @@ SCRB Sahayak uses a modern, separated client-server architecture:
 | **Backend** | FastAPI (Python 3.11+), Pydantic, Python-Jose (JWT), Passlib (Bcrypt) | High-performance async python REST API with strict request validation and RBAC enforcement. |
 | **Database** | PostgreSQL (hosted on Supabase) | Relational database schema optimized for entity matching, audit logs, and station jurisdiction queries. |
 | **AI/LLM** | OpenRouter (Gemini 1.5 Pro) | Context-aware query routing, automated FIR summary generation, entity extraction, and multi-lingual processing. |
+| **TTS** | Edge-TTS (backend `/api/tts`) | Server-side speech synthesis for bilingual Read Aloud on copilot replies. |
 
 ---
 
@@ -43,13 +44,14 @@ SCRB Sahayak uses a modern, separated client-server architecture:
 ### 1. 🤖 Bilingual Investigation Copilot (AI Chatbot)
 - **Conversational Queries**: Officers query the database in natural language (e.g. *"Show me all burglary cases from Vijayanagar"*).
 - **Kannada Support**: Complete dual-language capability (translation, input processing, and localized responses).
-- **Voice-Enabled Interface**: Integrated Web Speech API for hands-free dictation.
+- **Voice-Enabled Interface**: Web Speech API for hands-free dictation, plus backend Edge-TTS for spoken replies (FIR/CrPC/BNS acronym pronunciation fixes).
 - **Context Preservation**: Persists chat history/session context so follow-up queries carry over references to the active case.
 
 ### 2. 📁 Dynamic Case Dossier & Ledger
 - **Entity Extraction**: Automatically parses and extracts critical entities (Suspects, Victims, Vehicles, Locations) from unstructured FIR text.
 - **Explainable AI (XAI)**: Visual cues and back-links map AI summaries directly to the original FIR text source, ensuring evidence integrity for court verification.
 - **PDF Dossier Export**: Generate official, formatted case files and summaries with a single click.
+- **Chargesheet Drafting**: Standalone chargesheet page plus in-app `ChargesheetEditor` (generate, edit, save draft) from Deadlines and case workflows.
 
 ### 3. 🕸️ Cross-Case Linkage Canvas
 - **Visual Graph Rendering**: Plots interactive SVG graphs displaying links between Cases/FIRs, Persons, Vehicles, and Locations.
@@ -59,10 +61,12 @@ SCRB Sahayak uses a modern, separated client-server architecture:
 ### 4. 📈 Command Analytics & Predictive Intelligence
 - **Hotspot Heatmaps**: Geospatial mapping showing crime density clusters across different jurisdictions.
 - **Early Warnings**: Actionable risk forecast feed alerts command staff to potential crime spikes with concrete recommendations (e.g. *"Increase patrols in sector 4 on Saturday night"*).
+- **Statutory Deadlines**: Tracks chargesheet filing and victim-update clocks with risk tiers.
 
 ### 5. 🔑 Role-Based Access Control (RBAC) & Security
 - **Station-Level Siloing**: Investigating Officers (IO) are restricted to data/cases within their assigned police station.
 - **District-Level Scope**: Superintendents of Police (SP) view macro metrics, command panels, and audit logs district-wide.
+- **Officer Profile**: Dedicated Profile page for badge, role, and station context.
 
 ---
 
@@ -73,7 +77,7 @@ SCRB Sahayak uses a modern, separated client-server architecture:
 │   ├── app/
 │   │   ├── main.py            # FastAPI entry point
 │   │   ├── deps.py            # Dependency injection (Auth, DB)
-│   │   ├── routers/           # API routes (AI, Cases, Auth, Analytics, etc.)
+│   │   ├── routers/           # API routes (AI, Cases, Auth, Analytics, TTS, Legal, etc.)
 │   │   ├── services/          # Core business logic (AI tools, graph construction)
 │   │   └── tests/             # Pytest suite
 │   ├── requirements.txt       # Python dependencies
@@ -82,10 +86,10 @@ SCRB Sahayak uses a modern, separated client-server architecture:
 ├── frontend/                  # Vite + React Client code
 │   ├── src/
 │   │   ├── components/        # Shared component catalog & UI components (shadcn/ui)
-│   │   ├── pages/             # Page components (Dashboard, Analytics, Cases, Network)
+│   │   ├── pages/             # Page components (Dashboard, Analytics, Cases, Network, Profile, Deadlines)
 │   │   ├── api/               # API clients and HTTP wrappers
 │   │   ├── context/           # React Context Providers (Auth)
-│   │   └── lib/               # Utility functions, Zustand stores, and state
+│   │   └── lib/               # Utility functions, Zustand stores, speech hooks, PDF export
 │   ├── package.json
 │   └── .env.example
 │

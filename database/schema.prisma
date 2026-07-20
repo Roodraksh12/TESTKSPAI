@@ -62,6 +62,7 @@ model Case {
   longitude        Float?
   summary          String?
   rawExtractedText String?
+  chargesheetDraft String?
   createdFromScan  Boolean      @default(false)
   
   casePersons      CasePerson[]

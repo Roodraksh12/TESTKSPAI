@@ -14,7 +14,75 @@ import { ExplainChips } from "@/components/scrb/explain-chips";
 import { useSpeech } from "@/lib/scrb/use-speech";
 import { exportChatPdf } from "@/lib/scrb/chat-pdf";
 import { ChatHistoryPanel } from "@/components/scrb/chat-history";
+import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+
+const VoiceEqualizer = ({ isListening }: { isListening: boolean }) => {
+  const barsRef = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    if (!isListening) return;
+
+    let audioContext: AudioContext;
+    let analyzer: AnalyserNode;
+    let stream: MediaStream;
+    let animationFrame: number;
+
+    async function init() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        analyzer = audioContext.createAnalyser();
+        analyzer.fftSize = 64;
+        const microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyzer);
+        const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+
+        const update = () => {
+          analyzer.getByteFrequencyData(dataArray);
+
+          if (barsRef.current) {
+            for (let i = 0; i < 5; i++) {
+              const el = barsRef.current[i];
+              if (el) {
+                // sample different frequency bands for each bar (avoid DC offset at bin 0)
+                const value = dataArray[i * 3 + 2];
+                // value is 0-255. map to 4px - 24px
+                const height = 4 + (value / 255) * 20;
+                el.style.height = `${height}px`;
+              }
+            }
+          }
+          animationFrame = requestAnimationFrame(update);
+        };
+        update();
+      } catch (e) {
+        console.error("Audio API error:", e);
+      }
+    }
+
+    init();
+
+    return () => {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (audioContext) audioContext.close();
+    };
+  }, [isListening]);
+
+  return (
+    <div className="flex items-center gap-[3px] h-6 items-end pb-1">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          ref={(el) => { barsRef.current[i] = el; }}
+          className="w-[3px] bg-teal rounded-full"
+          style={{ height: "4px", transition: "height 0.05s ease-out" }}
+        />
+      ))}
+    </div>
+  );
+};
 
 const DEFAULT_SUGGESTIONS = [
   "Which cases risk default bail this month?",
@@ -117,20 +185,36 @@ export function DashboardClient({
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
-      recognitionRef.current.onresult = (event: any) => { setInput(event.results[0][0].transcript); };
-      recognitionRef.current.onerror = () => { setIsListening(false); };
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput((prev) => (prev ? prev + " " : "") + transcript);
+      };
+      recognitionRef.current.onerror = (event: any) => {
+        setIsListening(false);
+        if (event.error === "not-allowed") {
+          toast.error("Microphone access denied. Please allow microphone permissions in your browser.");
+        } else if (event.error !== "no-speech") {
+          toast.error(`Voice error: ${event.error}`);
+        }
+      };
       recognitionRef.current.onend = () => { setIsListening(false); };
     }
   }, []);
 
   const toggleListen = () => {
     if (isListening) { recognitionRef.current?.stop(); return; }
-    if (!recognitionRef.current) return;
+    if (!recognitionRef.current) {
+      toast.error("Voice recognition is not supported in this browser. Try Google Chrome or Microsoft Edge.");
+      return;
+    }
     try {
       recognitionRef.current.lang = lang === "KN" ? "kn-IN" : "en-IN";
       recognitionRef.current.start();
       setIsListening(true);
-    } catch { setIsListening(false); }
+    } catch {
+      setIsListening(false);
+      toast.error("Could not start microphone.");
+    }
   };
 
   const handleSend = async (customMessage?: string) => {
@@ -311,15 +395,15 @@ export function DashboardClient({
                           <button
                             type="button"
                             onClick={() => speech.toggle(`msg-${i}`, msg.content)}
-                            className="inline-flex w-fit items-center gap-1.5 rounded-md px-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                            className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-lg border border-hairline bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shadow-sm"
                           >
                             {speech.speakingId === `msg-${i}` ? (
                               <>
-                                <VolumeX className="h-3 w-3" /> Stop
+                                <VolumeX className="h-3.5 w-3.5" /> Stop Reading
                               </>
                             ) : (
                               <>
-                                <Volume2 className="h-3 w-3" /> Listen
+                                <Volume2 className="h-3.5 w-3.5" /> Read Aloud
                               </>
                             )}
                           </button>
@@ -388,12 +472,19 @@ export function DashboardClient({
                 <input type="file" id="scrb-file-upload" className="hidden"
                   onChange={(e) => { const files = e.target.files; if (files?.[0]) setInput((prev) => (prev ? prev + " " : "") + `[Attached: ${files[0].name}] `); }}
                 />
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={activeCaseId ? t("copilot.askCasePlaceholder") : t("copilot.askPlaceholder")}
-                  className="flex-1 bg-transparent border-none shadow-none focus:outline-none text-sm text-foreground placeholder:text-muted-foreground"
-                />
+                {isListening ? (
+                  <div className="flex-1 flex items-center gap-3 px-2">
+                    <span className="text-sm font-medium text-teal animate-pulse">Listening...</span>
+                    <VoiceEqualizer isListening={isListening} />
+                  </div>
+                ) : (
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder={activeCaseId ? t("copilot.askCasePlaceholder") : t("copilot.askPlaceholder")}
+                    className="flex-1 bg-transparent border-none shadow-none focus:outline-none text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                )}
                 <div className="flex items-center gap-1 shrink-0">
                   <button type="button" onClick={toggleListen}
                     className={cn("h-10 w-10 flex items-center justify-center rounded-xl transition-colors", isListening ? "text-teal bg-teal/10" : "text-muted-foreground hover:text-foreground")}

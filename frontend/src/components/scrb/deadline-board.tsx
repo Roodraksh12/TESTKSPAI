@@ -105,7 +105,7 @@ function ClockProgress({ clock }: { clock: Clock }) {
   );
 }
 
-export function DeadlineRiskList({ board }: { board: DeadlineRow[] }) {
+export function DeadlineRiskList({ board, onOpenEditor }: { board: DeadlineRow[]; onOpenEditor?: (id: string) => void }) {
   const { t } = useI18n();
   if (board.length === 0) {
     return (
@@ -131,12 +131,22 @@ export function DeadlineRiskList({ board }: { board: DeadlineRow[] }) {
               </div>
             </div>
             {row.tier !== "COMPLIANT" && (
-              <Link
-                to={`/cases/${row.caseId}/chargesheet`}
-                className="shrink-0 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                {t("deadlines.draftChargesheet")}
-              </Link>
+              onOpenEditor ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenEditor(row.caseId)}
+                  className="shrink-0 rounded-lg bg-ink px-4 py-2 text-xs font-medium text-white hover:bg-ink/90 transition-colors shadow-sm"
+                >
+                  {t("deadlines.draftChargesheet")}
+                </button>
+              ) : (
+                <Link
+                  to={`/cases/${row.caseId}/chargesheet`}
+                  className="shrink-0 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                >
+                  {t("deadlines.draftChargesheet")}
+                </Link>
+              )
             )}
           </div>
 

@@ -50,6 +50,10 @@ class MatchUpdateRequest(BaseModel):
     status: str
 
 
+class ChargesheetUpdateRequest(BaseModel):
+    chargesheetDraft: str
+
+
 def _find_or_create_person(name: str, role: str) -> dict:
     person = fetch_one(
         'SELECT * FROM "Person" WHERE LOWER(name) = LOWER(%(name)s) LIMIT 1',
@@ -357,9 +361,36 @@ def update_match(
     return {"success": True, "match": result["match"]}
 
 
-@router.post("/{case_id}/chargesheet")
-async def chargesheet(case_id: str, current_user: dict = Depends(get_current_user)) -> dict:
+@router.get("/{case_id}/chargesheet")
+async def get_chargesheet(case_id: str, current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
+    case_data = get_case_with_relations(case_id, officer)
+    if not case_data:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    row = fetch_one('SELECT "chargesheetDraft" FROM "Case" WHERE id = %(id)s', {"id": case_id})
+    return {"success": True, "chargesheetDraft": row.get("chargesheetDraft") if row else None}
+
+
+@router.put("/{case_id}/chargesheet")
+async def update_chargesheet(
+    case_id: str,
+    payload: ChargesheetUpdateRequest,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    officer = current_user["officer"]
+    case_data = get_case_with_relations(case_id, officer)
+    if not case_data:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    execute(
+        'UPDATE "Case" SET "chargesheetDraft" = %(draft)s WHERE id = %(id)s',
+        {"draft": payload.chargesheetDraft, "id": case_id},
+    )
+    return {"success": True}
+
+
+async def _generate_chargesheet_markdown(case_id: str, officer: dict) -> str:
     case_data = get_case_with_relations(case_id, officer)
     if not case_data:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -413,4 +444,26 @@ RAW TEXT: {case_data.get("rawExtractedText") or "N/A"}
     if isinstance(chargesheet_markdown, dict):
         chargesheet_markdown = chargesheet_markdown.get("content") or "Failed to generate chargesheet."
 
+    if chargesheet_markdown:
+        execute(
+            'UPDATE "Case" SET "chargesheetDraft" = %(draft)s WHERE id = %(id)s',
+            {"draft": chargesheet_markdown, "id": case_id},
+        )
+
+    return chargesheet_markdown
+
+
+@router.post("/{case_id}/chargesheet")
+async def chargesheet(case_id: str, current_user: dict = Depends(get_current_user)) -> dict:
+    """Generate a chargesheet (used by the standalone Chargesheet page)."""
+    officer = current_user["officer"]
+    chargesheet_markdown = await _generate_chargesheet_markdown(case_id, officer)
+    return {"success": True, "chargesheet": chargesheet_markdown}
+
+
+@router.post("/{case_id}/chargesheet/generate")
+async def generate_chargesheet(case_id: str, current_user: dict = Depends(get_current_user)) -> dict:
+    """Generate a chargesheet draft (used by ChargesheetEditor)."""
+    officer = current_user["officer"]
+    chargesheet_markdown = await _generate_chargesheet_markdown(case_id, officer)
     return {"success": True, "chargesheet": chargesheet_markdown}

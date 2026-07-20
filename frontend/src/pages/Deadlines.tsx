@@ -4,12 +4,14 @@ import { Card, SectionLabel, Skeleton } from "@/components/scrb/primitives";
 import { ShieldAlert } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { DeadlineRiskList, DeadlineSummaryTiles, type DeadlineRow, type DeadlineSummary } from "@/components/scrb/deadline-board";
+import { ChargesheetEditor } from "@/components/scrb/ChargesheetEditor";
 
 export default function Deadlines() {
   const { t } = useI18n();
   const [board, setBoard] = useState<DeadlineRow[]>([]);
   const [summary, setSummary] = useState<DeadlineSummary>({});
   const [loading, setLoading] = useState(true);
+  const [editorCaseId, setEditorCaseId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,7 +66,7 @@ export default function Deadlines() {
             ))}
           </div>
         ) : (
-          <DeadlineRiskList board={board} />
+          <DeadlineRiskList board={board} onOpenEditor={setEditorCaseId} />
         )}
       </div>
 
@@ -76,6 +78,12 @@ export default function Deadlines() {
           configurable operational policy, not law.
         </p>
       </Card>
+
+      <ChargesheetEditor
+        caseId={editorCaseId}
+        isOpen={!!editorCaseId}
+        onClose={() => setEditorCaseId(null)}
+      />
     </div>
   );
 }
