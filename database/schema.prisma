@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model District {
+  id       String          @id @default(cuid())
+  name     String
+  stations PoliceStation[]
+}
+
+model PoliceStation {
+  id         String    @id @default(cuid())
+  name       String
+  districtId String
+  district   District  @relation(fields: [districtId], references: [id])
+  officers   Officer[]
+  cases      Case[]
+  alerts     Alert[]
+}
+
+enum Role {
+  CONSTABLE
+  INSPECTOR
+  SP
+}
+
+model Officer {
+  id           String        @id @default(cuid())
+  badgeId      String        @unique
+  passwordHash String
+  name         String
+  role         Role
+  stationId    String
+  station      PoliceStation @relation(fields: [stationId], references: [id])
+  chatSessions ChatSession[]
+  auditLogs    AuditLog[]
+  feedbacks    Feedback[]
+}
+
+enum CaseStatus {
+  OPEN
+  UNDER_INVESTIGATION
+  CHARGESHEETED
+  CLOSED
+}
+
+model Case {
+  id               String       @id @default(cuid())
+  firNumber        String       @unique
+  stationId        String
+  station          PoliceStation @relation(fields: [stationId], references: [id])
+  crimeType        String
+  status           CaseStatus   @default(OPEN)
+  incidentDate     DateTime
+  reportedDate     DateTime     @default(now())
+  latitude         Float?
+  longitude        Float?
+  summary          String?
+  rawExtractedText String?
+  chargesheetDraft String?
+  createdFromScan  Boolean      @default(false)
+  
+  casePersons      CasePerson[]
+  connections      Connection[]
+  chatSessions     ChatSession[]
+  matches          CaseMatch[]  @relation("CaseMatches")
+  matchedBy        CaseMatch[]  @relation("MatchedCases")
+}
+
+enum PersonRole {
+  ACCUSED
+  VICTIM
+  WITNESS
+}
+
+model Person {
+  id          String       @id @default(cuid())
+  name        String
+  role        PersonRole
+  phone       String?
+  address     String?
+  
+  casePersons CasePerson[]
+  connectionsA Connection[] @relation("PersonA")
+  connectionsB Connection[] @relation("PersonB")
+  caseMatches  CaseMatch[]
+}
+
+model CasePerson {
+  id       String     @id @default(cuid())
+  caseId   String
+  personId String
+  role     PersonRole
+  
+  case   Case   @relation(fields: [caseId], references: [id])
+  person Person @relation(fields: [personId], references: [id])
+}
+
+enum RelationType {
+  CO_ACCUSED
+  SAME_ADDRESS
+  SAME_PHONE
+  PRIOR_CASE_TOGETHER
+}
+
+model Connection {
+  id             String       @id @default(cuid())
+  personAId      String
+  personBId      String
+  relationType   RelationType
+  sourceCaseId   String?
+  
+  personA   Person @relation("PersonA", fields: [personAId], references: [id])
+  personB   Person @relation("PersonB", fields: [personBId], references: [id])
+  sourceCase Case? @relation(fields: [sourceCaseId], references: [id])
+}
+
+enum MatchStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+model CaseMatch {
+  id              String      @id @default(cuid())
+  caseId          String
+  matchedCaseId   String?
+  matchedPersonId String?
+  confidenceScore Float
+  status          MatchStatus @default(PENDING)
+  reason          String?
+  
+  case          Case    @relation("CaseMatches", fields: [caseId], references: [id])
+  matchedCase   Case?   @relation("MatchedCases", fields: [matchedCaseId], references: [id])
+  matchedPerson Person? @relation(fields: [matchedPersonId], references: [id])
+}
+
+model ChatSession {
+  id           String        @id @default(cuid())
+  officerId    String
+  activeCaseId String?
+  createdAt    DateTime      @default(now())
+  
+  officer      Officer       @relation(fields: [officerId], references: [id])
+  activeCase   Case?         @relation(fields: [activeCaseId], references: [id])
+  messages     ChatMessage[]
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model ChatMessage {
+  id            String      @id @default(cuid())
+  sessionId     String
+  role          MessageRole
+  content       String
+  sourceCaseIds String[]    @default([])
+  createdAt     DateTime    @default(now())
+  
+  session  ChatSession @relation(fields: [sessionId], references: [id])
+  feedback Feedback?
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  officerId  String
+  action     String
+  targetType String
+  targetId   String?
+  details    String?
+  createdAt  DateTime @default(now())
+  
+  officer Officer @relation(fields: [officerId], references: [id])
+}
+
+enum AlertType {
+  HOTSPOT
+  ANOMALY
+}
+
+model Alert {
+  id         String        @id @default(cuid())
+  stationId  String
+  type       AlertType
+  zoneLabel  String
+  riskScore  Float
+  reason     String
+  createdAt  DateTime      @default(now())
+  
+  station PoliceStation @relation(fields: [stationId], references: [id])
+}
+
+enum Rating {
+  UP
+  DOWN
+}
+
+model Feedback {
+  id         String      @id @default(cuid())
+  messageId  String      @unique
+  officerId  String
+  rating     Rating
+  comment    String?
+  createdAt  DateTime    @default(now())
+  
+  message ChatMessage @relation(fields: [messageId], references: [id])
+  officer Officer     @relation(fields: [officerId], references: [id])
+}

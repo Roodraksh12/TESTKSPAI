@@ -1,0 +1,257 @@
+@import "tw-animate-css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* Professional Solid Palette */
+    --background: oklch(0.97 0 0); /* Slate 50/100ish */
+    --foreground: oklch(0.25 0 0); /* Dark slate grey */
+    --muted: oklch(0.94 0 0);
+    --muted-foreground: oklch(0.45 0 0);
+    --hairline: oklch(0.88 0 0); /* Darker border for clear separation */
+    
+    --surface: oklch(1 0 0); /* Pure white */
+    --surface-2: oklch(0.98 0 0);
+
+    /* Deep authoritative blue for Police theme */
+    --ink: oklch(0.3 0.1 260); /* Navy / Police Blue */
+    --ink-2: oklch(0.4 0.1 260);
+    
+    --teal: oklch(0.55 0.1 210);
+    --teal-soft: oklch(0.92 0.05 210);
+    
+    --amber: oklch(0.65 0.18 45);
+    --amber-soft: oklch(0.95 0.1 50);
+
+    --danger: oklch(0.55 0.2 25);
+    --danger-soft: oklch(0.95 0.08 25);
+
+    --font-display: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+    --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+
+  .dark {
+    --background: oklch(0.12 0.01 260); /* Deeper slate */
+    --foreground: oklch(0.95 0 0); /* Off white */
+    --muted: oklch(0.18 0.02 260);
+    --muted-foreground: oklch(0.65 0.02 260);
+    --hairline: oklch(0.22 0.02 260); 
+    
+    --surface: oklch(0.15 0.01 260); /* Slightly lighter than background */
+    --surface-2: oklch(0.20 0.01 260);
+
+    /* Keep accents deep but slightly more luminous for dark mode */
+    --ink: oklch(0.45 0.12 260); 
+    --ink-2: oklch(0.35 0.12 260);
+    
+    --teal: oklch(0.55 0.12 210);
+    --teal-soft: oklch(0.85 0.08 210); /* Soft teal text/bg */
+    
+    --amber: oklch(0.65 0.18 45);
+    --amber-soft: oklch(0.85 0.12 50);
+
+    --danger: oklch(0.55 0.2 25);
+    --danger-soft: oklch(0.85 0.1 25);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-hairline: var(--hairline);
+  --color-ink: var(--ink);
+
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+@utility text-kannada {
+  font-family: "Noto Serif Kannada", var(--font-sans);
+  font-feature-settings: "kern";
+}
+
+@utility text-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-hairline);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-weight: 500;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+    font-weight: 700;
+  }
+
+  .scrb-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-color: var(--background);
+  }
+}
+
+@utility dot-grid {
+  background-image: radial-gradient(circle, var(--hairline) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@utility scan-line {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(128, 128, 128, 0.03) 2px,
+    rgba(128, 128, 128, 0.03) 4px
+  );
+}
+
+@layer utilities {
+  /* Solid professional card */
+  .glass {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  .glass-strong {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  .glass-teal {
+    background: var(--surface);
+    border: 1px solid color-mix(in oklab, var(--teal) 40%, var(--hairline));
+    color: var(--foreground);
+    border-left: 4px solid var(--teal);
+  }
+
+  /* Dark contrast card */
+  .glass-ink {
+    background: var(--ink);
+    border: 1px solid var(--ink-2);
+    color: white;
+  }
+
+  .glass-amber {
+    background: var(--surface);
+    border: 1px solid color-mix(in oklab, var(--amber) 40%, var(--hairline));
+    color: var(--foreground);
+    border-left: 4px solid var(--amber);
+  }
+
+  .text-mono {
+    @apply font-mono;
+    letter-spacing: -0.01em;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 9999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+  }
+
+  .text-kannada {
+    font-family: "Noto Serif Kannada", ui-serif, Georgia, serif;
+    font-feature-settings: "kern";
+  }
+
+  .text-display {
+    @apply font-serif;
+    letter-spacing: -0.015em;
+  }
+}
+
+/* Minimalist Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border: 1px solid var(--hairline);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink);
+}
+
+/* Hide Google Translate Banner and Popups */
+body {
+  top: 0px !important;
+  position: static !important;
+}
+html {
+  top: 0px !important;
+}
+
+/* Hide the main banner iframe */
+iframe.goog-te-banner-frame {
+  display: none !important;
+}
+
+/* Hide any skiptranslate iframe (which is usually the banner) */
+.skiptranslate > iframe {
+  display: none !important;
+}
+
+/* Hide the weird auto-generated container for the new translate widget */
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf {
+  display: none !important;
+}
+.VIpgJd-ZVi9od-ORHb-OEVmcd {
+  display: none !important;
+}
+
+/* Hide tooltips and highlights */
+.goog-te-balloon-frame {
+  display: none !important;
+}
+.goog-tooltip, .goog-tooltip:hover {
+  display: none !important;
+}
+.goog-text-highlight {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
