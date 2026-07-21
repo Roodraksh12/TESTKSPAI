@@ -2,14 +2,80 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Mic, Send, X, Loader2, ArrowUpRight } from "lucide-react";
+import { Sparkles, Mic, Send, X, Loader2, ArrowUpRight, Copy, Edit2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { apiRequest } from "@/api/client";
 import { usePageContext } from "@/lib/scrb/page-context";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+const VoiceEqualizer = ({ isListening }: { isListening: boolean }) => {
+  const barsRef = useRef<(HTMLDivElement | null)[]>([]);
+  
+  useEffect(() => {
+    if (!isListening) return;
+    
+    let audioContext: AudioContext;
+    let analyzer: AnalyserNode;
+    let stream: MediaStream;
+    let animationFrame: number;
+    
+    async function init() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        analyzer = audioContext.createAnalyser();
+        analyzer.fftSize = 64;
+        const microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyzer);
+        const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+        
+        const update = () => {
+          analyzer.getByteFrequencyData(dataArray);
+          
+          if (barsRef.current) {
+            for (let i = 0; i < 5; i++) {
+              const el = barsRef.current[i];
+              if (el) {
+                const value = dataArray[i * 3 + 2]; 
+                const height = 4 + (value / 255) * 20;
+                el.style.height = `${height}px`;
+              }
+            }
+          }
+          animationFrame = requestAnimationFrame(update);
+        };
+        update();
+      } catch(e) {
+        console.error("Audio API error:", e);
+      }
+    }
+    
+    init();
+    
+    return () => {
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      if (audioContext && audioContext.state !== "closed") audioContext.close();
+    };
+  }, [isListening]);
+
+  return (
+    <div className="flex items-center gap-[3px] h-6 items-end pb-1">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div 
+          key={i} 
+          ref={el => { barsRef.current[i] = el; }}
+          className="w-[3px] bg-teal rounded-full"
+          style={{ height: '4px', transition: 'height 0.05s ease-out' }}
+        />
+      ))}
+    </div>
+  );
+};
 
 /**
  * Floating quick-ask pill.
@@ -138,14 +204,14 @@ export function AiPill() {
     // z-index sits above Leaflet, whose map controls and attribution declare up
     // to z-index 1000 and would otherwise draw through the panel on the Hotspots
     // and Analytics pages.
-    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[1100] flex justify-center px-4 sm:bottom-8">
+    <div className="pointer-events-none absolute inset-x-0 bottom-6 z-[1100] flex justify-center px-4 sm:bottom-8">
       <motion.div
         ref={containerRef}
         layout
         transition={{ type: "spring", stiffness: 280, damping: 28, mass: 1 }}
         className={cn(
           "pointer-events-auto relative overflow-hidden rounded-[28px] border border-hairline",
-          "bg-surface/80 shadow-[0_20px_60px_-20px_rgba(15,23,42,0.45)] backdrop-blur-2xl"
+          "bg-surface dark:bg-surface-2 shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)]"
         )}
         style={{ width: isOpen ? "min(640px, 92vw)" : "min(420px, 92vw)" }}
       >
@@ -242,6 +308,16 @@ export function AiPill() {
                             ))}
                           </div>
                         )}
+                        <div className="mt-2 flex items-center justify-end gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => { navigator.clipboard.writeText(answer || ""); toast.success("Copied to clipboard"); }}
+                            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            title="Copy text"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                        </div>
                       </>
                     )}
                   </motion.div>
@@ -292,6 +368,14 @@ export function AiPill() {
                 )}
 
                 <div className="ml-auto flex items-center gap-2">
+                  {listening && (
+                    <div className="flex items-center gap-2 mr-2">
+                      <span className="text-[12px] font-medium text-teal animate-pulse">
+                        Listening...
+                      </span>
+                      <VoiceEqualizer isListening={listening} />
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={toggleListen}

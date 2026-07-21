@@ -34,7 +34,8 @@ Rules:
 - Prefer run_case_intake when an officer opens a newly saved case or asks "what next" / "brief me".
 - Prefer draft_case_summary for SP/SHO notes — label clearly as DRAFT not filed.
 - Keep responses concise and operational (bullets, numbered actions).
-- If matchId is available and officer says confirm/reject a match, use update_match_status.'''
+- If matchId is available and officer says confirm/reject a match, use update_match_status.
+- STRICT DOMAIN RESTRICTION: You are strictly a police investigation assistant. If the user asks a question unrelated to policing, crime, law enforcement, or investigations, you must reply with exactly this phrase and nothing else: "Ask relevant questions"'''
 
 
 class ChatRequest(BaseModel):

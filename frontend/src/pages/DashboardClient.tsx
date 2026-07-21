@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Mic, Sparkles, ShieldCheck, ClipboardList, ExternalLink, TrendingUp, AlertTriangle, Activity, Briefcase, ChevronRight, FileText, MapPin, Volume2, VolumeX, FileDown, History, Plus, ShieldAlert, GitMerge, Clock } from "lucide-react";
+import { Send, Paperclip, Mic, Sparkles, ShieldCheck, ClipboardList, ExternalLink, TrendingUp, AlertTriangle, Activity, Briefcase, ChevronRight, FileText, MapPin, Volume2, VolumeX, FileDown, History, Plus, ShieldAlert, GitMerge, Clock, Copy, Edit2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -165,6 +165,7 @@ export function DashboardClient({
   const [isLoading, setIsLoading] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const speech = useSpeech();
 
   useEffect(() => {
@@ -409,6 +410,26 @@ export function DashboardClient({
                             )}
                           </button>
                         )}
+                        <div className={cn("flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity", msg.role === "user" ? "justify-end" : "justify-start")}>
+                          <button
+                            type="button"
+                            onClick={() => { navigator.clipboard.writeText(msg.content); toast.success("Copied to clipboard"); }}
+                            className="p-1 rounded-md border border-hairline hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            title="Copy text"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                          {msg.role === "user" && (
+                            <button
+                              type="button"
+                              onClick={() => { setInput(msg.content); inputRef.current?.focus(); }}
+                              className="p-1 rounded-md border border-hairline hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title="Edit text"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -480,6 +501,7 @@ export function DashboardClient({
                   </div>
                 ) : (
                   <input
+                    ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={activeCaseId ? t("copilot.askCasePlaceholder") : t("copilot.askPlaceholder")}

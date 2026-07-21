@@ -13,3 +13,4 @@ pymupdf
 psycopg[binary]
 psycopg_pool
 bcrypt
+edge-tts

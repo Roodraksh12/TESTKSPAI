@@ -23,6 +23,7 @@ import { useCopilotStore } from "@/lib/store";
 import { PredictiveNextSteps } from "@/components/scrb/predictive-steps";
 import { LegalSectionsPanel } from "@/components/scrb/legal-sections-panel";
 import { toast } from "sonner";
+import { ChargesheetEditor } from "@/components/scrb/ChargesheetEditor";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: FileText },
@@ -36,6 +37,7 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
   const [matches, setMatches] = useState(caseData.matches || []);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showChargesheet, setShowChargesheet] = useState(false);
   const { setPageContext, seedIntakeBrief, setActiveCaseId } = useCopilotStore();
   const navigate = useNavigate();
 
@@ -206,12 +208,10 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
                 Tactical view
               </Button>
             </Link>
-            <Link to={`/cases/${caseData.id}/chargesheet`}>
-              <Button variant="secondary" size="md">
-                <ScrollText className="h-4 w-4 mr-1.5" />
-                Chargesheet
-              </Button>
-            </Link>
+            <Button variant="secondary" size="md" onClick={() => setShowChargesheet(true)}>
+              <ScrollText className="h-4 w-4 mr-1.5" />
+              Chargesheet
+            </Button>
           </div>
         </div>
 
@@ -249,6 +249,11 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           )}
         </div>
       </Card>
+      <ChargesheetEditor
+        caseId={c.id}
+        isOpen={showChargesheet}
+        onClose={() => setShowChargesheet(false)}
+      />
     </div>
   );
 }
