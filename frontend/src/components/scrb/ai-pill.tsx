@@ -261,7 +261,6 @@ export function AiPill() {
                 <p className="text-[12px] font-medium tracking-wide text-foreground">
                   {t("copilot.title")}
                 </p>
-                <p className="hidden text-[11px] text-muted-foreground sm:block">· {t("pill.notSaved")}</p>
                 <button
                   type="button"
                   onClick={reset}

@@ -10,6 +10,7 @@ import {
 } from "@/components/scrb/primitives";
 import { SealMark } from "@/components/scrb/insignia";
 import { ModeToggle } from "@/components/scrb/mode-toggle";
+import { EntryTransition } from "@/components/scrb/entry-transition";
 
 const FEATURES = [
   { icon: Sparkles, label: "Source-cited copilot", copy: "Every answer cites the FIR, ledger or MO cluster it drew from." },
@@ -57,8 +58,8 @@ export default function LoginPage() {
 
     try {
       await login(loginBadge, loginPass);
-      setSubmitting(false);
-      navigate("/dashboard");
+      // Wait for the biometric transition animation
+      setTimeout(() => navigate("/dashboard"), 2700);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid Badge ID or Password";
       setError(message.includes("Failed to fetch") || message.includes("NetworkError")
@@ -213,9 +214,9 @@ export default function LoginPage() {
             </div>
           </TiltCard>
 
-
         </div>
       </div>
+      <EntryTransition show={submitting} />
     </main>
   );
 }
