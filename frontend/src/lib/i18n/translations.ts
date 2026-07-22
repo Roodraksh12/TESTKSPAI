@@ -55,6 +55,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "copilot.newConversation": "New conversation",
     "copilot.noConversations": "No saved conversations yet. Ask the copilot something and it will appear here.",
     "copilot.historyPrivacy": "Conversations are stored against your badge and visible only to you. Every query is separately recorded in the audit trail.",
+    "pill.notSaved": "Not saved to history",
+    "pill.thinking": "Checking records…",
+    "pill.sources": "Sources",
+    "pill.send": "Send",
+    "pill.continueInCopilot": "Continue in Copilot",
     "copilot.listen": "Listen",
     "copilot.stop": "Stop",
 
@@ -226,6 +231,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "copilot.newConversation": "ಹೊಸ ಸಂಭಾಷಣೆ",
     "copilot.noConversations": "ಇನ್ನೂ ಯಾವುದೇ ಸಂಭಾಷಣೆ ಉಳಿಸಿಲ್ಲ. ಸಹಾಯಕನಿಗೆ ಪ್ರಶ್ನೆ ಕೇಳಿದರೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತದೆ.",
     "copilot.historyPrivacy": "ಸಂಭಾಷಣೆಗಳು ನಿಮ್ಮ ಬ್ಯಾಡ್ಜ್‌ಗೆ ಸಂಬಂಧಿಸಿ ಉಳಿಸಲಾಗಿದ್ದು ನಿಮಗೆ ಮಾತ್ರ ಕಾಣುತ್ತವೆ. ಪ್ರತಿ ಪ್ರಶ್ನೆಯೂ ಲೆಕ್ಕಪರಿಶೋಧನಾ ದಾಖಲೆಯಲ್ಲಿ ಪ್ರತ್ಯೇಕವಾಗಿ ದಾಖಲಾಗುತ್ತದೆ.",
+    "pill.notSaved": "ಇತಿಹಾಸದಲ್ಲಿ ಉಳಿಸುವುದಿಲ್ಲ",
+    "pill.thinking": "ದಾಖಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸುತ್ತಿದೆ…",
+    "pill.sources": "ಮೂಲಗಳು",
+    "pill.send": "ಕಳುಹಿಸಿ",
+    "pill.continueInCopilot": "ಸಹಾಯಕದಲ್ಲಿ ಮುಂದುವರಿಸಿ",
     "copilot.listen": "ಆಲಿಸಿ",
     "copilot.stop": "ನಿಲ್ಲಿಸಿ",
 

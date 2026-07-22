@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 import httpx
+from fastapi import HTTPException
 
 from app.config import get_settings
 
@@ -44,7 +45,22 @@ async def chat_completion(
         )
         response.raise_for_status()
         data = response.json()
-        message = data["choices"][0]["message"]
+
+        # OpenRouter answers 200 even when the upstream provider refused — a
+        # rate-limited or tool-incapable free model comes back with an "error"
+        # object and no "choices". Reading choices blindly raised KeyError,
+        # which escaped as an unhandled 500 with no CORS headers and reached the
+        # browser as an opaque "failed to fetch". Surface the real reason.
+        choices = data.get("choices")
+        if not choices:
+            provider_error = data.get("error") or {}
+            reason = provider_error.get("message") or "no completion returned"
+            raise HTTPException(
+                status_code=502,
+                detail=f"Model '{payload['model']}' did not answer: {reason}",
+            )
+
+        message = choices[0].get("message") or {}
         if tools is not None:
             return message
         return message.get("content") or ""

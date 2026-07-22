@@ -34,7 +34,8 @@ Rules:
 - Prefer run_case_intake when an officer opens a newly saved case or asks "what next" / "brief me".
 - Prefer draft_case_summary for SP/SHO notes — label clearly as DRAFT not filed.
 - Keep responses concise and operational (bullets, numbered actions).
-- If matchId is available and officer says confirm/reject a match, use update_match_status.'''
+- If matchId is available and officer says confirm/reject a match, use update_match_status.
+- STRICT DOMAIN RESTRICTION: You are strictly a police investigation assistant. If the user asks a question unrelated to policing, crime, law enforcement, or investigations, you must reply with exactly this phrase and nothing else: "Ask relevant questions"'''
 
 
 class ChatRequest(BaseModel):
@@ -44,6 +45,12 @@ class ChatRequest(BaseModel):
     stationId: str | None = None
     sessionId: str | None = None
     history: list[dict] = Field(default_factory=list)
+    # The floating quick-ask pill is a one-shot lookup about the page in front of
+    # the officer, not a conversation. Those turns are deliberately not written
+    # to ChatSession/ChatMessage so the saved history stays a record of real
+    # investigative threads. The AuditLog entry is still written either way —
+    # every query against case data remains on record regardless of surface.
+    persist: bool = True
 
 
 class DraftFirRequest(BaseModel):
@@ -72,8 +79,12 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
 
     # Persist the question before the model runs, for the same reason the audit
     # row is written first: a conversation that errored still happened.
-    session_id = chat_store.ensure_session(officer["id"], payload.sessionId, payload.activeCaseId)
-    chat_store.append_message(session_id, chat_store.ROLE_USER, payload.message)
+    session_id: str | None = None
+    if payload.persist:
+        session_id = chat_store.ensure_session(
+            officer["id"], payload.sessionId, payload.activeCaseId
+        )
+        chat_store.append_message(session_id, chat_store.ROLE_USER, payload.message)
 
     context_addition = ""
     if payload.pageContext:
@@ -178,7 +189,8 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
 
     reply = final_reply or "No response."
     deduped_sources = list(dict.fromkeys(sources))[:6]
-    chat_store.append_message(session_id, chat_store.ROLE_ASSISTANT, reply, deduped_sources)
+    if session_id:
+        chat_store.append_message(session_id, chat_store.ROLE_ASSISTANT, reply, deduped_sources)
 
     return {
         "reply": reply,
@@ -186,6 +198,34 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
         "sources": deduped_sources,
         "sessionId": session_id,
     }
+
+
+class QuickAskRequest(BaseModel):
+    message: str
+    """Human-readable description of what the officer is looking at."""
+    pageContext: str | None = None
+    activeCaseId: str | None = None
+
+
+@router.post("/chat/quick")
+async def quick_ask(
+    payload: QuickAskRequest, current_user: dict = Depends(get_current_user)
+) -> dict:
+    """One-shot question about the current page.
+
+    Same tools and same jurisdiction scoping as the main copilot, but nothing is
+    written to the conversation history: this is a glance, not a thread.
+    """
+    return await chat(
+        ChatRequest(
+            message=payload.message,
+            pageContext=payload.pageContext,
+            activeCaseId=payload.activeCaseId,
+            history=[],
+            persist=False,
+        ),
+        current_user,
+    )
 
 
 @router.post("/ai/draft-fir")
