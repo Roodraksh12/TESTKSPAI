@@ -58,8 +58,8 @@ export default function LoginPage() {
 
     try {
       await login(loginBadge, loginPass);
-      // Wait for the biometric transition animation
-      setTimeout(() => navigate("/dashboard"), 2700);
+      // Wait for the transition animation
+      setTimeout(() => navigate("/dashboard"), 1800);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid Badge ID or Password";
       setError(message.includes("Failed to fetch") || message.includes("NetworkError")
@@ -191,7 +191,7 @@ export default function LoginPage() {
                 <div className="pt-2">
                   <MagneticButton>
                     <Button variant="primary" size="lg" className="w-full" disabled={submitting}>
-                      {submitting ? "Verifying badge…" : (<>Enter workspace <ArrowRight className="h-4 w-4" /></>)}
+                      {submitting ? "Loading..." : (<>Enter workspace <ArrowRight className="h-4 w-4" /></>)}
                     </Button>
                   </MagneticButton>
                   <button
