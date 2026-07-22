@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from math import ceil
 from typing import Any
 
-from app.services.case_access import station_filter_sql
+from app.services.case_access import jurisdiction_filter_sql
 from app.services.db import fetch_all
 
 # Statutory deadline engine. BNSS 187(3) (successor to CrPC 167(2)): if the
@@ -104,8 +104,8 @@ def compute_case_clocks(case: dict[str, Any], now: datetime) -> dict[str, Any]:
     }
 
 
-def get_compliance_board(is_sp: bool, station_id: str) -> dict[str, Any]:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="c")
+def get_compliance_board(officer: dict[str, Any]) -> dict[str, Any]:
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     cases = fetch_all(
         f'''
         SELECT c.id, c."firNumber", c."crimeType", c.status, c."reportedDate", c.summary
@@ -138,8 +138,8 @@ def get_compliance_board(is_sp: bool, station_id: str) -> dict[str, Any]:
     return {"board": board, "summary": summary}
 
 
-def get_deadline_risks(is_sp: bool, station_id: str, take: int = 10) -> list[dict[str, Any]]:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="c")
+def get_deadline_risks(officer: dict[str, Any], take: int = 10) -> list[dict[str, Any]]:
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     cases = fetch_all(
         f'''
         SELECT c.id, c."firNumber", c."crimeType", c.status, c."reportedDate", c.summary

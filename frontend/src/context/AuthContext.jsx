@@ -24,10 +24,6 @@ export function AuthProvider({ children }) {
       return
     }
 
-    // Render immediately from the cached profile, then reconcile with the server.
-    // Without this the cached copy never refreshes, so a token revoked server-side
-    // still renders a signed-in shell, and profile fields added after the officer
-    // last logged in stay missing until they sign out and back in.
     setUser(stored)
     setLoading(false)
 
@@ -39,9 +35,8 @@ export function AuthProvider({ children }) {
       })
       .catch((err) => {
         if (cancelled) return
-        // Only sign out on an explicit auth rejection — a transient network or
-        // server error must not evict a valid session.
-        if (err?.status === 401 || err?.status === 403) {
+        // Only clear on explicit unauthenticated — never on transient 5xx/network.
+        if (err?.status === 401) {
           clearAuthStorage()
           setUser(null)
         }
@@ -55,9 +50,13 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (badgeId, password) => {
     const data = await loginRequest(badgeId, password)
     localStorage.setItem(TOKEN_KEY, data.token)
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user))
-    setUser(data.user)
-    return data.user
+    const userPayload = {
+      ...data.user,
+      mustChangePassword: Boolean(data.mustChangePassword || data.user?.mustChangePassword),
+    }
+    localStorage.setItem(USER_KEY, JSON.stringify(userPayload))
+    setUser(userPayload)
+    return userPayload
   }, [])
 
   const logout = useCallback(() => {
@@ -72,6 +71,7 @@ export function AuthProvider({ children }) {
       login,
       logout,
       session: user ? { user } : null,
+      mustChangePassword: Boolean(user?.mustChangePassword || user?.status === "MUST_CHANGE_PASSWORD"),
     }),
     [user, loading, login, logout]
   )
@@ -89,7 +89,7 @@ export function useAuth() {
 
 /** Compatibility shim for ported Next.js components */
 export function useSession() {
-  const { user, loading, logout } = useAuth()
+  const { user, loading } = useAuth()
   return {
     data: user ? { user } : null,
     status: loading ? "loading" : user ? "authenticated" : "unauthenticated",

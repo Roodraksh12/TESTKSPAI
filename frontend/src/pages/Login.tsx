@@ -1,9 +1,9 @@
 "use client";
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Fingerprint, ShieldCheck, ArrowRight, Lock, Sparkles, FileSearch, Radio, Scale } from "lucide-react";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import {
   Button,
   Input,
@@ -23,44 +23,29 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   
-  const [district, setDistrict] = useState("Bengaluru City");
-  const [station, setStation] = useState("Cubbon Park");
   const [badgeId, setBadgeId] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Sample data for the dropdowns
-  const DISTRICTS = [
-    "Bengaluru City",
-    "Mysuru City",
-    "Mangaluru City",
-    "Hubballi-Dharwad City",
-    "Belagavi City",
-  ];
-
-  const STATIONS: Record<string, string[]> = {
-    "Bengaluru City": ["Cubbon Park", "Vidhana Soudha", "High Grounds", "Halasuru", "Indiranagar"],
-    "Mysuru City": ["Devaraja", "Krishnaraja", "Lashkar", "Mandi", "Narasimharaja"],
-    "Mangaluru City": ["Barke", "Bunder", "Kadri", "Kankanady", "Pandeshwar"],
-    "Hubballi-Dharwad City": ["Suburban", "Town", "Vidyanagar", "Gokul Road", "Keshwapur"],
-    "Belagavi City": ["Camp", "Khadebazar", "Market", "Shahapur", "Tilakwadi"],
-  };
-
-  const availableStations = STATIONS[district] || ["Select Station"];
-  const handleSignIn = async (useDemo: boolean) => {
+  const handleSignIn = async () => {
     setSubmitting(true);
     setError("");
-    
-    const loginBadge = useDemo ? "KA-INS-4471" : badgeId;
-    const loginPass = useDemo ? "demo1234" : password;
 
     try {
-      await login(loginBadge, loginPass);
-      // Wait for the transition animation
-      setTimeout(() => navigate("/dashboard"), 1800);
+      const user = await login(badgeId, password);
+      if (user?.mustChangePassword || user?.status === "MUST_CHANGE_PASSWORD") {
+        setSubmitting(false);
+        navigate("/change-password");
+      } else {
+        // Wait for the entry transition animation
+        setTimeout(() => {
+          navigate(user?.capabilities?.defaultHome || "/dashboard");
+          setSubmitting(false);
+        }, 1800);
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Invalid Badge ID or Password";
+      const message = err instanceof Error ? err.message : "Invalid Service ID or Password";
       setError(message.includes("Failed to fetch") || message.includes("NetworkError")
         ? "Cannot reach API. Is the backend running on http://localhost:8000?"
         : message);
@@ -107,56 +92,13 @@ export default function LoginPage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  handleSignIn(false);
+                  handleSignIn();
                 }}
                 className="mt-6 space-y-3"
               >
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium tracking-wide text-muted-foreground">
-                      District
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={district}
-                        onChange={(e) => {
-                          setDistrict(e.target.value);
-                          setStation(STATIONS[e.target.value]?.[0] || "");
-                        }}
-                        className="flex h-11 w-full rounded-2xl border border-hairline bg-surface-2 px-4 py-2 text-sm text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
-                      >
-                        {DISTRICTS.map((d) => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                        <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium tracking-wide text-muted-foreground">
-                      Station
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={station}
-                        onChange={(e) => setStation(e.target.value)}
-                        className="flex h-11 w-full rounded-2xl border border-hairline bg-surface-2 px-4 py-2 text-sm text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 appearance-none"
-                      >
-                        {availableStations.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                        <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
                 <div>
                   <label className="mb-1 block text-[11px] font-medium tracking-wide text-muted-foreground">
-                    Badge ID
+                    Service ID / Badge ID
                   </label>
                   <div className="relative">
                     <Input
@@ -183,6 +125,11 @@ export default function LoginPage() {
                     />
                     <Lock className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   </div>
+                  <div className="mt-1.5 text-right">
+                    <Link to="/forgot-password" className="text-[11px] text-teal hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
                 </div>
 
                 {error && <p className="text-red-500 text-[11px]">{error}</p>}
@@ -193,13 +140,6 @@ export default function LoginPage() {
                       {submitting ? "Loading..." : (<>Enter workspace <ArrowRight className="h-4 w-4" /></>)}
                     </Button>
                   </MagneticButton>
-                  <button
-                    type="button"
-                    onClick={() => handleSignIn(true)}
-                    className="mt-2 w-full rounded-2xl border border-hairline bg-surface px-5 py-3 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  >
-                    Use demo credentials
-                  </button>
                 </div>
               </form>
 
@@ -309,8 +249,6 @@ function HeroPanel() {
           ))}
         </div>
       </div>
-
-      <LiveTicker />
     </div>
   );
 }
@@ -348,42 +286,8 @@ function FeatureTile({ icon: Icon, label, copy }: { icon: typeof Sparkles; label
   );
 }
 
-/** Fake live ticker of ingested records to add motion at the bottom of the panel. */
-function LiveTicker() {
-  const items = [
-    "FIR-2026-1042 · linked to 1039",
-    "MO cluster \"Chotu\" · +2 witness matches",
-    "Hotspot · HAL 2nd Stage ↑9 this week",
-    "Dossier drafted · Cheque fraud Jayanagar",
-    "New intake · FIR-2026-1101",
-  ];
-  return (
-    <div className="mt-10 overflow-hidden rounded-full border border-hairline bg-surface">
-      <div className="flex items-center gap-3 px-4 py-2">
-        <span className="relative flex h-2 w-2 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal opacity-60" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-teal" />
-        </span>
-        <span className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
-          Live
-        </span>
-        <div className="relative min-w-0 flex-1 overflow-hidden">
-          <div className="flex gap-8 whitespace-nowrap animate-[marquee_28s_linear_infinite]">
-            {[...items, ...items].map((t, i) => (
-              <span key={i} className="text-mono text-[11px] text-foreground/80">
-                · {t}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-      <style>{`@keyframes marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }`}</style>
-    </div>
-  );
-}
-
 /** Card that tilts subtly toward the cursor, with a spotlight sheen. */
-function TiltCard({ children }: { children: React.ReactNode }) {
+function TiltCard({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const onMove = (e: MouseEvent<HTMLDivElement>) => {
     const el = ref.current;
@@ -468,7 +372,7 @@ function MagneticSeal() {
 }
 
 /** Wraps the primary submit button with a subtle magnetic pull. */
-function MagneticButton({ children }: { children: React.ReactNode }) {
+function MagneticButton({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const onMove = (e: MouseEvent<HTMLDivElement>) => {
     const el = ref.current;

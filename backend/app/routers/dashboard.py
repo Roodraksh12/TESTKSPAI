@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends
 
 from app.deps import get_current_user
 from app.services import deadline_engine
-from app.services.case_access import station_filter_sql
+from app.services.hierarchy import has_wide_case_scope, platform_capabilities, scope_level_for
+from app.services.case_access import jurisdiction_filter_sql
 from app.services.db import run_on_connection, serialize_row, serialize_rows
 from app.services.parallel import analytics_cache, gather
 
@@ -17,9 +18,10 @@ RECENT_CASE_COLUMNS = '''
 @router.get("")
 def dashboard(current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
-    is_sp = officer.get("role") == "SP"
-    scope_sql, scope_params = station_filter_sql(is_sp, officer["stationId"], alias="c")
-    alert_scope_sql, alert_scope_params = station_filter_sql(is_sp, officer["stationId"], alias="a")
+    wide_scope = has_wide_case_scope(officer.get("role"))
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
+    alert_scope_sql, alert_scope_params = jurisdiction_filter_sql(officer, alias="a")
+    cache_key = ("dashboard", officer["id"], officer.get("role"))
 
     def _load(conn):
         with conn.cursor() as cur:
@@ -61,8 +63,6 @@ def dashboard(current_user: dict = Depends(get_current_user)) -> dict:
             )
             recent_cases = serialize_rows(cur.fetchall())
 
-            # AI-suggested links still awaiting a human decision. These are the
-            # officer's queue: nothing acts on a match until it's confirmed.
             cur.execute(
                 f'''
                 SELECT COUNT(*) AS total
@@ -84,6 +84,26 @@ def dashboard(current_user: dict = Depends(get_current_user)) -> dict:
             )
             open_cases = int((serialize_row(cur.fetchone()) or {}).get("total") or 0)
 
+            station_breakdown = []
+            if wide_scope:
+                cur.execute(
+                    f'''
+                    SELECT ps.id AS "stationId", ps.name AS "stationName",
+                           COUNT(*)::int AS "caseCount",
+                           COUNT(*) FILTER (
+                             WHERE c.status IN ('OPEN', 'UNDER_INVESTIGATION')
+                           )::int AS "openCount"
+                    FROM "Case" c
+                    JOIN "PoliceStation" ps ON c."stationId" = ps.id
+                    WHERE 1=1{scope_sql}
+                    GROUP BY ps.id, ps.name
+                    ORDER BY "caseCount" DESC
+                    LIMIT 12
+                    ''',
+                    scope_params,
+                )
+                station_breakdown = serialize_rows(cur.fetchall())
+
             return (
                 total_cases,
                 clearance_rate,
@@ -91,18 +111,15 @@ def dashboard(current_user: dict = Depends(get_current_user)) -> dict:
                 recent_cases,
                 pending_matches,
                 open_cases,
+                station_breakdown,
             )
 
-    # The counts batch and the compliance board are independent, so they run
-    # side by side rather than one after the other — against a remote database
-    # that halves the page's time-to-first-paint. The result is then cached so
-    # returning to the landing tab is instant; creating a case clears it.
     parts = analytics_cache.get_or_compute(
-        ("dashboard", is_sp, officer["stationId"]),
+        cache_key,
         lambda: gather(
             {
                 "counts": lambda: run_on_connection(_load),
-                "board": lambda: deadline_engine.get_compliance_board(is_sp, officer["stationId"]),
+                "board": lambda: deadline_engine.get_compliance_board(officer),
             }
         ),
     )
@@ -114,11 +131,18 @@ def dashboard(current_user: dict = Depends(get_current_user)) -> dict:
         recent_cases,
         pending_matches,
         open_cases,
-    ) = parts["counts"] or (0, 0, 0, [], 0, 0)
+        station_breakdown,
+    ) = parts["counts"] or (0, 0, 0, [], 0, 0, [])
 
-    # Statutory clock exposure — the one number on this screen with a legal
-    # deadline attached, so it leads the "needs attention" block.
     summary = (parts["board"] or {}).get("summary", {})
+    caps = platform_capabilities(officer)
+    level = scope_level_for(officer.get("role"))
+    if level == "STATE":
+        scope_label = "Statewide"
+    elif wide_scope:
+        scope_label = f'{officer.get("districtName") or caps["scopeLabel"]} — all stations in scope'
+    else:
+        scope_label = f'{officer.get("stationName") or "Your station"} only'
 
     return {
         "officer": {
@@ -127,13 +151,8 @@ def dashboard(current_user: dict = Depends(get_current_user)) -> dict:
             "role": officer.get("role"),
             "stationName": officer.get("stationName"),
             "districtName": officer.get("districtName"),
-            # Spelling out the visibility rule makes RBAC legible instead of
-            # leaving an officer wondering why a case isn't in their list.
-            "scopeLabel": (
-                f'{officer.get("districtName") or "District"} — all stations'
-                if is_sp
-                else f'{officer.get("stationName") or "Your station"} only'
-            ),
+            "scopeLabel": scope_label,
+            "scopeLevel": level,
         },
         "stats": {
             "totalCases": total_cases,
@@ -149,4 +168,5 @@ def dashboard(current_user: dict = Depends(get_current_user)) -> dict:
             "highRiskAlerts": high_risk_alerts,
         },
         "recentCases": recent_cases,
+        "stationBreakdown": station_breakdown,
     }

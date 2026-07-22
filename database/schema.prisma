@@ -7,39 +7,138 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model CommandRange {
+  id        String     @id @default(cuid())
+  name      String
+  districts District[]
+  officers  Officer[]  @relation("OfficerCommandRange")
+}
+
 model District {
-  id       String          @id @default(cuid())
-  name     String
-  stations PoliceStation[]
+  id             String            @id @default(cuid())
+  name           String
+  commandRangeId String?
+  commandRange   CommandRange?     @relation(fields: [commandRangeId], references: [id])
+  stations       PoliceStation[]
+  ranges         Range[]
+  officerLinks   OfficerDistrict[]
+}
+
+model Range {
+  id         String          @id @default(cuid())
+  name       String
+  districtId String
+  district   District        @relation(fields: [districtId], references: [id])
+  stations   PoliceStation[]
+  officers   Officer[]       @relation("OfficerRange")
 }
 
 model PoliceStation {
   id         String    @id @default(cuid())
   name       String
   districtId String
+  rangeId    String?
   district   District  @relation(fields: [districtId], references: [id])
+  range      Range?    @relation(fields: [rangeId], references: [id])
   officers   Officer[]
   cases      Case[]
   alerts     Alert[]
 }
 
+model OfficerDistrict {
+  officerId  String
+  districtId String
+  officer    Officer  @relation(fields: [officerId], references: [id], onDelete: Cascade)
+  district   District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@id([officerId, districtId])
+}
+
 enum Role {
-  CONSTABLE
-  INSPECTOR
+  POLICE_IT
+  DGP_IGP
+  ADGP
+  IGP
+  DIG
   SP
+  ADDL_SP_DCP
+  ASP_ACP
+  DYSP
+  SHO
+  INSPECTOR
+  SI
+  ASI
+  HEAD_CONSTABLE
+  CONSTABLE
+}
+
+enum OfficerStatus {
+  PENDING_INVITE
+  MUST_CHANGE_PASSWORD
+  ACTIVE
+  DISABLED
+}
+
+enum ResetRequestStatus {
+  PENDING
+  FULFILLED
+  REJECTED
 }
 
 model Officer {
-  id           String        @id @default(cuid())
-  badgeId      String        @unique
-  passwordHash String
-  name         String
-  role         Role
-  stationId    String
-  station      PoliceStation @relation(fields: [stationId], references: [id])
-  chatSessions ChatSession[]
-  auditLogs    AuditLog[]
-  feedbacks    Feedback[]
+  id                 String         @id @default(cuid())
+  badgeId            String         @unique
+  passwordHash       String
+  name               String
+  role               Role
+  stationId          String?
+  email              String?
+  districtId         String?
+  rangeId            String?
+  commandRangeId     String?
+  reportingOfficerId String?
+  hierarchyPath      String // Postgres ltree; stored as text in Prisma
+  status             OfficerStatus  @default(ACTIVE)
+  createdById        String?
+  station            PoliceStation? @relation(fields: [stationId], references: [id])
+  range              Range?         @relation("OfficerRange", fields: [rangeId], references: [id])
+  commandRange       CommandRange?  @relation("OfficerCommandRange", fields: [commandRangeId], references: [id])
+  reportingOfficer   Officer?       @relation("OfficerReports", fields: [reportingOfficerId], references: [id])
+  reports            Officer[]      @relation("OfficerReports")
+  createdBy          Officer?       @relation("OfficerCreatedBy", fields: [createdById], references: [id])
+  createdOfficers    Officer[]      @relation("OfficerCreatedBy")
+  districts          OfficerDistrict[]
+  chatSessions       ChatSession[]
+  auditLogs          AuditLog[]
+  feedbacks          Feedback[]
+  invitationsSent    Invitation[]   @relation("InvitedBy")
+  invitationsRecv    Invitation[]   @relation("InvitedOfficer")
+  resetRequests      PasswordResetRequest[] @relation("ResetOfficer")
+  resetsFulfilled    PasswordResetRequest[] @relation("ResetFulfilledBy")
+}
+
+model Invitation {
+  id               String    @id @default(cuid())
+  invitedOfficerId String
+  invitedById      String
+  tempPasswordHash String
+  expiresAt        DateTime
+  usedAt           DateTime?
+  channel          String    @default("email")
+  createdAt        DateTime  @default(now())
+  invitedOfficer   Officer   @relation("InvitedOfficer", fields: [invitedOfficerId], references: [id])
+  invitedBy        Officer   @relation("InvitedBy", fields: [invitedById], references: [id])
+}
+
+model PasswordResetRequest {
+  id            String             @id @default(cuid())
+  officerId     String
+  requestedAt   DateTime           @default(now())
+  status        ResetRequestStatus @default(PENDING)
+  fulfilledById String?
+  fulfilledAt   DateTime?
+  officer       Officer            @relation("ResetOfficer", fields: [officerId], references: [id])
+  fulfilledBy   Officer?           @relation("ResetFulfilledBy", fields: [fulfilledById], references: [id])
 }
 
 enum CaseStatus {

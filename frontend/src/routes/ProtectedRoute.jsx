@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 
 export default function ProtectedRoute() {
-  const { loading, user } = useAuth()
+  const { loading, user, mustChangePassword } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -18,6 +18,15 @@ export default function ProtectedRoute() {
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />
+  }
+
+  const onChangePassword = location.pathname === "/change-password"
+  if (mustChangePassword && !onChangePassword) {
+    return <Navigate to="/change-password" replace />
+  }
+  if (!mustChangePassword && onChangePassword) {
+    const home = user?.capabilities?.defaultHome || "/dashboard"
+    return <Navigate to={home} replace />
   }
 
   return <Outlet />

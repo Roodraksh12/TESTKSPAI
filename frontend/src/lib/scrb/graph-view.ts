@@ -13,6 +13,9 @@ export type GraphNode = {
   sub?: string | null;
   detail?: string | null;
   date?: string | null;
+  /** Server-precomputed layout (0–100). Prefer over client force layout. */
+  x?: number;
+  y?: number;
 };
 
 export type GraphEdge = { from: string; to: string; label: string };
@@ -82,20 +85,29 @@ export function shortestPath(edges: GraphEdge[], from: string, to: string): stri
 }
 
 /**
- * Deterministic Fruchterman–Reingold-style force layout in a 0–100 coordinate
- * box. Run on the small revealed subset (tens of nodes) each time it changes,
- * so the visible neighbourhood always clusters neatly around what's on screen
- * rather than being scattered across a full-graph layout.
- *
- * The seeded RNG keeps the layout stable across renders — the same subgraph
- * always lands in the same arrangement, so the canvas doesn't reshuffle itself
- * while an officer is reading it.
+ * Prefer server-precomputed x/y (display-only FE). Fall back to a light
+ * client layout only when the payload has no coordinates.
  */
 export function layoutGraph(rawNodes: GraphNode[], edges: GraphEdge[]): PositionedNode[] {
   const n = rawNodes.length;
   if (n === 0) return [];
-  if (n === 1) return [{ ...rawNodes[0], x: 50, y: 50 }];
+  if (n === 1) {
+    const only = rawNodes[0];
+    return [{ ...only, x: only.x ?? 50, y: only.y ?? 50 }];
+  }
 
+  const withServer = rawNodes.every(
+    (node) => typeof node.x === "number" && typeof node.y === "number"
+  );
+  if (withServer) {
+    return rawNodes.map((node) => ({ ...node, x: node.x as number, y: node.y as number }));
+  }
+
+  return layoutGraphClient(rawNodes, edges);
+}
+
+function layoutGraphClient(rawNodes: GraphNode[], edges: GraphEdge[]): PositionedNode[] {
+  const n = rawNodes.length;
   const idToIndex = new Map(rawNodes.map((node, i) => [node.id, i]));
 
   let seed = 42;

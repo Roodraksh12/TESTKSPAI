@@ -6,6 +6,7 @@ from app.routers import (
     ai,
     audit,
     auth,
+    admin_officers,
     cases,
     chat_sessions,
     dashboard,
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(admin_officers.router)
     app.include_router(cases.router)
     app.include_router(search.router)
     app.include_router(dashboard.router)

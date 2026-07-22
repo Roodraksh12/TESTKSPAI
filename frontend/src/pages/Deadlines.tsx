@@ -5,6 +5,7 @@ import { ShieldAlert } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { DeadlineRiskList, DeadlineSummaryTiles, type DeadlineRow, type DeadlineSummary } from "@/components/scrb/deadline-board";
 import { ChargesheetEditor } from "@/components/scrb/ChargesheetEditor";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 
 export default function Deadlines() {
   const { t } = useI18n();
@@ -13,22 +14,20 @@ export default function Deadlines() {
   const [loading, setLoading] = useState(true);
   const [editorCaseId, setEditorCaseId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = () =>
     apiRequest("/api/deadlines")
       .then((payload) => {
-        if (cancelled) return;
         setBoard(payload.board || []);
         setSummary(payload.summary || {});
       })
       .catch(console.error)
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => setLoading(false));
+
+  useEffect(() => {
+    load();
   }, []);
+
+  useVisibilityRefetch(load);
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto p-4 sm:p-6 lg:p-8">

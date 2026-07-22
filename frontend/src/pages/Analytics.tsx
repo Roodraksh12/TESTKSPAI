@@ -7,6 +7,7 @@ import { CrimeTrendChart, PredictiveRadarChart, type TrendDatum, type TrendSerie
 import { EarlyWarningsFeed, type EarlyWarning } from "@/components/scrb/early-warnings";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/lib/i18n";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 
 type AnalyticsPayload = {
   metrics: {
@@ -31,11 +32,14 @@ export default function Analytics() {
     apiRequest("/api/analytics").then(setPayload).catch(console.error);
   }, []);
 
+  useVisibilityRefetch(() => apiRequest("/api/analytics").then(setPayload).catch(console.error));
+
   // Composition of the current caseload. This was already computed server-side
   // and thrown away; it answers "what am I actually dealing with?", which the
   // time-series trend chart beside it does not.
-  const crimeMix = Object.entries(payload?.metrics.crimeTypeBreakdown ?? {})
-    .sort((a, b) => b[1] - a[1]);
+  const crimeMix = Object.entries(
+    payload?.metrics.crimeTypeBreakdown ?? (payload?.metrics as any)?.byType ?? {}
+  ).sort((a, b) => b[1] - a[1]);
   const mixTotal = crimeMix.reduce((sum, [, n]) => sum + n, 0);
 
   const totalCases = payload?.metrics.totalCases ?? 0;

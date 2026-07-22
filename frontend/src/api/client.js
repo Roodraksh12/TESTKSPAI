@@ -23,6 +23,16 @@ export function clearAuthStorage() {
 
 const apiCache = new Map()
 
+function detailMessage(payload) {
+  if (typeof payload === "object" && payload?.detail) {
+    return typeof payload.detail === "string"
+      ? payload.detail
+      : JSON.stringify(payload.detail)
+  }
+  if (typeof payload === "object" && payload?.error) return payload.error
+  return "Request failed"
+}
+
 async function performFetch(path, options, headers) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -35,19 +45,25 @@ async function performFetch(path, options, headers) {
     : await response.text()
 
   if (!response.ok) {
-    const message =
-      typeof payload === "object" && payload?.detail
-        ? typeof payload.detail === "string"
-          ? payload.detail
-          : JSON.stringify(payload.detail)
-        : typeof payload === "object" && payload?.error
-          ? payload.error
-          : "Request failed"
+    const message = detailMessage(payload)
     const error = new Error(message)
-    // Callers need to tell an auth rejection from a transient server error —
-    // e.g. only signing the officer out on 401/403, not on a 500 or a timeout.
     error.status = response.status
     error.payload = payload
+
+    // Server-side must-change gate: send the user to the change-password screen.
+    if (
+      response.status === 403 &&
+      typeof message === "string" &&
+      message.toLowerCase().includes("password change required") &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/change-password")
+    ) {
+      const stored = getStoredUser() || {}
+      const next = { ...stored, mustChangePassword: true, status: "MUST_CHANGE_PASSWORD" }
+      localStorage.setItem(USER_KEY, JSON.stringify(next))
+      window.location.assign("/change-password")
+    }
+
     throw error
   }
 
@@ -69,9 +85,9 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (isGet && apiCache.has(path)) {
-    // SWR: Fetch in background to update cache, but return immediately
+    // SWR-style: return cache immediately, refresh in background
     performFetch(path, options, headers)
-      .then(payload => apiCache.set(path, payload))
+      .then((payload) => apiCache.set(path, payload))
       .catch(console.error)
 
     return apiCache.get(path)

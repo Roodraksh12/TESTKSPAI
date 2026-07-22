@@ -8,47 +8,44 @@ from app.services import deadline_engine, intake_intel
 from app.services.case_access import (
     create_audit_log,
     get_case_with_relations,
-    person_in_scope_sql,
-    station_filter_sql,
+    jurisdiction_filter_sql,
+    person_in_scope_sql_for_officer,
 )
 from app.services.db import fetch_all, fetch_one
 
 
-async def search_cases(args: dict[str, Any], station_id: str, is_sp: bool = False) -> list[dict[str, Any]]:
+async def search_cases(args: dict[str, Any], officer: dict[str, Any]) -> list[dict[str, Any]]:
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     clauses = []
-    params: dict[str, Any] = {}
-    if not is_sp:
-        clauses.append('"stationId" = %(stationId)s')
-        params["stationId"] = station_id
+    params: dict[str, Any] = {**scope_params}
     if args.get("crimeType"):
-        clauses.append('"crimeType" ILIKE %(crimeType)s')
+        clauses.append('c."crimeType" ILIKE %(crimeType)s')
         params["crimeType"] = f'%{args["crimeType"]}%'
     if args.get("status"):
-        clauses.append("status = %(status)s")
+        clauses.append("c.status = %(status)s")
         params["status"] = args["status"]
     where = " AND ".join(clauses) if clauses else "1=1"
     return fetch_all(
         f'''
-        SELECT id, "firNumber", "crimeType", summary, status, "incidentDate"
-        FROM "Case"
-        WHERE {where}
-        ORDER BY "reportedDate" DESC
+        SELECT c.id, c."firNumber", c."crimeType", c.summary, c.status, c."incidentDate"
+        FROM "Case" c
+        WHERE {where}{scope_sql}
+        ORDER BY c."reportedDate" DESC
         LIMIT 5
         ''',
         params,
     )
 
 
-async def get_case_dossier(args: dict[str, Any], station_id: str, is_sp: bool = False) -> dict[str, Any]:
-    officer = {"role": "SP" if is_sp else "INSPECTOR", "stationId": station_id}
+async def get_case_dossier(args: dict[str, Any], officer: dict[str, Any]) -> dict[str, Any]:
     case_data = get_case_with_relations(args["caseId"], officer)
     return case_data or {"error": "Case not found or access denied."}
 
 
 async def get_person_connections(
-    args: dict[str, Any], station_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    scope_sql, scope_params = person_in_scope_sql(is_sp, station_id, person_alias="p")
+    scope_sql, scope_params = person_in_scope_sql_for_officer(officer, person_alias="p")
     in_scope = fetch_one(
         f'SELECT id FROM "Person" p WHERE p.id = %(personId)s{scope_sql}',
         {"personId": args["personId"], **scope_params},
@@ -70,35 +67,41 @@ async def get_person_connections(
     )
 
 
-async def get_similar_cases(args: dict[str, Any], station_id: str) -> list[dict[str, Any]]:
-    return intake_intel.find_mo_similar_cases(case_id=args["caseId"], station_id=station_id, take=5)
+async def get_similar_cases(args: dict[str, Any], officer: dict[str, Any]) -> list[dict[str, Any]]:
+    case_data = get_case_with_relations(args["caseId"], officer)
+    if not case_data:
+        return []
+    return intake_intel.find_mo_similar_cases(
+        case_id=case_data["id"],
+        station_id=case_data["stationId"],
+        take=5,
+    )
 
 
 async def get_hotspot_summary(
-    args: dict[str, Any], station_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> list[dict[str, Any]]:
     _ = args.get("timeframe")
-    if is_sp:
-        return fetch_all('SELECT * FROM "Alert" ORDER BY "riskScore" DESC LIMIT 5')
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="a")
     return fetch_all(
-        '''
-        SELECT * FROM "Alert"
-        WHERE "stationId" = %(stationId)s
-        ORDER BY "riskScore" DESC
+        f'''
+        SELECT * FROM "Alert" a
+        WHERE 1=1{scope_sql}
+        ORDER BY a."riskScore" DESC
         LIMIT 5
         ''',
-        {"stationId": station_id},
+        scope_params,
     )
 
 
 async def get_deadline_risks_tool(
-    args: dict[str, Any], station_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> list[dict[str, Any]]:
     take = args.get("take") or 10
-    return deadline_engine.get_deadline_risks(is_sp, station_id, take=take)
+    return deadline_engine.get_deadline_risks(officer, take=take)
 
 
-async def fetch_ipc_section(args: dict[str, Any], _station_id: str) -> dict[str, Any]:
+async def fetch_ipc_section(args: dict[str, Any], _officer: dict[str, Any]) -> dict[str, Any]:
     db = {
         "379": "IPC Section 379: Punishment for theft. Whoever commits theft shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both.",
         "392": "IPC Section 392: Punishment for robbery.",
@@ -116,7 +119,7 @@ async def fetch_ipc_section(args: dict[str, Any], _station_id: str) -> dict[str,
     }
 
 
-async def extract_entities(args: dict[str, Any], _station_id: str) -> dict[str, Any]:
+async def extract_entities(args: dict[str, Any], _officer: dict[str, Any]) -> dict[str, Any]:
     text = args.get("text") or ""
     phones = re.findall(r"\b[6-9]\d{9}\b", text)
     vehicles = re.findall(r"\bKA[-\s]?\d{2}[-\s]?[A-Z]{1,2}[-\s]?\d{1,4}\b", text, re.IGNORECASE)
@@ -131,30 +134,25 @@ async def extract_entities(args: dict[str, Any], _station_id: str) -> dict[str, 
     }
 
 
-async def run_case_intake(args: dict[str, Any], station_id: str, is_sp: bool = False) -> dict[str, Any]:
-    return intake_intel.build_case_intake_brief(args["caseId"], station_id, is_sp=is_sp)
+async def run_case_intake(args: dict[str, Any], officer: dict[str, Any]) -> dict[str, Any]:
+    return intake_intel.build_case_intake_brief(args["caseId"], officer)
 
 
 async def find_identity_matches_tool(
-    args: dict[str, Any], station_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> Any:
     if args.get("caseId"):
-        scope_sql, scope_params = station_filter_sql(is_sp, station_id)
-        case_row = fetch_one(
-            f'SELECT * FROM "Case" WHERE id = %(caseId)s{scope_sql}',
-            {"caseId": args["caseId"], **scope_params},
-        )
+        case_row = get_case_with_relations(args["caseId"], officer)
         if not case_row:
             return {"error": "Case not found or access denied"}
-        persons = fetch_all(
-            '''
-            SELECT p.name, p.phone, p.address
-            FROM "CasePerson" cp
-            JOIN "Person" p ON cp."personId" = p.id
-            WHERE cp."caseId" = %(caseId)s
-            ''',
-            {"caseId": args["caseId"]},
-        )
+        persons = [
+            {
+                "name": cp["person"]["name"],
+                "phone": cp["person"].get("phone"),
+                "address": cp["person"].get("address"),
+            }
+            for cp in case_row.get("casePersons") or []
+        ]
         names = args.get("names") or [p["name"] for p in persons]
         return intake_intel.find_identity_matches(
             names=names,
@@ -165,43 +163,34 @@ async def find_identity_matches_tool(
         )
     if not args.get("names"):
         return {"error": "Provide caseId or names[]"}
-    return intake_intel.find_identity_matches(names=args["names"], station_id=station_id)
+    return intake_intel.find_identity_matches(
+        names=args["names"],
+        station_id=officer.get("stationId"),
+    )
 
 
 async def find_mo_similar_cases_tool(
-    args: dict[str, Any], station_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> Any:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id)
-    case_row = fetch_one(
-        f'SELECT * FROM "Case" WHERE id = %(caseId)s{scope_sql}',
-        {"caseId": args["caseId"], **scope_params},
-    )
+    case_row = get_case_with_relations(args["caseId"], officer)
     if not case_row:
         return {"error": "Case not found or access denied"}
     return intake_intel.find_mo_similar_cases(case_id=case_row["id"], station_id=case_row["stationId"], take=5)
 
 
 async def get_investigation_checklist_tool(
-    args: dict[str, Any], station_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> dict[str, Any]:
     if args.get("caseId"):
-        scope_sql, scope_params = station_filter_sql(is_sp, station_id)
-        case_row = fetch_one(
-            f'''
-            SELECT c.*, ps.name AS "stationName"
-            FROM "Case" c
-            LEFT JOIN "PoliceStation" ps ON c."stationId" = ps.id
-            WHERE c.id = %(caseId)s{scope_sql}
-            ''',
-            {"caseId": args["caseId"], **scope_params},
-        )
+        case_row = get_case_with_relations(args["caseId"], officer)
         if not case_row:
             return {"error": "Case not found or access denied"}
+        station_name = (case_row.get("station") or {}).get("name")
         return {
             "caseId": case_row["id"],
             "firNumber": case_row["firNumber"],
             "checklist": intake_intel.get_investigation_checklist(
-                case_row["crimeType"], case_row.get("stationName")
+                case_row["crimeType"], station_name
             ),
         }
     if not args.get("crimeType"):
@@ -210,25 +199,20 @@ async def get_investigation_checklist_tool(
 
 
 async def draft_case_summary_tool(
-    args: dict[str, Any], station_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> dict[str, Any]:
     return intake_intel.draft_case_summary(
         args["caseId"],
-        station_id,
-        is_sp=is_sp,
+        officer,
         audience=args.get("audience") or "SP",
     )
 
 
 async def suggest_legal_sections_tool(
-    args: dict[str, Any], station_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> dict[str, Any]:
     if args.get("caseId"):
-        scope_sql, scope_params = station_filter_sql(is_sp, station_id)
-        case_row = fetch_one(
-            f'SELECT * FROM "Case" WHERE id = %(caseId)s{scope_sql}',
-            {"caseId": args["caseId"], **scope_params},
-        )
+        case_row = get_case_with_relations(args["caseId"], officer)
         if not case_row:
             return {"error": "Case not found or access denied"}
         legal = intake_intel.suggest_legal_sections(case_row["crimeType"], case_row.get("summary"))
@@ -244,31 +228,29 @@ async def suggest_legal_sections_tool(
 
 
 async def update_match_status_tool(
-    args: dict[str, Any], station_id: str, officer_id: str, is_sp: bool = False
+    args: dict[str, Any], officer: dict[str, Any]
 ) -> dict[str, Any]:
     if args.get("status") not in ("CONFIRMED", "REJECTED"):
         return {"error": "status must be CONFIRMED or REJECTED"}
-    return intake_intel.update_match_status(
-        args["matchId"], args["status"], officer_id, station_id, is_sp=is_sp
-    )
+    return intake_intel.update_match_status(args["matchId"], args["status"], officer)
 
 
 TOOL_HANDLERS = {
-    "search_cases": lambda args, station_id, officer_id, is_sp: search_cases(args, station_id, is_sp),
-    "get_case_dossier": lambda args, station_id, officer_id, is_sp: get_case_dossier(args, station_id, is_sp),
-    "run_case_intake": lambda args, station_id, officer_id, is_sp: run_case_intake(args, station_id, is_sp),
-    "find_identity_matches": lambda args, station_id, officer_id, is_sp: find_identity_matches_tool(args, station_id, is_sp),
-    "find_mo_similar_cases": lambda args, station_id, officer_id, is_sp: find_mo_similar_cases_tool(args, station_id, is_sp),
-    "get_investigation_checklist": lambda args, station_id, officer_id, is_sp: get_investigation_checklist_tool(args, station_id, is_sp),
-    "draft_case_summary": lambda args, station_id, officer_id, is_sp: draft_case_summary_tool(args, station_id, is_sp),
-    "suggest_legal_sections": lambda args, station_id, officer_id, is_sp: suggest_legal_sections_tool(args, station_id, is_sp),
-    "update_match_status": lambda args, station_id, officer_id, is_sp: update_match_status_tool(args, station_id, officer_id, is_sp),
-    "get_person_connections": lambda args, station_id, officer_id, is_sp: get_person_connections(args, station_id, is_sp),
-    "get_similar_cases": lambda args, station_id, officer_id, is_sp: get_similar_cases(args, station_id),
-    "get_hotspot_summary": lambda args, station_id, officer_id, is_sp: get_hotspot_summary(args, station_id, is_sp),
-    "fetch_ipc_section": lambda args, station_id, officer_id, is_sp: fetch_ipc_section(args, station_id),
-    "extract_entities": lambda args, station_id, officer_id, is_sp: extract_entities(args, station_id),
-    "get_deadline_risks": lambda args, station_id, officer_id, is_sp: get_deadline_risks_tool(args, station_id, is_sp),
+    "search_cases": lambda args, officer: search_cases(args, officer),
+    "get_case_dossier": lambda args, officer: get_case_dossier(args, officer),
+    "run_case_intake": lambda args, officer: run_case_intake(args, officer),
+    "find_identity_matches": lambda args, officer: find_identity_matches_tool(args, officer),
+    "find_mo_similar_cases": lambda args, officer: find_mo_similar_cases_tool(args, officer),
+    "get_investigation_checklist": lambda args, officer: get_investigation_checklist_tool(args, officer),
+    "draft_case_summary": lambda args, officer: draft_case_summary_tool(args, officer),
+    "suggest_legal_sections": lambda args, officer: suggest_legal_sections_tool(args, officer),
+    "update_match_status": lambda args, officer: update_match_status_tool(args, officer),
+    "get_person_connections": lambda args, officer: get_person_connections(args, officer),
+    "get_similar_cases": lambda args, officer: get_similar_cases(args, officer),
+    "get_hotspot_summary": lambda args, officer: get_hotspot_summary(args, officer),
+    "fetch_ipc_section": lambda args, officer: fetch_ipc_section(args, officer),
+    "extract_entities": lambda args, officer: extract_entities(args, officer),
+    "get_deadline_risks": lambda args, officer: get_deadline_risks_tool(args, officer),
 }
 
 
@@ -477,14 +459,12 @@ NEEDS_CASE_TOOLS = {
 async def execute_tool(
     name: str,
     args: dict[str, Any],
-    station_id: str,
-    officer_id: str,
-    is_sp: bool,
+    officer: dict[str, Any],
 ) -> Any:
     handler = TOOL_HANDLERS.get(name)
     if not handler:
         return {"error": f"Unknown tool: {name}"}
-    return await handler(args, station_id, officer_id, is_sp)
+    return await handler(args, officer)
 
 
 def filter_tools_for_role(role: str) -> list[dict[str, Any]]:

@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Briefcase, TrendingUp, AlertTriangle, ShieldAlert, ShieldCheck, Clock, GitMerge,
-  FileText, MapPin, Activity, MessageSquare, ChevronRight, ArrowRight,
+  FileText, MapPin, Activity, MessageSquare, ChevronRight, ArrowRight, Users, KeyRound, UserPlus, Mail,
 } from "lucide-react";
 import { apiRequest } from "@/api/client";
+import { useAuth } from "@/context/AuthContext";
 import { Card, SectionLabel, StatCard, Badge, Skeleton } from "@/components/scrb/primitives";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { DashboardOfficer, DashboardAttention } from "./DashboardClient";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 
 type RecentCase = {
   id: string;
@@ -29,6 +31,7 @@ const ROLE_KEY: Record<string, string> = {
   SP: "role.SP",
   INSPECTOR: "role.INSPECTOR",
   CONSTABLE: "role.CONSTABLE",
+  POLICE_IT: "role.POLICE_IT",
 };
 
 function initialsOf(name: string): string {
@@ -37,33 +40,223 @@ function initialsOf(name: string): string {
   return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
-export default function Overview() {
+function PoliceItOverview() {
   const { t } = useI18n();
+  const [loading, setLoading] = useState(true);
+  const [payload, setPayload] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      apiRequest("/api/admin/it-dashboard")
+        .then((data) => {
+          if (!cancelled) setPayload(data);
+        })
+        .catch(console.error)
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useVisibilityRefetch(() =>
+    apiRequest("/api/admin/it-dashboard")
+      .then(setPayload)
+      .catch(console.error)
+  );
+
+  const officer = payload?.officer;
+  const stats = payload?.stats || {};
+  const byRole = payload?.officersByRole || [];
+  const recent = payload?.recentInvites || [];
+  const smtp = payload?.smtp;
+
+  return (
+    <div className="space-y-6 max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
+      <Card accent="teal" className="p-6">
+        {loading && !officer ? (
+          <Skeleton className="h-16 rounded-2xl" />
+        ) : officer ? (
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-ink text-sm font-bold text-white dark:bg-foreground dark:text-background">
+                {initialsOf(officer.name)}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-display text-2xl leading-tight">{officer.name}</h1>
+                <p className="text-mono text-[11px] text-muted-foreground">
+                  {officer.badgeId} · {officer.role}
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-teal/[0.08] px-2.5 py-1.5 text-[11px] text-teal">
+              <ShieldCheck className="h-3 w-3" />
+              {officer.scopeLabel}
+            </span>
+          </div>
+        ) : null}
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard icon={Users} label={t("it.totalOfficers")} value={loading ? "—" : stats.totalOfficers ?? 0} tone="teal" />
+        <StatCard icon={KeyRound} label={t("it.pendingResets")} value={loading ? "—" : stats.pendingPasswordResets ?? 0} tone="amber" />
+        <StatCard icon={Clock} label={t("it.mustChange")} value={loading ? "—" : stats.mustChangePassword ?? 0} tone="default" />
+        <StatCard icon={Activity} label={t("it.activeOfficers")} value={loading ? "—" : stats.activeOfficers ?? 0} tone="default" />
+      </div>
+
+      <Card className="p-6">
+        <SectionLabel className="mb-3">{t("dash.quickActions")}</SectionLabel>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            { to: "/invite", icon: UserPlus, label: t("nav.invite"), tone: "teal" as const },
+            { to: "/password-resets", icon: KeyRound, label: t("nav.passwordResets"), tone: "amber" as const },
+            { to: "/administration", icon: Users, label: t("nav.officers"), tone: "muted" as const },
+          ].map((action) => (
+            <Link
+              key={action.to}
+              to={action.to}
+              className="flex items-center gap-3 rounded-2xl border border-hairline px-3 py-2.5 transition-colors hover:bg-surface-2"
+            >
+              <div
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg",
+                  action.tone === "amber" && "bg-amber/10 text-amber",
+                  action.tone === "teal" && "bg-teal/10 text-teal",
+                  action.tone === "muted" && "bg-surface-2 text-muted-foreground"
+                )}
+              >
+                <action.icon className="h-4 w-4" />
+              </div>
+              <span className="flex-1 text-[13px] font-medium">{action.label}</span>
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+            </Link>
+          ))}
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="p-6">
+          <SectionLabel className="mb-3">{t("it.byRank")}</SectionLabel>
+          {loading ? (
+            <Skeleton className="h-24 rounded-xl" />
+          ) : byRole.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("it.noOfficers")}</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {byRole.map((row: { role: string; n: number }) => (
+                <li key={row.role} className="flex items-center justify-between rounded-xl border border-hairline px-3 py-2 text-sm">
+                  <span className="font-medium">{row.role}</span>
+                  <span className="tabular-nums text-muted-foreground">{row.n}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card className="p-6">
+          <div className="mb-3 flex items-center justify-between">
+            <SectionLabel>{t("it.recentInvites")}</SectionLabel>
+            <Link to="/invite" className="text-[11px] font-medium text-teal hover:text-teal/80">
+              {t("nav.invite")}
+            </Link>
+          </div>
+          {loading ? (
+            <Skeleton className="h-24 rounded-xl" />
+          ) : recent.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("it.noInvites")}</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {recent.map((row: any) => (
+                <li key={row.id} className="flex items-center justify-between gap-2 rounded-xl border border-hairline px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{row.name}</p>
+                    <p className="text-[11px] text-muted-foreground font-mono">{row.badgeId} · {row.role}</p>
+                  </div>
+                  <Badge tone="muted">{row.status || "—"}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      {smtp && (
+        <Card className="p-6">
+          <SectionLabel className="mb-2">{t("admin.smtp")}</SectionLabel>
+          <div className="flex items-start gap-3">
+            <Mail className="h-4 w-4 mt-0.5 text-muted-foreground" />
+            <div>
+              <p className="text-sm">
+                {smtp.configured ? t("admin.smtpConfigured") : t("admin.smtpMissing")}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Host: {smtp.host || "—"} · From: {smtp.from || "—"}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+export default function Overview() {
+  const { user } = useAuth();
+  const { t } = useI18n();
+  const isIt = Boolean(user?.capabilities?.isPoliceIt);
+
   const [officer, setOfficer] = useState<DashboardOfficer | null>(null);
   const [attention, setAttention] = useState<DashboardAttention | null>(null);
   const [stats, setStats] = useState({ totalCases: 0, clearanceRate: 0, highRiskAlerts: 0, openCases: 0 });
   const [recentCases, setRecentCases] = useState<RecentCase[]>([]);
+  const [stationBreakdown, setStationBreakdown] = useState<
+    { stationId: string; stationName: string; caseCount: number; openCount: number }[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isIt) return;
     let cancelled = false;
-    apiRequest("/api/dashboard")
-      .then((payload) => {
-        if (cancelled) return;
-        setOfficer(payload.officer ?? null);
-        setAttention(payload.attention ?? null);
-        setStats(payload.stats ?? stats);
-        setRecentCases(payload.recentCases || []);
-      })
-      .catch(console.error)
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const load = () =>
+      apiRequest("/api/dashboard")
+        .then((payload) => {
+          if (cancelled) return;
+          setOfficer(payload.officer ?? null);
+          setAttention(payload.attention ?? null);
+          setStats(payload.stats ?? stats);
+          setRecentCases(payload.recentCases || []);
+          setStationBreakdown(payload.stationBreakdown || []);
+        })
+        .catch(console.error)
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    load();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isIt]);
+
+  useVisibilityRefetch(() => {
+    if (isIt) return;
+    return apiRequest("/api/dashboard")
+      .then((payload) => {
+        setOfficer(payload.officer ?? null);
+        setAttention(payload.attention ?? null);
+        setStats(payload.stats ?? stats);
+        setRecentCases(payload.recentCases || []);
+        setStationBreakdown(payload.stationBreakdown || []);
+      })
+      .catch(console.error);
+  }, !isIt);
+
+  if (isIt) {
+    return <PoliceItOverview />;
+  }
 
   const attentionRows = attention
     ? [
@@ -76,7 +269,6 @@ export default function Overview() {
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
-      {/* Identity + scope */}
       <Card accent="teal" className="p-6">
         {loading && !officer ? (
           <Skeleton className="h-16 rounded-2xl" />
@@ -105,7 +297,6 @@ export default function Overview() {
         ) : null}
       </Card>
 
-      {/* Needs attention — the only block with legal clocks behind it */}
       <Card accent={attentionRows.length > 0 ? "danger" : "default"} className="p-6">
         <div className="mb-3 flex items-center justify-between">
           <SectionLabel>{t("dash.needsAttention")}</SectionLabel>
@@ -151,15 +342,36 @@ export default function Overview() {
         )}
       </Card>
 
-      {/* Workload */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard icon={Briefcase} label={t("dash.openInvestigations")} value={loading ? "—" : stats.openCases} tone="teal" />
         <StatCard icon={TrendingUp} label={t("dash.clearanceRate")} value={loading ? "—" : `${stats.clearanceRate}%`} tone="default" />
         <StatCard icon={Activity} label={t("dash.totalCases")} value={loading ? "—" : stats.totalCases} tone="default" />
       </div>
 
+      {stationBreakdown.length > 0 && (
+        <Card className="p-6">
+          <SectionLabel className="mb-3">Stations in jurisdiction</SectionLabel>
+          <div className="space-y-1.5">
+            {stationBreakdown.map((row) => (
+              <div
+                key={row.stationId}
+                className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-3 py-2.5"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-foreground">{row.stationName}</p>
+                  <p className="text-[11px] text-muted-foreground">{row.openCount} open</p>
+                </div>
+                <span className="text-lg font-bold tabular-nums text-foreground">{row.caseCount}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
-        {/* Recent cases */}
         <Card className="p-6">
           <div className="mb-3 flex items-center justify-between">
             <SectionLabel>{t("dash.recentCases")}</SectionLabel>
@@ -199,7 +411,6 @@ export default function Overview() {
           )}
         </Card>
 
-        {/* Quick actions */}
         <Card className="p-6">
           <SectionLabel className="mb-3">{t("dash.quickActions")}</SectionLabel>
           <div className="space-y-1.5">
@@ -228,13 +439,6 @@ export default function Overview() {
                 <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
               </Link>
             ))}
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-hairline bg-surface-2 p-3 text-center">
-            <p className="text-[9px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-              {t("dash.securedSession")}
-            </p>
-            <p className="mt-1 text-[10px] text-muted-foreground">{t("dash.auditLogged")}</p>
           </div>
         </Card>
       </div>

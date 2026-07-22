@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.deps import get_current_user
 from app.services import intake_intel
-from app.services.case_access import create_audit_log
+from app.services.case_access import create_audit_log, require_case_write
 from app.services.job_store import fir_jobs
 from app.services.openrouter import chat_completion
 
@@ -150,15 +150,16 @@ async def _process_fir(
     extracted_data = await _extract_fir_fields(raw_text)
 
     stage("Searching for prior leads")
+    station_id = officer.get("stationId")
     identity = intake_intel.find_identity_matches(
         names=[
             *extracted_data.accusedNames,
             *([extracted_data.victimName] if extracted_data.victimName else []),
         ],
-        station_id=officer["stationId"],
+        station_id=station_id,
     )
     mo_similar = intake_intel.find_mo_similar_cases(
-        station_id=officer["stationId"],
+        station_id=station_id,
         crime_type=extracted_data.crimeType,
         summary=extracted_data.narrativeSummary,
         modus_operandi=extracted_data.modusOperandi,
@@ -236,6 +237,7 @@ async def upload_fir(
     content_type = file.content_type or ""
     filename = file.filename or "scan"
     officer = current_user["officer"]
+    require_case_write(officer)
 
     if not (content_type.startswith("image/") or content_type == "application/pdf"):
         raise HTTPException(status_code=415, detail="Only image or PDF FIR scans are supported.")

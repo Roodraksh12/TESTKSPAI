@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
 from app.services import graph_engine
-from app.services.case_access import station_filter_sql
+from app.services.case_access import jurisdiction_filter_sql
 from app.services.db import fetch_all
 
 GRAPH_CASE_CAP = 60
@@ -29,9 +30,9 @@ def _extract_plates(text: str) -> set[str]:
 
 
 def build_crime_network(
-    is_sp: bool, station_id: str, seed_id: str | None = None, hops: int = 2
+    officer: dict[str, Any], seed_id: str | None = None, hops: int = 2
 ) -> dict[str, Any]:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="c")
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     fetched = fetch_all(
         f'''
         SELECT c.id, c."firNumber", c."crimeType", c."incidentDate", c.summary,
@@ -165,11 +166,42 @@ def build_crime_network(
         visible_nodes = [n for n in node_list if n["id"] in visible_ids]
         visible_edges = [e for e in edges if e["from"] in visible_ids and e["to"] in visible_ids]
 
+    _assign_layout(visible_nodes, visible_edges)
+
     return {
         "nodes": visible_nodes,
         "edges": visible_edges,
         "rings": rings,
         "hubs": hubs,
         "brokers": brokers,
-        "meta": {"caseCount": len(cases), "capped": capped},
+        "meta": {"caseCount": len(cases), "capped": capped, "layout": "server"},
     }
+
+
+def _assign_layout(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> None:
+    """Precompute x/y so the frontend only paints — no heavy client layout."""
+    if not nodes:
+        return
+    kind_rings = {"Case": 0.35, "Person": 0.55, "Location": 0.75, "Vehicle": 0.9}
+    by_kind: dict[str, list[dict[str, Any]]] = {}
+    for n in nodes:
+        by_kind.setdefault(n.get("kind") or "Other", []).append(n)
+
+    # Degree for slight radius jitter toward hubs
+    degree: dict[str, int] = {n["id"]: 0 for n in nodes}
+    for e in edges:
+        if e["from"] in degree:
+            degree[e["from"]] += 1
+        if e["to"] in degree:
+            degree[e["to"]] += 1
+
+    cx, cy = 50.0, 50.0
+    for kind, group in by_kind.items():
+        base_r = kind_rings.get(kind, 0.65) * 42  # percent of view box
+        n = len(group)
+        for i, node in enumerate(group):
+            angle = (2 * math.pi * i / max(n, 1)) - math.pi / 2
+            hub_boost = min(degree.get(node["id"], 0), 8) * 0.8
+            r = max(8.0, base_r - hub_boost)
+            node["x"] = round(cx + r * math.cos(angle), 2)
+            node["y"] = round(cy + r * math.sin(angle), 2)

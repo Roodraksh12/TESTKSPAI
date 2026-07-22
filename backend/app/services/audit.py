@@ -4,6 +4,7 @@ from typing import Any
 
 from app.services.case_access import create_audit_log
 from app.services.db import fetch_all
+from app.services.hierarchy import has_wide_case_scope, is_police_it, SHO_RANKS
 
 # Only these client-triggered (browser-side PDF export) actions may be written
 # via the public audit endpoint — never let a client write arbitrary rows.
@@ -14,9 +15,9 @@ def list_audit_logs(officer: dict[str, Any]) -> list[dict[str, Any]]:
     role = officer.get("role")
     where = ""
     params: dict[str, Any] = {}
-    if role == "SP":
+    if has_wide_case_scope(role) or is_police_it(role):
         pass
-    elif role == "INSPECTOR":
+    elif role in SHO_RANKS or role == "INSPECTOR":
         where = ' AND o."stationId" = %(stationId)s'
         params["stationId"] = officer["stationId"]
     else:
@@ -30,7 +31,7 @@ def list_audit_logs(officer: dict[str, Any]) -> list[dict[str, Any]]:
                ps.name AS "stationName"
         FROM "AuditLog" al
         JOIN "Officer" o ON al."officerId" = o.id
-        JOIN "PoliceStation" ps ON o."stationId" = ps.id
+        LEFT JOIN "PoliceStation" ps ON o."stationId" = ps.id
         WHERE 1=1{where}
         ORDER BY al."createdAt" DESC
         LIMIT 100

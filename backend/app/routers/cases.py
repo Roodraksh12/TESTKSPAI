@@ -8,10 +8,13 @@ from pydantic import BaseModel, Field
 from app.deps import get_current_user
 from app.services.parallel import invalidate_all
 from app.services import geocoder, intake_intel
+from app.services.hierarchy import has_wide_case_scope
 from app.services.case_access import (
     create_audit_log,
     get_case_with_relations,
-    station_filter_sql,
+    jurisdiction_filter_sql,
+    jurisdiction_station_filter_sql,
+    require_case_write,
 )
 from app.services.db import (
     execute,
@@ -38,6 +41,7 @@ class CreateCaseRequest(BaseModel):
     modusOperandi: str | None = None
     rawText: str | None = None
     location: str | None = None
+    stationId: str | None = None
     possibleMatches: list[dict] = Field(default_factory=list)
 
 
@@ -87,8 +91,8 @@ def list_cases(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     officer = current_user["officer"]
-    is_sp = officer.get("role") == "SP"
-    scope_sql, scope_params = station_filter_sql(is_sp, officer["stationId"], alias="c")
+    wide_scope = has_wide_case_scope(officer.get("role"))
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     params: dict = {**scope_params}
     filters = ""
 
@@ -96,7 +100,7 @@ def list_cases(
         filters += ' AND c."crimeType" = %(crimeType)s'
         params["crimeType"] = crimeType
 
-    if stationId and stationId != "all" and is_sp:
+    if stationId and stationId != "all" and wide_scope:
         filters += ' AND c."stationId" = %(filterStationId)s'
         params["filterStationId"] = stationId
 
@@ -140,19 +144,15 @@ def list_cases(
             )
             cases = serialize_rows(cur.fetchall())
 
-            station_scope = ""
-            station_params: dict = {}
-            if not is_sp:
-                station_scope = ' WHERE ps.id = %(stationId)s'
-                station_params = {"stationId": officer["stationId"]}
+            station_scope_sql, station_scope_params = jurisdiction_station_filter_sql(officer, alias="ps")
             cur.execute(
                 f'''
                 SELECT ps.id, ps.name
                 FROM "PoliceStation" ps
-                {station_scope}
+                WHERE 1=1{station_scope_sql}
                 ORDER BY ps.name
                 ''',
-                station_params,
+                station_scope_params,
             )
             stations = serialize_rows(cur.fetchall())
             return cases, stations
@@ -166,7 +166,13 @@ def list_cases(
 @router.post("")
 def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
-    station_id = officer["stationId"]
+    require_case_write(officer)
+    station_id = officer.get("stationId") or payload.stationId
+    if not station_id:
+        raise HTTPException(
+            status_code=400,
+            detail="stationId is required when your account is not assigned to a station",
+        )
     year = datetime.now(timezone.utc).year
     count = fetch_scalar(
         'SELECT COUNT(*) FROM "Case" WHERE "stationId" = %(stationId)s',
@@ -279,8 +285,7 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
     # away, so drop the cached aggregates rather than waiting out their TTL.
     invalidate_all()
 
-    is_sp = officer.get("role") == "SP"
-    intake = intake_intel.build_case_intake_brief(case_row["id"], station_id, is_sp=is_sp)
+    intake = intake_intel.build_case_intake_brief(case_row["id"], officer)
     if "error" in intake:
         intake = None
 
@@ -303,8 +308,7 @@ def get_case(case_id: str, current_user: dict = Depends(get_current_user)) -> di
 @router.get("/{case_id}/intake")
 def intake(case_id: str, current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
-    is_sp = officer.get("role") == "SP"
-    brief = intake_intel.build_case_intake_brief(case_id, officer["stationId"], is_sp=is_sp)
+    brief = intake_intel.build_case_intake_brief(case_id, officer)
     if "error" in brief:
         raise HTTPException(status_code=404, detail=brief["error"])
 
@@ -322,11 +326,9 @@ def intake(case_id: str, current_user: dict = Depends(get_current_user)) -> dict
 def draft(case_id: str, payload: DraftRequest, current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
     audience = payload.audience if payload.audience in ("SP", "SHO", "IO") else "IO"
-    is_sp = officer.get("role") == "SP"
     result = intake_intel.draft_case_summary(
         case_id,
-        officer["stationId"],
-        is_sp=is_sp,
+        officer,
         audience=audience,
     )
     if "error" in result:
@@ -352,13 +354,11 @@ def update_match(
         raise HTTPException(status_code=400, detail="matchId and status (CONFIRMED|REJECTED) required")
 
     officer = current_user["officer"]
-    is_sp = officer.get("role") == "SP"
+    require_case_write(officer)
     result = intake_intel.update_match_status(
         payload.matchId,
         payload.status,
-        officer["id"],
-        officer["stationId"],
-        is_sp=is_sp,
+        officer,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.services.db import execute, execute_returning, fetch_all, fetch_one, fetch_scalar, new_id
+from app.services.case_access import get_case_with_relations
 
 STOPWORDS = {
     "the", "and", "for", "with", "from", "that", "this", "were", "was", "are",
@@ -351,7 +352,7 @@ def find_identity_matches(
 def find_mo_similar_cases(
     *,
     case_id: str | None = None,
-    station_id: str,
+    station_id: str | None = None,
     crime_type: str | None = None,
     summary: str | None = None,
     modus_operandi: str | None = None,
@@ -372,12 +373,12 @@ def find_mo_similar_cases(
     probe_text = " ".join(x for x in [modus_operandi, summary, crime_type] if x)
     probe_tokens = tokenize(probe_text)
 
+    station_sql = ' AND "stationId" = %(stationId)s' if station_id else ""
     candidates = fetch_all(
-        '''
+        f'''
         SELECT id, "firNumber", "crimeType", status, summary, "rawExtractedText", "incidentDate"
         FROM "Case"
-        WHERE "stationId" = %(stationId)s
-          AND (%(excludeId)s::text IS NULL OR id <> %(excludeId)s)
+        WHERE (%(excludeId)s::text IS NULL OR id <> %(excludeId)s){station_sql}
         ORDER BY "reportedDate" DESC
         LIMIT 50
         ''',
@@ -615,36 +616,17 @@ I can: review matches · open similar cases · full 72h checklist · draft SP no
 
 def build_case_intake_brief(
     case_id: str,
-    station_id: str,
-    *,
-    is_sp: bool = False,
+    officer: dict[str, Any],
 ) -> dict[str, Any]:
-    case_data = fetch_one(
-        '''
-        SELECT c.*, ps.name AS "stationName"
-        FROM "Case" c
-        LEFT JOIN "PoliceStation" ps ON c."stationId" = ps.id
-        WHERE c.id = %(id)s
-        ''',
-        {"id": case_id},
-    )
+    case_data = get_case_with_relations(case_id, officer)
     if not case_data:
-        return {"error": "Case not found"}
-    if not is_sp and case_data["stationId"] != station_id:
         return {"error": "Case not found or access denied"}
 
-    case_persons = fetch_all(
-        '''
-        SELECT cp.*, p.id AS "personIdRef", p.name, p.role AS "personRole", p.phone, p.address
-        FROM "CasePerson" cp
-        JOIN "Person" p ON cp."personId" = p.id
-        WHERE cp."caseId" = %(caseId)s
-        ''',
-        {"caseId": case_id},
-    )
-
+    case_persons = case_data.get("casePersons") or []
     effective_station = case_data["stationId"]
-    accused_names = [cp["name"] for cp in case_persons if cp["role"] == "ACCUSED"]
+    accused_names = [
+        cp["person"]["name"] for cp in case_persons if cp["role"] == "ACCUSED"
+    ]
     victim = next((cp for cp in case_persons if cp["role"] == "VICTIM"), None)
     mo = extract_mo_from_text(case_data.get("summary")) or extract_mo_from_text(
         case_data.get("rawExtractedText")
@@ -654,9 +636,9 @@ def build_case_intake_brief(
         case_id=case_data["id"],
         station_id=effective_station,
         accused_names=accused_names,
-        victim_name=victim["name"] if victim else None,
-        phones=[cp["phone"] for cp in case_persons if cp.get("phone")],
-        addresses=[cp["address"] for cp in case_persons if cp.get("address")],
+        victim_name=victim["person"]["name"] if victim else None,
+        phones=[cp["person"].get("phone") for cp in case_persons if cp["person"].get("phone")],
+        addresses=[cp["person"].get("address") for cp in case_persons if cp["person"].get("address")],
         crime_type=case_data["crimeType"],
         summary=case_data.get("summary"),
         modus_operandi=mo,
@@ -665,7 +647,8 @@ def build_case_intake_brief(
     mo_similar = match_result["moSimilar"]
 
     legal = suggest_legal_sections(case_data["crimeType"], case_data.get("summary"))
-    checklist = get_investigation_checklist(case_data["crimeType"], case_data.get("stationName"))
+    station_name = (case_data.get("station") or {}).get("name")
+    checklist = get_investigation_checklist(case_data["crimeType"], station_name)
 
     since = datetime.now(timezone.utc) - timedelta(days=14)
     same_crime_recent_count = fetch_scalar(
@@ -703,7 +686,11 @@ def build_case_intake_brief(
     elevated = same_crime_recent_count >= 2 or any(a["riskScore"] >= 70 for a in related_alerts)
 
     persons = [
-        {"name": cp["name"], "role": cp["role"], "phone": cp.get("phone")}
+        {
+            "name": cp["person"]["name"],
+            "role": cp["role"],
+            "phone": cp["person"].get("phone"),
+        }
         for cp in case_persons
     ]
     action_prompts = [
@@ -719,7 +706,7 @@ def build_case_intake_brief(
             "firNumber": case_data["firNumber"],
             "crimeType": case_data["crimeType"],
             "status": case_data["status"],
-            "stationName": case_data.get("stationName") or "Station",
+            "stationName": (case_data.get("station") or {}).get("name") or "Station",
             "summary": case_data.get("summary"),
             "persons": persons,
             "identity": identity,
@@ -764,49 +751,21 @@ def build_case_intake_brief(
 
 def draft_case_summary(
     case_id: str,
-    station_id: str,
+    officer: dict[str, Any],
     *,
-    is_sp: bool = False,
     audience: str = "SP",
 ) -> dict[str, Any]:
-    case_data = fetch_one(
-        '''
-        SELECT c.*, ps.name AS "stationName"
-        FROM "Case" c
-        LEFT JOIN "PoliceStation" ps ON c."stationId" = ps.id
-        WHERE c.id = %(id)s
-        ''',
-        {"id": case_id},
-    )
+    case_data = get_case_with_relations(case_id, officer)
     if not case_data:
-        return {"error": "Case not found"}
-    if not is_sp and case_data["stationId"] != station_id:
-        return {"error": "Access denied"}
+        return {"error": "Case not found or access denied"}
 
-    case_persons = fetch_all(
-        '''
-        SELECT cp.*, p.name
-        FROM "CasePerson" cp
-        JOIN "Person" p ON cp."personId" = p.id
-        WHERE cp."caseId" = %(caseId)s
-        ''',
-        {"caseId": case_id},
-    )
-    matches = fetch_all(
-        '''
-        SELECT cm.*, p.name AS "matchedPersonName", mc."firNumber" AS "matchedFirNumber"
-        FROM "CaseMatch" cm
-        LEFT JOIN "Person" p ON cm."matchedPersonId" = p.id
-        LEFT JOIN "Case" mc ON cm."matchedCaseId" = mc.id
-        WHERE cm."caseId" = %(caseId)s AND cm.status IN ('PENDING', 'CONFIRMED')
-        ''',
-        {"caseId": case_id},
-    )
-
-    people = "; ".join(f'{cp["name"]} ({cp["role"]})' for cp in case_persons)
+    case_persons = case_data.get("casePersons") or []
+    matches = case_data.get("matches") or []
+    people = "; ".join(f'{cp["person"]["name"]} ({cp["role"]})' for cp in case_persons)
     pending_matches = [m for m in matches if m["status"] == "PENDING"]
     confirmed_matches = [m for m in matches if m["status"] == "CONFIRMED"]
-    checklist = get_investigation_checklist(case_data["crimeType"], case_data.get("stationName"))
+    station_name = (case_data.get("station") or {}).get("name")
+    checklist = get_investigation_checklist(case_data["crimeType"], station_name)
     top_steps = [c["action"] for c in checklist[:3]]
 
     confirmed_line = (
@@ -828,7 +787,7 @@ def draft_case_summary(
         [
             f"PROGRESS NOTE — for {audience}",
             f"FIR: {case_data['firNumber']}",
-            f"PS: {case_data.get('stationName') or '—'}",
+            f"PS: {(case_data.get('station') or {}).get('name') or '—'}",
             f"Crime: {case_data['crimeType']} | Status: {case_data['status']}",
             f"Incident date: {case_data['incidentDate']}",
             "",
@@ -861,9 +820,7 @@ def draft_case_summary(
 def update_match_status(
     match_id: str,
     status: str,
-    officer_id: str,
-    station_id: str,
-    is_sp: bool = False,
+    officer: dict[str, Any],
 ) -> dict[str, Any]:
     match = fetch_one(
         '''
@@ -876,7 +833,7 @@ def update_match_status(
     )
     if not match:
         return {"error": "Match not found"}
-    if not is_sp and match["caseStationId"] != station_id:
+    if not get_case_with_relations(match["caseId"], officer):
         return {"error": "Access denied"}
 
     updated = execute_returning(
@@ -895,7 +852,7 @@ def update_match_status(
         ''',
         {
             "id": new_id(),
-            "officerId": officer_id,
+            "officerId": officer["id"],
             "action": "CONFIRM_MATCH" if status == "CONFIRMED" else "REJECT_MATCH",
             "targetId": match_id,
             "details": f'Case {match["caseId"]} match set to {status}',

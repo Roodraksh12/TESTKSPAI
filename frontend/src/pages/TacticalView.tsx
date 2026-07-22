@@ -14,9 +14,6 @@ export default function TacticalView({ caseData }: { caseData: any }) {
   const [bootSequence, setBootSequence] = useState(0);
   const [typedText, setTypedText] = useState("");
   const [selectedSuspect, setSelectedSuspect] = useState<any>(null);
-  
-  const [investigationProgress, setInvestigationProgress] = useState(0);
-  const [investigationStep, setInvestigationStep] = useState(0);
 
   const fullText = `INITIATING TACTICAL ANALYSIS...
 CASE NO: ${caseData.firNumber}
@@ -41,45 +38,12 @@ ANALYSIS COMPLETE.`;
         i++;
         if (i > fullText.length) {
           clearInterval(intervalId);
-          setTimeout(() => setBootSequence(2), 500); // Trigger suspects to appear
+          setTimeout(() => setBootSequence(2), 500);
         }
-      }, 20); // typing speed
+      }, 20);
       return () => clearInterval(intervalId);
     }
   }, [bootSequence, fullText]);
-
-  // Deep dive progress simulation
-  useEffect(() => {
-    if (selectedSuspect) {
-      setInvestigationProgress(0);
-      setInvestigationStep(1);
-      
-      const interval = setInterval(() => {
-        setInvestigationProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          
-          if (prev === 30) setInvestigationStep(2);
-          if (prev === 60) setInvestigationStep(3);
-          if (prev === 90) setInvestigationStep(4);
-
-          return prev + 2;
-        });
-      }, 50);
-
-      return () => clearInterval(interval);
-    }
-  }, [selectedSuspect]);
-
-  const investigationLogs = [
-    "Initiating Deep Dive...",
-    "[1/3] Syncing with National Crime Records Bureau (NCRB)...",
-    "[2/3] Triangulating Telecom / CDR Pings for incident timeframe...",
-    "[3/3] Cross-referencing Dark Web aliases and social media footprints...",
-    "Diagnostics Complete. Compiling Intelligence Report."
-  ];
 
   const generatePDF = async () => {
     const doc = new jsPDF();
@@ -261,7 +225,7 @@ ANALYSIS COMPLETE.`;
                     <p className="text-xs text-green-600 uppercase tracking-widest mb-4">ROLE: {cp.role}</p>
                     
                     <div className="flex items-center gap-2 text-xs text-green-500/70 group-hover:text-green-400">
-                      <Activity className="w-4 h-4" /> Click to Interrogate / Deep Dive
+                      <Activity className="w-4 h-4" /> View case record
                     </div>
                   </motion.div>
                 ))}
@@ -290,86 +254,61 @@ ANALYSIS COMPLETE.`;
                   </Button>
                 </div>
 
-                <div className="bg-[#050f0a] border border-green-900/50 p-6 flex-1 flex flex-col">
-                  {/* Progress sequence */}
-                  <div className="mb-8">
-                    <div className="flex justify-between text-xs mb-2 text-green-400">
-                      <span>SYSTEM_DIAGNOSTICS</span>
-                      <span>{investigationProgress}%</span>
+                <div className="bg-[#050f0a] border border-green-900/50 p-6 flex-1 flex flex-col overflow-y-auto">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="border border-green-900/30 p-4 bg-green-950/10">
+                      <h4 className="flex items-center gap-2 text-sm font-bold text-white mb-4 border-b border-green-900/50 pb-2">
+                        <Database className="w-4 h-4 text-green-500" /> CASE PERSON RECORD
+                      </h4>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between border-b border-green-900/30 pb-1 gap-4">
+                          <span className="text-green-600 shrink-0">NAME:</span>
+                          <span className="text-white text-right">{selectedSuspect.person?.name || "—"}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-green-900/30 pb-1 gap-4">
+                          <span className="text-green-600 shrink-0">ROLE:</span>
+                          <span className="text-white text-right">{selectedSuspect.role || "—"}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-green-900/30 pb-1 gap-4">
+                          <span className="text-green-600 shrink-0">PHONE:</span>
+                          <span className="text-white text-right">{selectedSuspect.person?.phone || "Not on record"}</span>
+                        </div>
+                        <div className="flex justify-between pb-1 gap-4">
+                          <span className="text-green-600 shrink-0">ADDRESS:</span>
+                          <span className="text-white text-right">{selectedSuspect.person?.address || "Not on record"}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="w-full h-2 bg-green-900/30 overflow-hidden">
-                      <div 
-                        className="h-full bg-green-500 transition-all duration-75"
-                        style={{ width: `${investigationProgress}%` }}
-                      />
-                    </div>
-                    <div className="mt-4 space-y-2 h-24">
-                      {investigationLogs.slice(0, investigationStep + 1).map((log, i) => (
-                        <motion.p 
-                          key={i} 
-                          initial={{ opacity: 0, x: -10 }} 
-                          animate={{ opacity: 1, x: 0 }}
-                          className={`text-sm ${i === investigationStep ? 'text-white' : 'text-green-600'}`}
-                        >
-                          {'>'} {log}
-                        </motion.p>
-                      ))}
+
+                    <div className="border border-green-900/30 p-4 bg-green-950/10">
+                      <h4 className="flex items-center gap-2 text-sm font-bold text-white mb-4 border-b border-green-900/50 pb-2">
+                        <MapPin className="w-4 h-4 text-green-500" /> CASE CONTEXT
+                      </h4>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between border-b border-green-900/30 pb-1 gap-4">
+                          <span className="text-green-600 shrink-0">FIR:</span>
+                          <span className="text-white text-right">{caseData.firNumber || "—"}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-green-900/30 pb-1 gap-4">
+                          <span className="text-green-600 shrink-0">CRIME:</span>
+                          <span className="text-white text-right">{caseData.crimeType || "—"}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-green-900/30 pb-1 gap-4">
+                          <span className="text-green-600 shrink-0">STATUS:</span>
+                          <span className="text-white text-right">{caseData.status || "—"}</span>
+                        </div>
+                        <div className="flex justify-between pb-1 gap-4">
+                          <span className="text-green-600 shrink-0">STATION:</span>
+                          <span className="text-white text-right">
+                            {caseData.station?.name || caseData.stationName || "—"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Results (Only show when 100%) */}
-                  <AnimatePresence>
-                    {investigationProgress >= 100 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex-1 grid grid-cols-2 gap-6"
-                      >
-                        <div className="col-span-2 border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-300">
-                          SIMULATED — no telecom/NCRB integration exists; not included in the exported PDF.
-                        </div>
-                        <div className="border border-green-900/30 p-4 bg-green-950/10">
-                          <h4 className="flex items-center gap-2 text-sm font-bold text-white mb-4 border-b border-green-900/50 pb-2">
-                            <MapPin className="w-4 h-4 text-green-500" /> TELECOM / CDR DATA
-                          </h4>
-                          <div className="space-y-3 text-sm">
-                            <div className="flex justify-between border-b border-green-900/30 pb-1">
-                              <span className="text-green-600">PHONE_ID:</span>
-                              <span className="text-white">{selectedSuspect.person.phone || "+91 98XXX XXXXX"}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-green-900/30 pb-1">
-                              <span className="text-green-600">PING_LOCATION:</span>
-                              <span className="text-red-400 font-bold">MATCHES INCIDENT ZONE</span>
-                            </div>
-                            <div className="flex justify-between pb-1">
-                              <span className="text-green-600">TOWER_ID:</span>
-                              <span className="text-white">KA-BLR-044</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="border border-green-900/30 p-4 bg-green-950/10">
-                          <h4 className="flex items-center gap-2 text-sm font-bold text-white mb-4 border-b border-green-900/50 pb-2">
-                            <Database className="w-4 h-4 text-green-500" /> NCRB RECORD MATCH
-                          </h4>
-                          <div className="space-y-3 text-sm">
-                            <div className="flex justify-between border-b border-green-900/30 pb-1">
-                              <span className="text-green-600">PAST_OFFENSES:</span>
-                              <span className="text-white">2 DETECTED</span>
-                            </div>
-                            <div className="flex justify-between border-b border-green-900/30 pb-1">
-                              <span className="text-green-600">GANG_AFFILIATION:</span>
-                              <span className="text-red-400 font-bold">POSSIBLE</span>
-                            </div>
-                            <div className="flex justify-between pb-1">
-                              <span className="text-green-600">RISK_LEVEL:</span>
-                              <span className="text-white bg-red-900/50 px-2 py-0.5 border border-red-500">HIGH</span>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <p className="mt-6 text-[11px] text-green-700">
+                    Data shown is from the live case record only. No external telecom or NCRB lookup.
+                  </p>
                 </div>
               </motion.div>
             )}

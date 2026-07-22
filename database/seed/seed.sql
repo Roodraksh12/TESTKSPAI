@@ -16,20 +16,100 @@ insert into "District" (id, name) values
   ('district-mysuru', 'Mysuru')
 on conflict (id) do nothing;
 
+-- IGP command ranges (requires 0005). "Range" below = DySP subdivision, not IGP range.
+insert into "CommandRange" (id, name) values
+  ('cmd-range-bengaluru', 'Bengaluru Range'),
+  ('cmd-range-mysuru', 'Mysuru Range')
+on conflict (id) do nothing;
+
+update "District"
+set "commandRangeId" = 'cmd-range-bengaluru'
+where id = 'district-bengaluru-urban'
+  and ("commandRangeId" is null or "commandRangeId" = '');
+
+update "District"
+set "commandRangeId" = 'cmd-range-mysuru'
+where id = 'district-mysuru'
+  and ("commandRangeId" is null or "commandRangeId" = '');
+
 insert into "PoliceStation" (id, name, "districtId") values
   ('station-indiranagar-ps', 'Indiranagar PS', 'district-bengaluru-urban'),
   ('station-kuvempunagar-ps', 'Kuvempunagar PS', 'district-mysuru'),
   ('station-whitefield-ps', 'Whitefield PS', 'district-bengaluru-urban')
 on conflict (id) do nothing;
 
--- Demo officers: badge IDs KA-CON-1001 / KA-INS-4471 / KA-SP-9999, all password demo1234.
+-- Demo officers: badge IDs KA-CON-1001 / KA-INS-4471 / KA-SP-9999 / KA-IT-0001, password demo1234.
 -- passwordHash below is bcrypt('demo1234'); regenerate with backend/scripts/seed_supabase.py
 -- if you need a fresh hash (bcrypt salts are random on every run).
+-- Hierarchy columns (status, hierarchyPath, …) come from migration 0004; commandRangeId
+-- from 0005. This seed only refreshes passwordHash on conflict so re-seeding does not
+-- wipe the org tree.
+
+insert into "Range" (id, name, "districtId") values
+  ('range-east-bengaluru', 'East Bengaluru Subdivision', 'district-bengaluru-urban')
+on conflict (id) do nothing;
+
+update "PoliceStation"
+set "rangeId" = 'range-east-bengaluru'
+where id in ('station-whitefield-ps', 'station-indiranagar-ps')
+  and "rangeId" is null;
+
 insert into "Officer" (id, "badgeId", "passwordHash", name, role, "stationId") values
   ('officer-constable-demo', 'KA-CON-1001', '$2b$10$9xGWyAisITUSGE7IG0iP0uPAPquMfRzCKcT1ZGtQ.RDK1rmmX0NF2', 'Ramesh K (Demo Constable)', 'CONSTABLE', 'station-whitefield-ps'),
   ('officer-inspector-demo', 'KA-INS-4471', '$2b$10$9xGWyAisITUSGE7IG0iP0uPAPquMfRzCKcT1ZGtQ.RDK1rmmX0NF2', 'Suresh V (Demo Inspector)', 'INSPECTOR', 'station-whitefield-ps'),
   ('officer-sp-demo', 'KA-SP-9999', '$2b$10$9xGWyAisITUSGE7IG0iP0uPAPquMfRzCKcT1ZGtQ.RDK1rmmX0NF2', 'Priya M (Demo SP)', 'SP', 'station-whitefield-ps')
 on conflict ("badgeId") do update set "passwordHash" = excluded."passwordHash";
+
+-- Police IT + hierarchy backfill (requires 0004 columns). Safe if 0004 already applied.
+insert into "Officer" (
+  id, "badgeId", "passwordHash", name, role, "stationId",
+  email, "districtId", "rangeId", "reportingOfficerId",
+  "hierarchyPath", status, "createdById"
+) values (
+  'officer-police-it', 'KA-IT-0001',
+  '$2b$10$9xGWyAisITUSGE7IG0iP0uPAPquMfRzCKcT1ZGtQ.RDK1rmmX0NF2',
+  'Police IT (System Admin)', 'POLICE_IT', null,
+  'police.it@ksp.local', null, null, null,
+  'it'::ltree, 'ACTIVE', null
+)
+on conflict ("badgeId") do update set
+  "passwordHash" = excluded."passwordHash",
+  role = excluded.role,
+  status = 'ACTIVE',
+  "hierarchyPath" = coalesce("Officer"."hierarchyPath", excluded."hierarchyPath");
+
+update "Officer" o
+set "districtId" = coalesce(o."districtId", ps."districtId"),
+    "rangeId" = coalesce(o."rangeId", ps."rangeId")
+from "PoliceStation" ps
+where o."stationId" = ps.id;
+
+update "Officer" o
+set "commandRangeId" = coalesce(o."commandRangeId", d."commandRangeId")
+from "District" d
+where o."districtId" = d.id
+  and d."commandRangeId" is not null;
+
+update "Officer"
+set "hierarchyPath" = 'it.sp_demo'::ltree,
+    "reportingOfficerId" = 'officer-police-it',
+    "createdById" = coalesce("createdById", 'officer-police-it'),
+    status = coalesce(status, 'ACTIVE')
+where id = 'officer-sp-demo';
+
+update "Officer"
+set "hierarchyPath" = 'it.sp_demo.sho_demo'::ltree,
+    "reportingOfficerId" = 'officer-sp-demo',
+    "createdById" = coalesce("createdById", 'officer-sp-demo'),
+    status = coalesce(status, 'ACTIVE')
+where id = 'officer-inspector-demo';
+
+update "Officer"
+set "hierarchyPath" = 'it.sp_demo.sho_demo.con_demo'::ltree,
+    "reportingOfficerId" = 'officer-inspector-demo',
+    "createdById" = coalesce("createdById", 'officer-inspector-demo'),
+    status = coalesce(status, 'ACTIVE')
+where id = 'officer-constable-demo';
 
 insert into "Person" (id, name, role, phone, address) values
   ('person-anita-d', 'Anita D', 'VICTIM', '9123456789', '789 1st Ave, Whitefield'),

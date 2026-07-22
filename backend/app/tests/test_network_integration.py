@@ -16,26 +16,26 @@ def sp_officer(db_available: bool):
 
 
 def test_network_graph_has_rings_after_seed_backfill(sp_officer) -> None:
-    graph = network_builder.build_crime_network(True, sp_officer["stationId"])
+    graph = network_builder.build_crime_network(sp_officer)
     assert len(graph["nodes"]) > 0
     assert len(graph["rings"]) >= 1
     assert graph["meta"]["caseCount"] > 0
 
 
 def test_network_brokers_rank_differently_from_hubs(sp_officer) -> None:
-    graph = network_builder.build_crime_network(True, sp_officer["stationId"])
+    graph = network_builder.build_crime_network(sp_officer)
     hub_ids = [h["id"] for h in graph["hubs"]]
     broker_ids = [b["id"] for b in graph["brokers"]]
     assert hub_ids != broker_ids
 
 
 def test_rejected_match_is_excluded_from_edges(sp_officer) -> None:
-    graph = network_builder.build_crime_network(True, sp_officer["stationId"])
+    graph = network_builder.build_crime_network(sp_officer)
     edge_labels = {e["label"] for e in graph["edges"]}
     # The seeded REJECTED match (EXTRA-108 vs EXTRA-109) must never surface as an edge.
     assert not any(label.startswith("MO match") and "42" in label for label in edge_labels)
 
 
 def test_network_respects_case_cap(sp_officer) -> None:
-    graph = network_builder.build_crime_network(True, sp_officer["stationId"])
+    graph = network_builder.build_crime_network(sp_officer)
     assert graph["meta"]["caseCount"] <= network_builder.GRAPH_CASE_CAP

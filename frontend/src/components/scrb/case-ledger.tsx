@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { Clock, FileText, MapPin } from "lucide-react";
-import { type CaseStatus } from "@/lib/scrb/mock";
 import { Badge } from "./primitives";
 import { cn } from "@/lib/utils";
+
+type CaseStatus = "Active" | "Under Review" | "Cold" | "Closed";
 
 const STATUS_TONE: Record<CaseStatus, "teal" | "amber" | "muted" | "danger"> = {
   Active: "teal",

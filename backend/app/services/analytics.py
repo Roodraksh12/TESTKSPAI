@@ -5,8 +5,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.services import deadline_engine
-from app.services.case_access import station_filter_sql
+from app.services.case_access import jurisdiction_filter_sql
 from app.services.db import fetch_all, fetch_scalar
+from app.services.hierarchy import has_wide_case_scope
 
 # Every number here comes from a DB query — no hardcoded arrays, no random().
 
@@ -38,8 +39,8 @@ def _months_window(now: datetime, count: int = 6) -> list[tuple[int, int]]:
     return list(reversed(months))
 
 
-def get_crime_trend(is_sp: bool, station_id: str) -> dict[str, Any]:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="c")
+def get_crime_trend(officer: dict[str, Any]) -> dict[str, Any]:
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     now = datetime.now(timezone.utc)
     window_start = now - timedelta(days=183)
     rows = fetch_all(
@@ -82,8 +83,8 @@ def get_crime_trend(is_sp: bool, station_id: str) -> dict[str, Any]:
     return {"data": data, "series": series}
 
 
-def compute_crime_velocity(is_sp: bool, station_id: str) -> list[dict[str, Any]]:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="c")
+def compute_crime_velocity(officer: dict[str, Any]) -> list[dict[str, Any]]:
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     now = datetime.now(timezone.utc)
     recent_start = now - timedelta(days=7)
     baseline_start = now - timedelta(days=7 + VELOCITY_BASELINE_WEEKS * 7)
@@ -128,14 +129,14 @@ def compute_crime_velocity(is_sp: bool, station_id: str) -> list[dict[str, Any]]
     return results
 
 
-def get_risk_forecast(is_sp: bool, station_id: str) -> dict[str, Any]:
-    top5 = compute_crime_velocity(is_sp, station_id)[:5]
+def get_risk_forecast(officer: dict[str, Any]) -> dict[str, Any]:
+    top5 = compute_crime_velocity(officer)[:5]
     axes = [{"crimeType": v["crimeType"], "risk": v["risk"]} for v in top5]
     return {"axes": axes, "baseline": 50}
 
 
-def get_hotspot_clusters(is_sp: bool, station_id: str) -> list[dict[str, Any]]:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="c")
+def get_hotspot_clusters(officer: dict[str, Any]) -> list[dict[str, Any]]:
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     rows = fetch_all(
         f'''
         SELECT "crimeType", latitude, longitude
@@ -179,10 +180,11 @@ def get_hotspot_clusters(is_sp: bool, station_id: str) -> list[dict[str, Any]]:
     return clusters
 
 
-def get_early_warnings(is_sp: bool, station_id: str, take: int = 6) -> list[dict[str, Any]]:
+def get_early_warnings(officer: dict[str, Any], take: int = 6) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
+    wide_scope = has_wide_case_scope(officer.get("role"))
 
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="a")
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="a")
     alerts = fetch_all(
         f'''
         SELECT a.type, a."zoneLabel", a."riskScore", a.reason
@@ -205,13 +207,13 @@ def get_early_warnings(is_sp: bool, station_id: str, take: int = 6) -> list[dict
             }
         )
 
-    for v in compute_crime_velocity(is_sp, station_id):
+    for v in compute_crime_velocity(officer):
         if v["risk"] >= 65 and v["recentCount"] >= 2:
             warnings.append(
                 {
                     "type": "ANOMALY",
                     "probability": v["risk"],
-                    "location": "District-wide" if is_sp else "Station jurisdiction",
+                    "location": "District-wide" if wide_scope else "Station jurisdiction",
                     "timeframe": "Next 7 days",
                     "reasoning": (
                         f'{v["recentCount"]} {v["crimeType"]} cases in the last 7 days '
@@ -223,7 +225,7 @@ def get_early_warnings(is_sp: bool, station_id: str, take: int = 6) -> list[dict
             )
 
     deadline_added = 0
-    for risk in deadline_engine.get_deadline_risks(is_sp, station_id, take=10):
+    for risk in deadline_engine.get_deadline_risks(officer, take=10):
         if deadline_added >= 3:
             break
         if risk["tier"] not in ("OVERDUE", "URGENT"):
@@ -248,8 +250,8 @@ def get_early_warnings(is_sp: bool, station_id: str, take: int = 6) -> list[dict
     return warnings[:take]
 
 
-def get_high_risk_summary(is_sp: bool, station_id: str) -> dict[str, Any]:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="a")
+def get_high_risk_summary(officer: dict[str, Any]) -> dict[str, Any]:
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="a")
     high_risk_zones = fetch_scalar(
         f'SELECT COUNT(*) FROM "Alert" a WHERE a."riskScore" >= 70{scope_sql}',
         scope_params,
@@ -277,8 +279,8 @@ def get_high_risk_summary(is_sp: bool, station_id: str) -> dict[str, Any]:
     }
 
 
-def get_daily_case_volume(is_sp: bool, station_id: str, days: int = 7) -> list[dict[str, Any]]:
-    scope_sql, scope_params = station_filter_sql(is_sp, station_id, alias="c")
+def get_daily_case_volume(officer: dict[str, Any], days: int = 7) -> list[dict[str, Any]]:
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     now = datetime.now(timezone.utc)
     window_start = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
     rows = fetch_all(
@@ -298,3 +300,21 @@ def get_daily_case_volume(is_sp: bool, station_id: str, days: int = 7) -> list[d
         {"date": (window_start + timedelta(days=i)).date().isoformat(), "count": counts.get((window_start + timedelta(days=i)).date().isoformat(), 0)}
         for i in range(days)
     ]
+
+
+def sparkline_paths(daily_volume: list[dict[str, Any]]) -> dict[str, str] | None:
+    """Precompute SVG path strings so the FE only paints."""
+    if not daily_volume:
+        return None
+    max_count = max((int(d.get("count") or 0) for d in daily_volume), default=1) or 1
+    step_x = 200 / max(len(daily_volume) - 1, 1)
+    points = []
+    for i, d in enumerate(daily_volume):
+        x = i * step_x
+        y = 55 - (int(d.get("count") or 0) / max_count) * 45
+        points.append((x, y))
+    line = " ".join(
+        f'{"M" if i == 0 else "L"}{x:.1f},{y:.1f}' for i, (x, y) in enumerate(points)
+    )
+    area = f"{line} L200,60 L0,60 Z"
+    return {"line": line, "area": area}

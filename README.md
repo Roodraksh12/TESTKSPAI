@@ -123,10 +123,12 @@ There is **no demo button** on the login UI. Enter a Service ID manually. After 
 
 | Role / Rank | Badge ID | Password | Notes |
 |---|---|---|---|
-| **Police IT** (bootstrap admin) | `KA-IT-0001` | `demo1234` | Administration / IT dashboard; documented in `backend/README.md` / `.env` |
+| **Police IT** (bootstrap admin) | `KA-IT-0001` | `demo1234` | Administration-first; read-only statewide case views; invites gazetted ranks. Documented in `backend/README.md` / `.env`. |
 | **Inspector (SHO)** | `KA-INS-4471` | `demo1234` | Station-scoped Copilot / cases |
 | **Superintendent of Police (SP)** | `KA-SP-9999` | `demo1234` | District-scoped Overview |
-| **Constable** | `KA-CON-1001` | `demo1234` | Station leaf |
+| **Constable** | `KA-CON-1001` | `demo1234` | Station leaf; profile-only admin |
+
+Apply DB migrations **0003 → both `0004_*` (hierarchy + chargesheet) → 0005 → seed** before first login (see `database/README.md`).
 
 ---
 

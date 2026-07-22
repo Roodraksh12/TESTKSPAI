@@ -1,41 +1,36 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiRequest } from "@/api/client";
 import HotspotMap, { type HotspotCluster } from "@/components/scrb/hotspot-map.leaflet";
 import { AlertTriangle, TrendingUp } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Card, Badge, IconOrb, SectionLabel } from "@/components/scrb/primitives";
+import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
 
 type DailyVolume = { date: string; count: number };
+type SparklinePath = { line: string; area: string } | null;
 
 export default function Hotspots() {
   const { t } = useI18n();
   const [alerts, setAlerts] = useState<any[]>([]);
   const [clusters, setClusters] = useState<HotspotCluster[]>([]);
   const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
+  const [sparklinePath, setSparklinePath] = useState<SparklinePath>(null);
 
-  useEffect(() => {
+  const load = () =>
     apiRequest("/api/hotspots")
       .then((payload) => {
         setAlerts(payload.alerts || []);
         setClusters(payload.clusters || []);
         setDailyVolume(payload.dailyVolume || []);
+        setSparklinePath(payload.sparklinePath || null);
       })
       .catch(console.error);
+
+  useEffect(() => {
+    load();
   }, []);
 
-  const sparklinePath = useMemo(() => {
-    if (dailyVolume.length === 0) return null;
-    const max = Math.max(...dailyVolume.map((d) => d.count), 1);
-    const stepX = 200 / Math.max(dailyVolume.length - 1, 1);
-    const points = dailyVolume.map((d, i) => {
-      const x = i * stepX;
-      const y = 55 - (d.count / max) * 45;
-      return { x, y };
-    });
-    const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-    const area = `${line} L200,60 L0,60 Z`;
-    return { line, area };
-  }, [dailyVolume]);
+  useVisibilityRefetch(load);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">

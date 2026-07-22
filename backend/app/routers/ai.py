@@ -64,10 +64,6 @@ class PredictStepsRequest(BaseModel):
 @router.post("/chat")
 async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
-    is_sp = officer.get("role") == "SP"
-    effective_station_id = (
-        payload.stationId if is_sp and payload.stationId else officer["stationId"]
-    )
 
     # Audited before the LLM call so failed/errored queries are still on record.
     create_audit_log(
@@ -158,9 +154,7 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
                 tool_result = await execute_tool(
                     tool_name,
                     args,
-                    effective_station_id,
-                    officer["id"],
-                    is_sp,
+                    officer,
                 )
             except Exception:
                 tool_result = {"error": "Tool execution failed."}
@@ -257,10 +251,10 @@ Raw Notes:
             *extracted_data["accusedNames"],
             *([extracted_data["victimName"]] if extracted_data.get("victimName") else []),
         ],
-        station_id=officer["stationId"],
+        station_id=officer.get("stationId"),
     )
     mo_similar = intake_intel.find_mo_similar_cases(
-        station_id=officer["stationId"],
+        station_id=officer.get("stationId"),
         crime_type=extracted_data["crimeType"],
         summary=extracted_data["narrativeSummary"],
         modus_operandi=extracted_data["modusOperandi"],

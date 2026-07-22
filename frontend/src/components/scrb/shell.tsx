@@ -19,6 +19,9 @@ import {
   Clock,
   ClipboardList,
   LayoutDashboard,
+  Shield,
+  UserPlus,
+  KeyRound,
 } from "lucide-react";
 import { SealMark, TricolourThread } from "./insignia";
 import { useI18n } from "@/lib/i18n";
@@ -33,24 +36,35 @@ const NAV_SECTIONS = [
   {
     labelKey: "nav.command",
     items: [
-      { to: "/overview", labelKey: "nav.dashboard", icon: LayoutDashboard },
-      { to: "/dashboard", labelKey: "nav.copilot", icon: MessageSquare },
-      { to: "/analytics", labelKey: "nav.analytics", icon: BarChart2 },
-      { to: "/hotspots", labelKey: "nav.hotspots", icon: MapIcon },
-      { to: "/deadlines", labelKey: "nav.deadlines", icon: Clock },
+      { to: "/overview", labelKey: "nav.dashboard", icon: LayoutDashboard, cap: "overview" },
+      { to: "/dashboard", labelKey: "nav.copilot", icon: MessageSquare, cap: "copilot" },
+      { to: "/analytics", labelKey: "nav.analytics", icon: BarChart2, cap: "analytics" },
+      { to: "/hotspots", labelKey: "nav.hotspots", icon: MapIcon, cap: "hotspots" },
+      { to: "/deadlines", labelKey: "nav.deadlines", icon: Clock, cap: "deadlines" },
     ],
   },
   {
     labelKey: "nav.records",
     items: [
-      { to: "/cases", labelKey: "nav.cases", icon: Briefcase },
-      { to: "/network", labelKey: "nav.network", icon: Share2 },
-      { to: "/fir/upload", labelKey: "nav.firIntake", icon: FileUp },
-      { to: "/audit", labelKey: "nav.auditTrail", icon: ClipboardList },
+      { to: "/cases", labelKey: "nav.cases", icon: Briefcase, cap: "cases" },
+      { to: "/network", labelKey: "nav.network", icon: Share2, cap: "network" },
+      { to: "/fir/upload", labelKey: "nav.firIntake", icon: FileUp, cap: "firIntake" },
+      { to: "/audit", labelKey: "nav.auditTrail", icon: ClipboardList, cap: "audit" },
+      { to: "/invite", labelKey: "nav.invite", icon: UserPlus, cap: "invite" },
+      { to: "/password-resets", labelKey: "nav.passwordResets", icon: KeyRound, cap: "passwordResets" },
+      { to: "/administration", labelKey: "nav.admin", icon: Shield, cap: "administration" },
     ],
   },
 ];
 
+function roleBadge(role: string) {
+  if (role === "POLICE_IT") return "IT";
+  if (role === "SP" || role === "ADDL_SP_DCP") return "SP";
+  if (role === "INSPECTOR" || role === "SHO") return "SHO";
+  if (role === "DYSP") return "DySP";
+  if (role === "CONSTABLE" || role === "SI" || role === "ASI" || role === "HEAD_CONSTABLE") return "CON";
+  return role.slice(0, 3);
+}
 export function Header() {
   const { data: session } = useSession();
   const { t } = useI18n();
@@ -109,6 +123,8 @@ export function Sidebar() {
   const officerName = session?.user?.name || "Officer";
   const initials = officerName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
   const role = session?.user?.role || "OFFICER";
+  const navCaps = session?.user?.capabilities?.nav || {};
+  const home = session?.user?.capabilities?.defaultHome || "/dashboard";
 
   return (
     <aside className={cn(
@@ -120,7 +136,7 @@ export function Sidebar() {
         "flex shrink-0 items-center border-b border-white/10 px-4",
         collapsed ? "h-14 justify-center" : "h-14 gap-3"
       )}>
-        <Link to="/dashboard" className={cn("flex items-center", collapsed ? "" : "gap-3")}>
+        <Link to={home} className={cn("flex items-center", collapsed ? "" : "gap-3")}>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
             <SealMark size={18} />
           </div>
@@ -148,7 +164,10 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-5">
-        {NAV_SECTIONS.map((section) => (
+        {NAV_SECTIONS.map((section) => {
+          const visible = section.items.filter((item) => navCaps[item.cap] !== false);
+          if (visible.length === 0) return null;
+          return (
           <div key={section.labelKey}>
             {!collapsed && (
               <p className="px-3 pb-1.5 text-[9px] font-semibold tracking-[0.2em] text-white/30 uppercase">
@@ -156,8 +175,12 @@ export function Sidebar() {
               </p>
             )}
             <div className="space-y-0.5">
-              {section.items.map(({ to, labelKey, icon: Icon }) => {
-                const label = t(labelKey);
+              {visible.map(({ to, labelKey, icon: Icon, cap }) => {
+                const resolvedKey =
+                  cap === "administration" && session?.user?.capabilities?.isPoliceIt
+                    ? "nav.officers"
+                    : labelKey;
+                const label = t(resolvedKey);
                 const active = pathname === to || pathname.startsWith(to + "/");
                 return (
                   <Link
@@ -186,7 +209,8 @@ export function Sidebar() {
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* User */}
@@ -209,7 +233,7 @@ export function Sidebar() {
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-medium text-white truncate">{officerName}</span>
                 <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-teal uppercase tracking-wider">
-                  {role === "SP" ? "SP" : role === "INSPECTOR" ? "INS" : "CON"}
+                  {roleBadge(role)}
                 </span>
               </div>
               <span className="text-xs text-white/40 truncate">
