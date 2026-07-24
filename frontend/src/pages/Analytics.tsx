@@ -39,8 +39,8 @@ export default function Analytics() {
   // time-series trend chart beside it does not.
   const crimeMix = Object.entries(
     payload?.metrics.crimeTypeBreakdown ?? (payload?.metrics as any)?.byType ?? {}
-  ).sort((a, b) => b[1] - a[1]);
-  const mixTotal = crimeMix.reduce((sum, [, n]) => sum + n, 0);
+  ).sort((a, b) => (b[1] as number) - (a[1] as number));
+  const mixTotal = crimeMix.reduce((sum, [, n]) => sum + (n as number), 0);
 
   const totalCases = payload?.metrics.totalCases ?? 0;
   const clearanceRate = payload?.metrics.clearanceRate ?? 0;
@@ -104,13 +104,14 @@ export default function Analytics() {
           ) : (
             <div className="space-y-2.5">
               {crimeMix.slice(0, 6).map(([type, count]) => {
-                const pct = mixTotal > 0 ? Math.round((count / mixTotal) * 100) : 0;
+                const numCount = count as number;
+                const pct = mixTotal > 0 ? Math.round((numCount / mixTotal) * 100) : 0;
                 return (
                   <div key={type}>
                     <div className="flex items-center justify-between text-[12px]">
                       <span className="min-w-0 truncate font-medium text-foreground">{type}</span>
                       <span className="text-mono ml-2 shrink-0 text-[11px] text-muted-foreground">
-                        {count} · {pct}%
+                        {numCount} · {pct}%
                       </span>
                     </div>
                     <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
