@@ -6,6 +6,7 @@ import { apiRequest } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/lib/i18n";
 import { Button, Input } from "@/components/scrb/primitives";
+import { toast } from "sonner";
 
 type GeoOption = { id: string; name: string; districtName?: string; commandRangeName?: string };
 
@@ -137,10 +138,12 @@ export default function InviteOfficersPage() {
           commandRangeId: geoFields.includes("commandRangeId") ? commandRangeId || null : null,
         }),
       });
+      const invitedName = name.trim();
       if (data.tempPassword) setTempShown(data.tempPassword);
       setName("");
       setBadgeId("");
       setEmail("");
+      toast.success(`${invitedName} has been invited successfully.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invite failed");
     } finally {

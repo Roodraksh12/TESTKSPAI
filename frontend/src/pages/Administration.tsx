@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/lib/i18n";
 import { Button, Input } from "@/components/scrb/primitives";
 import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
+import { toast } from "sonner";
 
 type OfficerRow = {
   id: string;
@@ -179,12 +180,14 @@ export default function AdministrationPage() {
           commandRangeId: geoFields.includes("commandRangeId") ? commandRangeId || null : null,
         }),
       });
+      const invitedName = name.trim();
       if (data.tempPassword) {
         setTempShown(data.tempPassword);
       }
       setName("");
       setBadgeId("");
       setEmail("");
+      toast.success(`${invitedName} has been invited successfully.`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invite failed");
