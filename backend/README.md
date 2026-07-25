@@ -13,11 +13,13 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Apply DB migrations in order (see `database/README.md`): **0003 → 0004 → 0005 → seed**.
+Apply DB migrations in order (see `database/README.md`): **0003 → both 0004 files → 0005 → 0006 → seed**.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\apply_0004.py
 .\.venv\Scripts\python.exe scripts\apply_0005.py
+.\.venv\Scripts\python.exe -m scripts.apply_0006
+.\.venv\Scripts\python.exe -m scripts.refresh_early_warnings
 ```
 
 ## Bootstrap admin — Police IT

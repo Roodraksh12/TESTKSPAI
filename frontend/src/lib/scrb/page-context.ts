@@ -77,6 +77,11 @@ export function usePageContext(): PageContext {
       placeholder: "Ask about hotspots…",
       prompts: ["Which zone is highest risk?", "Why is this zone flagged?", "Where should we patrol tonight?"],
     },
+    "/early-warnings": {
+      description: "The officer is reviewing active hotspot-derived early warnings and the jurisdiction crime-velocity forecast.",
+      placeholder: "Ask about these warnings…",
+      prompts: ["Why was the top warning triggered?", "Which patrol area needs attention?", "Explain the risk score"],
+    },
     "/network": {
       description: "The officer is on the entity network canvas, exploring cross-case links between people, vehicles and cases.",
       placeholder: "Ask about these links…",

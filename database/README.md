@@ -22,6 +22,8 @@ Then **`database/migrations/0005_command_jurisdiction.sql`** (use
 `backend/scripts/apply_0005.py`). 0005 adds IGP-level **`CommandRange`** (several
 districts) and **`OfficerDistrict`** (DIG multi-district); the existing **`Range`**
 table remains a DySP **subdivision** under a district — not an IGP range.
+Finally apply **`database/migrations/0006_early_warning_notifications.sql`** for
+hotspot-warning lifecycle fields and per-officer read state.
 
 `0001_initial_schema.sql` + `0002_rls_policies.sql` describe an earlier, unused design
 (snake_case tables, Supabase-Auth-linked via `auth.users`/`auth.uid()`). The running
@@ -33,10 +35,12 @@ app authenticates with its own FastAPI JWT (badge ID + bcrypt), not Supabase Aut
 3. Run `backend/scripts/apply_0004.py` (or apply `0004_hierarchy_auth.sql` in two transactions).
 4. Apply `database/migrations/0004_chargesheet_draft.sql`.
 5. Run `backend/scripts/apply_0005.py` (or apply `0005_command_jurisdiction.sql`).
-6. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
+6. From `backend/`, run `python -m scripts.apply_0006` (or apply `0006_early_warning_notifications.sql`).
+7. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
    several overdue on the statutory deadline clock, a criminal network with a
    detectable ring) — or create demo officers by hand.
-7. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
+8. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
+9. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
 
 ## Demo login (after seed + 0004)
 

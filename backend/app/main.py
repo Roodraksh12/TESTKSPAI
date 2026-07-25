@@ -11,6 +11,7 @@ from app.routers import (
     chat_sessions,
     dashboard,
     deadlines,
+    early_warnings,
     fir,
     health,
     hotspots,
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(ai.router)
     app.include_router(fir.router)
     app.include_router(deadlines.router)
+    app.include_router(early_warnings.router)
     app.include_router(network.router)
     app.include_router(audit.router)
     app.include_router(legal.router)

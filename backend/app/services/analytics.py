@@ -8,13 +8,13 @@ from app.services import deadline_engine
 from app.services.case_access import jurisdiction_filter_sql
 from app.services.db import fetch_all, fetch_scalar
 from app.services.hierarchy import has_wide_case_scope
+from app.services.warning_engine import get_hotspot_clusters as get_spatial_hotspot_clusters
 
 # Every number here comes from a DB query — no hardcoded arrays, no random().
 
 MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 TREND_SERIES_COLORS = ["var(--teal)", "var(--amber)", "var(--danger)", "var(--ink-2)"]
 VELOCITY_BASELINE_WEEKS = 8
-HOTSPOT_GRID_DEG = 0.01
 
 
 def _parse_dt(value: Any) -> datetime:
@@ -136,48 +136,7 @@ def get_risk_forecast(officer: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_hotspot_clusters(officer: dict[str, Any]) -> list[dict[str, Any]]:
-    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
-    rows = fetch_all(
-        f'''
-        SELECT "crimeType", latitude, longitude
-        FROM "Case" c
-        WHERE latitude IS NOT NULL AND longitude IS NOT NULL{scope_sql}
-        ''',
-        scope_params,
-    )
-
-    cells: dict[tuple[int, int], dict[str, Any]] = {}
-    for row in rows:
-        lat, lng = row["latitude"], row["longitude"]
-        cell_key = (round(lat / HOTSPOT_GRID_DEG), round(lng / HOTSPOT_GRID_DEG))
-        cell = cells.setdefault(cell_key, {"lats": [], "lngs": [], "typeCounts": defaultdict(int)})
-        cell["lats"].append(lat)
-        cell["lngs"].append(lng)
-        cell["typeCounts"][row["crimeType"]] += 1
-
-    clusters = []
-    for cell in cells.values():
-        count = len(cell["lats"])
-        top_type = max(cell["typeCounts"], key=lambda t: cell["typeCounts"][t])
-        if count >= 3:
-            intensity, radius = "high", 28
-        elif count == 2:
-            intensity, radius = "medium", 20
-        else:
-            intensity, radius = "low", 14
-        clusters.append(
-            {
-                "lat": sum(cell["lats"]) / count,
-                "lng": sum(cell["lngs"]) / count,
-                "count": count,
-                "intensity": intensity,
-                "label": f"{top_type} cluster ({count})",
-                "radius": radius,
-            }
-        )
-
-    clusters.sort(key=lambda c: c["count"], reverse=True)
-    return clusters
+    return get_spatial_hotspot_clusters(officer)
 
 
 def get_early_warnings(officer: dict[str, Any], take: int = 6) -> list[dict[str, Any]]:
@@ -189,7 +148,9 @@ def get_early_warnings(officer: dict[str, Any], take: int = 6) -> list[dict[str,
         f'''
         SELECT a.type, a."zoneLabel", a."riskScore", a.reason
         FROM "Alert" a
-        WHERE 1=1{scope_sql}
+        WHERE a.status = 'ACTIVE'
+          AND (a."expiresAt" IS NULL OR a."expiresAt" > NOW())
+          {scope_sql}
         ORDER BY a."riskScore" DESC
         ''',
         scope_params,
@@ -252,16 +213,20 @@ def get_early_warnings(officer: dict[str, Any], take: int = 6) -> list[dict[str,
 
 def get_high_risk_summary(officer: dict[str, Any]) -> dict[str, Any]:
     scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="a")
+    active_sql = " AND a.status = 'ACTIVE' AND (a.\"expiresAt\" IS NULL OR a.\"expiresAt\" > NOW())"
     high_risk_zones = fetch_scalar(
-        f'SELECT COUNT(*) FROM "Alert" a WHERE a."riskScore" >= 70{scope_sql}',
+        f'SELECT COUNT(*) FROM "Alert" a WHERE a."riskScore" >= 70{active_sql}{scope_sql}',
         scope_params,
     )
-    open_alerts = fetch_scalar(f'SELECT COUNT(*) FROM "Alert" a WHERE 1=1{scope_sql}', scope_params)
+    open_alerts = fetch_scalar(
+        f'SELECT COUNT(*) FROM "Alert" a WHERE 1=1{active_sql}{scope_sql}',
+        scope_params,
+    )
     top = fetch_all(
         f'''
         SELECT a."zoneLabel", a."riskScore"
         FROM "Alert" a
-        WHERE 1=1{scope_sql}
+        WHERE 1=1{active_sql}{scope_sql}
         ORDER BY a."riskScore" DESC
         LIMIT 1
         ''',

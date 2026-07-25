@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
 import { useTheme } from "next-themes";
 import "leaflet/dist/leaflet.css";
 
@@ -12,6 +12,10 @@ export type HotspotCluster = {
   intensity: "high" | "medium" | "low";
   label: string;
   radius: number;
+  riskScore?: number;
+  stationId?: string;
+  crimeType?: string;
+  fingerprint?: string;
 };
 
 const BENGALURU_CENTRE: [number, number] = [12.9716, 77.5946];
@@ -22,7 +26,21 @@ const INTENSITY_COLOR: Record<HotspotCluster["intensity"], { fill: string; strok
   low: { fill: "#14b8a6", stroke: "#0f766e" },
 };
 
-export default function HotspotMap({ clusters = [] }: { clusters?: HotspotCluster[] }) {
+function FocusMap({ focus }: { focus: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (focus) map.flyTo(focus, 15, { duration: 0.8 });
+  }, [focus, map]);
+  return null;
+}
+
+export default function HotspotMap({
+  clusters = [],
+  focus = null,
+}: {
+  clusters?: HotspotCluster[];
+  focus?: [number, number] | null;
+}) {
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
 
@@ -45,18 +63,28 @@ export default function HotspotMap({ clusters = [] }: { clusters?: HotspotCluste
         scrollWheelZoom
         style={{ height: "100%", width: "100%", position: "absolute", inset: 0 }}
       >
+        <FocusMap focus={focus} />
         <TileLayer
           url={tileUrl}
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
         {clusters.map((cluster, i) => {
           const colors = INTENSITY_COLOR[cluster.intensity] || INTENSITY_COLOR.low;
+          const selected =
+            focus &&
+            Math.abs(cluster.lat - focus[0]) < 0.001 &&
+            Math.abs(cluster.lng - focus[1]) < 0.001;
           return (
             <CircleMarker
               key={i}
               center={[cluster.lat, cluster.lng]}
-              radius={Math.max(cluster.radius / 2.2, 8)}
-              pathOptions={{ color: colors.stroke, fillColor: colors.fill, fillOpacity: 0.55, weight: 2 }}
+              radius={Math.max(cluster.radius / 2.2, selected ? 12 : 8)}
+              pathOptions={{
+                color: selected ? "#ffffff" : colors.stroke,
+                fillColor: colors.fill,
+                fillOpacity: selected ? 0.8 : 0.55,
+                weight: selected ? 4 : 2,
+              }}
             >
               <Popup>
                 <div className="text-sm font-medium text-black">{cluster.label}</div>

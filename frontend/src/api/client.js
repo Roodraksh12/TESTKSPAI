@@ -71,11 +71,12 @@ async function performFetch(path, options, headers) {
 }
 
 export async function apiRequest(path, options = {}) {
-  const method = options.method || "GET"
+  const { fresh = false, ...requestOptions } = options
+  const method = requestOptions.method || "GET"
   const isGet = method.toUpperCase() === "GET"
 
-  const headers = new Headers(options.headers)
-  if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
+  const headers = new Headers(requestOptions.headers)
+  if (!headers.has("Content-Type") && requestOptions.body && !(requestOptions.body instanceof FormData)) {
     headers.set("Content-Type", "application/json")
   }
 
@@ -84,18 +85,18 @@ export async function apiRequest(path, options = {}) {
     headers.set("Authorization", `Bearer ${token}`)
   }
 
-  if (isGet && apiCache.has(path)) {
+  if (isGet && !fresh && apiCache.has(path)) {
     // SWR-style: return cache immediately, refresh in background
-    performFetch(path, options, headers)
+    performFetch(path, requestOptions, headers)
       .then((payload) => apiCache.set(path, payload))
       .catch(console.error)
 
     return apiCache.get(path)
   }
 
-  const payload = await performFetch(path, options, headers)
+  const payload = await performFetch(path, requestOptions, headers)
 
-  if (isGet) {
+  if (isGet && !fresh) {
     apiCache.set(path, payload)
   }
 

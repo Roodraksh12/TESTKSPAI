@@ -22,6 +22,10 @@ import {
   Shield,
   UserPlus,
   KeyRound,
+  AlertTriangle,
+  CheckCheck,
+  ExternalLink,
+  Wifi,
 } from "lucide-react";
 import { SealMark, TricolourThread } from "./insignia";
 import { useI18n } from "@/lib/i18n";
@@ -29,6 +33,8 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { OmniSearch } from "./command-palette";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useEarlyWarnings } from "@/context/EarlyWarningsContext";
 
 // Labels are i18n keys resolved at render time, so switching language
 // re-renders the nav in place rather than needing a reload.
@@ -40,6 +46,7 @@ const NAV_SECTIONS = [
       { to: "/dashboard", labelKey: "nav.copilot", icon: MessageSquare, cap: "copilot" },
       { to: "/analytics", labelKey: "nav.analytics", icon: BarChart2, cap: "analytics" },
       { to: "/hotspots", labelKey: "nav.hotspots", icon: MapIcon, cap: "hotspots" },
+      { to: "/early-warnings", labelKey: "nav.earlyWarnings", icon: Bell, cap: "earlyWarnings" },
       { to: "/deadlines", labelKey: "nav.deadlines", icon: Clock, cap: "deadlines" },
     ],
   },
@@ -65,6 +72,138 @@ function roleBadge(role: string) {
   if (role === "CONSTABLE" || role === "SI" || role === "ASI" || role === "HEAD_CONSTABLE") return "CON";
   return role.slice(0, 3);
 }
+
+function NotificationBell() {
+  const { t } = useI18n();
+  const {
+    enabled,
+    warnings,
+    unreadCount,
+    loading,
+    error,
+    lastUpdated,
+    markRead,
+    markAllRead,
+  } = useEarlyWarnings();
+  const [open, setOpen] = useState(false);
+
+  if (!enabled) return null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          aria-label={`${t("header.notifications")}${unreadCount ? ` (${unreadCount})` : ""}`}
+          className="relative flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
+        >
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white ring-2 ring-surface">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border-hairline bg-surface p-0 shadow-xl"
+      >
+        <div className="flex items-start justify-between border-b border-hairline p-4">
+          <div>
+            <h2 className="text-sm font-semibold">{t("header.notifications")}</h2>
+            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <Wifi className={cn("h-3 w-3", !error && "text-teal")} />
+              {error
+                ? t("warnings.offline")
+                : loading && !lastUpdated
+                  ? t("warnings.connecting")
+                  : `${t("warnings.live")} · ${
+                      lastUpdated
+                        ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : "—"
+                    }`}
+            </div>
+          </div>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => void markAllRead()}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-teal hover:text-foreground"
+            >
+              <CheckCheck className="h-3.5 w-3.5" />
+              {t("warnings.markAll")}
+            </button>
+          )}
+        </div>
+
+        <div className="max-h-[24rem] overflow-y-auto">
+          {warnings.length === 0 ? (
+            <div className="flex min-h-32 flex-col items-center justify-center gap-2 p-5 text-center">
+              <CheckCheck className="h-7 w-7 text-teal" />
+              <p className="text-xs text-muted-foreground">{t("warnings.none")}</p>
+            </div>
+          ) : (
+            warnings.slice(0, 5).map((warning) => {
+              const query = new URLSearchParams({
+                warning: warning.id,
+                lat: String(warning.latitude),
+                lng: String(warning.longitude),
+              });
+              return (
+                <Link
+                  key={warning.id}
+                  to={`/hotspots?${query.toString()}`}
+                  onClick={() => {
+                    void markRead(warning.id);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "flex gap-3 border-b border-hairline p-3.5 transition-colors last:border-b-0 hover:bg-surface-2",
+                    !warning.isRead && "bg-amber/5"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                      warning.severity === "CRITICAL"
+                        ? "bg-danger/15 text-danger"
+                        : warning.severity === "HIGH"
+                          ? "bg-amber/15 text-amber"
+                          : "bg-teal/15 text-teal"
+                    )}
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-xs font-semibold">{warning.zoneLabel}</p>
+                      {!warning.isRead && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber" />}
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
+                      {warning.reason}
+                    </p>
+                    <p className="mt-1.5 text-[9px] font-semibold text-muted-foreground">
+                      {warning.severity} · {Math.round(warning.riskScore)}% · {warning.stationName}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })
+          )}
+        </div>
+
+        <Link
+          to="/early-warnings"
+          onClick={() => setOpen(false)}
+          className="flex items-center justify-center gap-1.5 border-t border-hairline bg-surface-2 px-4 py-3 text-xs font-semibold hover:text-teal"
+        >
+          {t("warnings.activeFeed")} <ExternalLink className="h-3.5 w-3.5" />
+        </Link>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function Header() {
   const { data: session } = useSession();
   const { t } = useI18n();
@@ -94,13 +233,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          aria-label={t("header.notifications")}
-          className="relative flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-amber ring-2 ring-surface" />
-        </button>
+        <NotificationBell />
         <ModeToggle />
         <Link
           to="/profile"

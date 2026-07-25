@@ -5,12 +5,14 @@ import { AlertTriangle, TrendingUp } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Card, Badge, IconOrb, SectionLabel } from "@/components/scrb/primitives";
 import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
+import { useSearchParams } from "react-router-dom";
 
 type DailyVolume = { date: string; count: number };
 type SparklinePath = { line: string; area: string } | null;
 
 export default function Hotspots() {
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
   const [alerts, setAlerts] = useState<any[]>([]);
   const [clusters, setClusters] = useState<HotspotCluster[]>([]);
   const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
@@ -31,6 +33,17 @@ export default function Hotspots() {
   }, []);
 
   useVisibilityRefetch(load);
+  const focusLatParam = searchParams.get("lat");
+  const focusLngParam = searchParams.get("lng");
+  const focusLat = Number(focusLatParam);
+  const focusLng = Number(focusLngParam);
+  const focus: [number, number] | null =
+    focusLatParam !== null &&
+    focusLngParam !== null &&
+    Number.isFinite(focusLat) &&
+    Number.isFinite(focusLng)
+      ? [focusLat, focusLng]
+      : null;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
@@ -40,7 +53,7 @@ export default function Hotspots() {
         <p className="mt-2 text-sm text-muted-foreground">{t("hotspots.subtitle")}</p>
 
         <div className="relative mt-5 flex-1 w-full overflow-hidden rounded-3xl border border-hairline bg-surface/50 flex flex-col">
-          <HotspotMap clusters={clusters} />
+          <HotspotMap clusters={clusters} focus={focus} />
         </div>
       </Card>
 

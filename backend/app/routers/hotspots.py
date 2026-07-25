@@ -16,7 +16,9 @@ def _load_alerts(officer: dict) -> list[dict]:
         SELECT a.*, ps.name AS "stationName"
         FROM "Alert" a
         LEFT JOIN "PoliceStation" ps ON a."stationId" = ps.id
-        WHERE 1=1{scope_sql}
+        WHERE a.status = 'ACTIVE'
+          AND (a."expiresAt" IS NULL OR a."expiresAt" > NOW())
+          {scope_sql}
         ORDER BY a."riskScore" DESC
         ''',
         scope_params,

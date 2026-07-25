@@ -7,6 +7,7 @@ const ROUTE_CAPS = [
   { prefix: "/dashboard", cap: "copilot" },
   { prefix: "/analytics", cap: "analytics" },
   { prefix: "/hotspots", cap: "hotspots" },
+  { prefix: "/early-warnings", cap: "earlyWarnings" },
   { prefix: "/deadlines", cap: "deadlines" },
   { prefix: "/cases", cap: "cases" },
   { prefix: "/network", cap: "network" },

@@ -27,6 +27,7 @@ from app.services.db import (
     serialize_rows,
 )
 from app.services.openrouter import chat_completion
+from app.services.warning_engine import refresh_hotspot_warnings
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
 
@@ -284,6 +285,9 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
     # A newly registered FIR must appear on the dashboard and network straight
     # away, so drop the cached aggregates rather than waiting out their TTL.
     invalidate_all()
+    # Re-evaluate only the affected station. The stable warning fingerprint
+    # makes this idempotent and lets connected officers see it on their next poll.
+    refresh_hotspot_warnings(station_id=station_id)
 
     intake = intake_intel.build_case_intake_brief(case_row["id"], officer)
     if "error" in intake:

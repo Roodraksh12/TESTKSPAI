@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Command } from "cmdk";
-import { Search, FolderClosed, User, Sparkles, MapPin, Zap } from "lucide-react";
+import { Search, FolderClosed, User, Sparkles, MapPin, Zap, BellRing } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "@/api/client";
 import { Badge, IconOrb } from "./primitives";
@@ -112,6 +112,14 @@ export function OmniSearch({
                 >
                   <MapPin className="w-4 h-4 opacity-70" />
                   <span className="font-medium text-sm">View Risk Hotspots</span>
+                </Command.Item>
+                <Command.Item
+                  value="action-early-warnings"
+                  onSelect={() => { onOpenChange(false); navigate("/early-warnings"); }}
+                  className="flex items-center gap-3 px-3 py-3 mt-1 rounded-lg cursor-pointer aria-selected:bg-ink aria-selected:text-white transition-colors"
+                >
+                  <BellRing className="w-4 h-4 opacity-70" />
+                  <span className="font-medium text-sm">View Early Warnings</span>
                 </Command.Item>
               </Command.Group>
             )}

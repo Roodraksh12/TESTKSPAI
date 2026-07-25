@@ -111,6 +111,7 @@ model Officer {
   chatSessions       ChatSession[]
   auditLogs          AuditLog[]
   feedbacks          Feedback[]
+  alertReads         AlertRead[]
   invitationsSent    Invitation[]   @relation("InvitedBy")
   invitationsRecv    Invitation[]   @relation("InvitedOfficer")
   resetRequests      PasswordResetRequest[] @relation("ResetOfficer")
@@ -286,15 +287,39 @@ enum AlertType {
 }
 
 model Alert {
-  id         String        @id @default(cuid())
-  stationId  String
-  type       AlertType
-  zoneLabel  String
-  riskScore  Float
-  reason     String
-  createdAt  DateTime      @default(now())
+  id              String        @id @default(cuid())
+  stationId       String
+  type            AlertType
+  zoneLabel       String
+  riskScore       Float
+  reason          String
+  fingerprint     String?       @unique
+  latitude        Float?
+  longitude       Float?
+  crimeType       String?
+  severity        String        @default("MEDIUM")
+  status          String        @default("ACTIVE")
+  source          String        @default("LEGACY")
+  action          String?
+  evidence        Json          @default("{}")
+  firstDetectedAt DateTime      @default(now())
+  lastDetectedAt  DateTime      @default(now())
+  expiresAt       DateTime?
+  createdAt       DateTime      @default(now())
   
   station PoliceStation @relation(fields: [stationId], references: [id])
+  reads   AlertRead[]
+}
+
+model AlertRead {
+  officerId String
+  alertId   String
+  readAt    DateTime @default(now())
+
+  officer Officer @relation(fields: [officerId], references: [id], onDelete: Cascade)
+  alert   Alert   @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@id([officerId, alertId])
 }
 
 enum Rating {

@@ -22,6 +22,7 @@ import Profile from "./pages/Profile.tsx"
 import Administration from "./pages/Administration.tsx"
 import InviteOfficers from "./pages/InviteOfficers.tsx"
 import PasswordResets from "./pages/PasswordResets.tsx"
+import EarlyWarnings from "./pages/EarlyWarnings.tsx"
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/hotspots" element={<Hotspots />} />
+            <Route path="/early-warnings" element={<EarlyWarnings />} />
             <Route path="/cases" element={<Cases />} />
             <Route path="/cases/:id" element={<CaseDetail />} />
             <Route path="/cases/:id/tactical" element={<Tactical />} />

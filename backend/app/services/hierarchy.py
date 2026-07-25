@@ -207,6 +207,7 @@ def platform_capabilities(officer: dict[str, Any]) -> dict[str, Any]:
             "copilot": not is_it,
             "analytics": not is_it,
             "hotspots": not is_it,
+            "earlyWarnings": not is_it,
             "deadlines": not is_it,
             "cases": not is_it,
             "network": not is_it,
