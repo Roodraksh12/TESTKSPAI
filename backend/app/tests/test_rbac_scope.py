@@ -62,3 +62,26 @@ def test_audit_visibility_differs_by_role(tokens: dict[str, str]) -> None:
     # SP sees the whole district; constable sees only their own actions, which
     # is a subset (and, in this seeded dataset, strictly fewer) than SP's view.
     assert len(sp_response.json()["auditLogs"]) >= len(con_response.json()["auditLogs"])
+
+
+def test_audit_scope_my(tokens: dict[str, str]) -> None:
+    client = TestClient(app)
+    con_headers = {"Authorization": f"Bearer {tokens['CONSTABLE']}"}
+    
+    # Record an event as constable
+    res = client.post(
+        "/api/audit",
+        json={"action": "EXPORT_CHAT_PDF", "targetType": "CASE", "targetId": "case-123"},
+        headers=con_headers,
+    )
+    assert res.status_code == 200
+
+    # Query scope=my as constable
+    my_res = client.get("/api/audit", params={"scope": "my"}, headers=con_headers)
+    assert my_res.status_code == 200
+    my_logs = my_res.json()["auditLogs"]
+    assert len(my_logs) >= 1
+    # Ensure every single log in scope=my belongs to KA-CON-1001 (Ramesh K)
+    for log in my_logs:
+        assert log["officerBadgeId"] == "KA-CON-1001"
+

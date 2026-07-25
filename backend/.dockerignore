@@ -9,8 +9,8 @@ venv/
 .git/
 .gitignore
 
-.env
-.env.*
+# .env
+# .env.*
 
 !.env.example
 

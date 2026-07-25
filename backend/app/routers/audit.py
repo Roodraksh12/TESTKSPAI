@@ -17,8 +17,8 @@ class AuditEventRequest(BaseModel):
 
 
 @router.get("")
-def list_audit(current_user: dict = Depends(get_current_user)) -> dict:
-    return {"auditLogs": audit.list_audit_logs(current_user["officer"])}
+def list_audit(scope: str = "jurisdiction", current_user: dict = Depends(get_current_user)) -> dict:
+    return {"auditLogs": audit.list_audit_logs(current_user["officer"], scope=scope)}
 
 
 @router.post("")
