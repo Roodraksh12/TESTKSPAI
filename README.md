@@ -25,6 +25,39 @@
 
 ---
 
+## 📋 Prototype Brief
+
+### 1. Problem Statement Addressed
+Law enforcement agencies, such as the Karnataka State Police (KSP), face critical operational bottlenecks:
+- **Manual & Error-Prone Ingestion:** Traditional FIR indexing requires tedious manual data entry, leading to backlogs and missed entity connections across police stations.
+- **Language Barriers:** Field officers operate primarily in native regional scripts (Kannada), while central databases and formal dossiers often require English, creating friction.
+- **Siloed Criminal Intelligence:** Disparate case records conceal underlying organized crime networks, shared aliases, stolen vehicles, and safe houses.
+- **Statutory Lapse Risks:** Strict legal deadlines (60/90 days for filing chargesheets) are frequently missed due to manual tracking, resulting in mandatory default bails.
+- **Reactive Policing:** Command staff lack real-time predictive spatial analytics to preemptively deploy patrols before localized crime spikes occur.
+
+### 2. Key Features and Functionalities
+- **🎙️ Bilingual Voice-Activated AI Copilot:** Natural hands-free voice interaction in both **English and Kannada** powered by Web Speech API and backend Edge-TTS for querying cases and generating court-ready PDF transcripts.
+- **📄 Automated FIR Ingestion & Explainable OCR:** Zero-data-entry workflow using Tesseract OCR and LLM entity extraction (Suspects, Victims, Vehicles, Modus Operandi, Locations) with sentence-level visual Explainable AI (XAI).
+- **🕸️ Interactive Crime Network Canvas (Link Analysis):** Interactive visual graph plotting invisible connections across cases, shared license plates, mobile numbers, and safe houses to uncover crime rings.
+- **⚡ Predictive Early Warning & Tactical Alert Engine:** Automated pattern recognition algorithms that identify localized crime spikes and broadcast real-time tactical patrol advisories to field officers.
+- **⚖️ Statutory Deadlines & Chargesheet Draft Generator:** Proactive alerts on statutory 60/90-day chargesheet timelines with an in-app `ChargesheetEditor` to generate and edit formal legal drafts.
+- **📈 Command Analytics & Predictive Heatmaps:** Geospatial cluster heatmaps (Leaflet) and 7-day risk forecasts (Radar charts) for district commanders.
+- **🔒 Enterprise Security & Hierarchy-Based RBAC:** Strict jurisdictional siloing (Constable, Inspector, SP, Police IT Admin) backed by tamper-proof audit trails.
+
+### 3. Technology Stack Used
+- **Frontend SPA:** React 18, TypeScript, Vite, Tailwind CSS, Leaflet Maps, Recharts, Framer Motion, Lucide Icons, Web Speech API.
+- **Backend Services:** FastAPI (Python 3.11+), Pydantic, Python-Jose (JWT Authentication), Passlib (Bcrypt), PyTesseract (OCR Engine), Microsoft Edge-TTS.
+- **Database & Storage:** PostgreSQL (hosted on Supabase) utilizing PostgreSQL `ltree` extension for hierarchical police org-trees and station-level data siloing.
+- **AI & Speech Models:** OpenRouter API (Google Gemini 1.5 Pro) for context-aware bilingual extraction, entity matching, and reasoning; Edge-TTS for multi-lingual speech synthesis.
+
+### 4. Proposed Impact and Use Case
+- **Rapid Operational Turnaround:** Cuts FIR processing, entity extraction, and dossier synthesis time from hours down to seconds.
+- **Zero Statutory Lapses:** Automated deadline countdowns eliminate procedural default bails by empowering officers with auto-drafted chargesheets well before statutory expiration dates.
+- **Proactive Resource Allocation:** Shifts police operations from reactive incident response to predictive, intelligence-driven patrol deployment.
+- **Grassroots Empowerment:** Enables non-English speaking field officers across Karnataka to leverage advanced AI intelligence in native Kannada via natural voice commands.
+
+---
+
 ## 🔑 Demo Credentials
 
 To test the application across different Role-Based Access Control (RBAC) levels, log in with any of the demo credentials below:
