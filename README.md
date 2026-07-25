@@ -14,7 +14,7 @@
 
 </div>
 
-> **Next-Generation Bilingual AI-Powered Investigation Copilot & Decision Support System** developed for the Karnataka State Police (KSP). Designed to streamline FIR ingestion, automate entity linkage, visualize organized crime networks, and provide command-level predictive intelligence in both **English and Kannada**.
+> **Next-Generation Bilingual AI-Powered Investigation Copilot & Decision Support System** developed for the Karnataka State Police (KSP). Designed to streamline FIR ingestion, automate entity linkage, visualize organized crime networks, track statutory deadlines, issue predictive early warnings, and provide command-level intelligence in both **English and Kannada**.
 
 ---
 
@@ -62,16 +62,23 @@ SCRB Sahayak isn't just a database; it's an intelligent agent assisting officers
 - **Organized Crime Detection:** Instantly uncover shared license plates, aliases, or safe houses across separate cases.
 - **Drill-Down Mode:** Isolate a single suspect and recursively expand their immediate connection web.
 
-### ⚖️ 4. Intelligent Legal Assistant & Deadlines Tracker
+### ⚡ 4. Predictive Early Warning & Tactical Alert Engine
+- **Automated Spike Detection:** Algorithmic scan of incoming FIR patterns automatically detects localized spikes (e.g., sudden increase in vehicle thefts or burglaries within a station jurisdiction).
+- **Proactive Tactical Advisories:** Generates concrete patrol advice (e.g., *"78% probability of burglary spike in Sector 3; deploy night patrols between 22:00 and 02:00"*).
+- **Real-Time Notification System:** Live unread alert counter, unread/read state tracking, and station-scoped broadcast via `/api/early-warnings`.
+- **Geospatial Alert Pinning:** Alerts are linked to exact coordinates on the command map for immediate tactical deployment.
+
+### ⚖️ 5. Intelligent Legal Assistant & Statutory Deadlines Tracker
 - **Smart Legal References:** Instantly fetches relevant IPC/BNS sections based on case descriptions.
 - **Automated Deadline Management:** Tracks statutory timelines (e.g., 60/90 days for charge sheets) and sends proactive alerts to Investigating Officers, ensuring zero procedural lapses.
 - **Chargesheet Drafting:** Standalone chargesheet page plus in-app `ChargesheetEditor` (generate, edit, save draft) from Deadlines and case workflows.
 
-### 📈 5. Command Analytics & Geospatial Hotspots
+### 📈 6. Command Analytics & Geospatial Hotspots
 - **Predictive Heatmaps:** Geospatial cluster mapping (via Leaflet) highlights emerging crime hotspots.
-- **Actionable Risk Forecasts:** Provides command staff with concrete recommendations (e.g., *"Increase patrols in Sector 4 on Saturday night based on recent chain-snatching trends"*).
+- **7-Day Risk Forecast (Radar Chart):** Forward-looking visualizations comparing predicted crime risks against historical baselines.
+- **Multi-Station & District Comparisons:** Allows SPs and Command Staff to evaluate jurisdiction performance and crime trends over 6-month horizons.
 
-### 🔒 6. Enterprise-Grade Security & RBAC
+### 🔒 7. Enterprise-Grade Security & RBAC
 - **Station-Level Siloing:** Investigating Officers (IO) are strictly limited to data within their jurisdiction.
 - **District Command View:** Superintendents of Police (SP) get macro metrics and district-wide audit logs.
 - **Cascading Invites & Police IT:** Bootstrap Police IT admin invites gazetted ranks; hierarchy-scoped invitations and password resets.
@@ -91,7 +98,7 @@ SCRB Sahayak uses a modern, separated client-server architecture:
                    │ REST / JWT
        ┌───────────▼────────────┐
        │     FastAPI Backend    │
-       │   RBAC · OCR · TTS     │
+       │  RBAC · OCR · Alerts   │
        └─────┬────────────┬─────┘
              │            │
        ┌─────▼─────┐  ┌───▼──────────────┐
@@ -102,9 +109,9 @@ SCRB Sahayak uses a modern, separated client-server architecture:
 
 | Component | Technology | Description |
 |---|---|---|
-| **Frontend** | React 18, Vite, TypeScript, Tailwind CSS, Recharts, Framer Motion, Lucide icons, Leaflet | Responsive SPA for visualization and bilingual copilot UX. |
-| **Backend** | FastAPI (Python 3.11+), Pydantic, Python-Jose (JWT), Passlib (Bcrypt), PyTesseract (OCR), Edge-TTS | Async REST API with RBAC, OCR ingestion, and bilingual speech. |
-| **Database** | PostgreSQL (hosted on Supabase) | Schema for cases, entity matching, hierarchy (`ltree`), audit logs, jurisdiction. |
+| **Frontend** | React 18, Vite, TypeScript, Tailwind CSS, Recharts, Framer Motion, Lucide icons, Leaflet | Responsive SPA for visualization, early warnings UI, and bilingual copilot UX. |
+| **Backend** | FastAPI (Python 3.11+), Pydantic, Python-Jose (JWT), Passlib (Bcrypt), PyTesseract (OCR), Edge-TTS | Async REST API with RBAC, Early Warning engine, OCR ingestion, and speech. |
+| **Database** | PostgreSQL (hosted on Supabase) | Schema for cases, alerts, entity matching, hierarchy (`ltree`), audit logs. |
 | **AI/LLM** | OpenRouter (Gemini 1.5 Pro) | Context-aware routing, FIR summaries, entity extraction, multi-lingual processing. |
 | **TTS** | Edge-TTS (`/api/tts`) | Server-side speech synthesis for Read Aloud on copilot replies. |
 
