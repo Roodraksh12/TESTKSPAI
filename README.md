@@ -1,17 +1,46 @@
 # 🛡️ SCRB Sahayak (KSP Portal)
 
 <div align="center">
-  <img src="https://img.shields.io/badge/Status-Active-success.svg" alt="Status Active" />
-  <img src="https://img.shields.io/badge/Platform-Web-blue.svg" alt="Platform Web" />
-  <img src="https://img.shields.io/badge/Language-Bilingual%20(EN%2FKN)-orange.svg" alt="Bilingual" />
-  <img src="https://img.shields.io/badge/AI-Gemini%201.5%20Pro-purple.svg" alt="AI Powered" />
+
+[![Live Demo](https://img.shields.io/badge/🌐_Deployed_App-https%3A%2F%2Fkspai--zgymgiew.onslate.in%2F-blue?style=for-the-badge)](https://kspai-zgymgiew.onslate.in/)
+[![Demo Video](https://img.shields.io/badge/📹_Demo_Video-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/_UJdQK79kRM)
+
+<br />
+
+<img src="https://img.shields.io/badge/Status-Active-success.svg" alt="Status Active" />
+<img src="https://img.shields.io/badge/Platform-Web-blue.svg" alt="Platform Web" />
+<img src="https://img.shields.io/badge/Language-Bilingual%20(EN%2FKN)-orange.svg" alt="Bilingual" />
+<img src="https://img.shields.io/badge/AI-Gemini%201.5%20Pro-purple.svg" alt="AI Powered" />
+
 </div>
 
 > **Next-Generation Bilingual AI-Powered Investigation Copilot & Decision Support System** developed for the Karnataka State Police (KSP). Designed to streamline FIR ingestion, automate entity linkage, visualize organized crime networks, and provide command-level predictive intelligence in both **English and Kannada**.
 
 ---
 
-## 🌟 Transformative Features (Why It Stands Out)
+## 🔗 Quick Links
+
+- 🌐 **Live Web Application:** [https://kspai-zgymgiew.onslate.in/](https://kspai-zgymgiew.onslate.in/)
+- 🎥 **Video Walkthrough / Demo:** [https://youtu.be/_UJdQK79kRM](https://youtu.be/_UJdQK79kRM)
+
+---
+
+## 🔑 Demo Credentials
+
+To test the application across different Role-Based Access Control (RBAC) levels, log in with any of the demo credentials below:
+
+| Role / Rank | Badge ID (Service ID) | Password | Access Level & Scope |
+|---|---|---|---|
+| 👑 **Police IT Admin** | `KA-IT-0001` | `demo1234` | Statewide Admin; Officer Management & Invites |
+| 🏬 **Superintendent of Police (SP)** | `KA-SP-9999` | `demo1234` | District Command Overview, Analytics & Audit Logs |
+| 👮 **Inspector (SHO)** | `KA-INS-4471` | `demo1234` | Station-Level Copilot, FIR Ingestion & Link Analysis |
+| 🛡️ **Constable** | `KA-CON-1001` | `demo1234` | Station-Level Case Entry & Officer Profile |
+
+> ℹ️ **How to log in:** Open the [Live App](https://kspai-zgymgiew.onslate.in/), enter any **Badge ID** from the table above and password `demo1234`.
+
+---
+
+## 🌟 Transformative Features
 
 SCRB Sahayak isn't just a database; it's an intelligent agent assisting officers at every step of an investigation.
 
@@ -81,7 +110,7 @@ SCRB Sahayak uses a modern, separated client-server architecture:
 
 ---
 
-## 🛠️ Setup & Installation
+## 🛠️ Setup & Local Installation
 
 ### 1. Database (Supabase / Postgres)
 1. Apply migrations in order: `0003` → `0004_hierarchy_auth` → `0005_command_jurisdiction` (and any newer migrations such as chargesheet draft). See `database/README.md`.
@@ -114,21 +143,6 @@ cp .env.example .env       # Set VITE_API_URL (and Maps key if used)
 npm run dev
 ```
 Application URL: http://localhost:5173
-
----
-
-## 🛡️ Demo Credentials
-
-There is **no demo button** on the login UI. Enter a Service ID manually. After migrations + seed:
-
-| Role / Rank | Badge ID | Password | Notes |
-|---|---|---|---|
-| **Police IT** (bootstrap admin) | `KA-IT-0001` | `demo1234` | Administration-first; read-only statewide case views; invites gazetted ranks. Documented in `backend/README.md` / `.env`. |
-| **Inspector (SHO)** | `KA-INS-4471` | `demo1234` | Station-scoped Copilot / cases |
-| **Superintendent of Police (SP)** | `KA-SP-9999` | `demo1234` | District-scoped Overview |
-| **Constable** | `KA-CON-1001` | `demo1234` | Station leaf; profile-only admin |
-
-Apply DB migrations **0003 → both `0004_*` (hierarchy + chargesheet) → 0005 → seed** before first login (see `database/README.md`).
 
 ---
 
