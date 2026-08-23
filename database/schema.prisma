@@ -116,6 +116,9 @@ model Officer {
   invitationsRecv    Invitation[]   @relation("InvitedOfficer")
   resetRequests      PasswordResetRequest[] @relation("ResetOfficer")
   resetsFulfilled    PasswordResetRequest[] @relation("ResetFulfilledBy")
+
+  currentIoCases     Case[]         @relation("CaseCurrentIO")
+  authoredDiaryEntries CaseDiaryEntry[] @relation("DiaryEntryAuthor")
 }
 
 model Invitation {
@@ -170,6 +173,12 @@ model Case {
   chatSessions     ChatSession[]
   matches          CaseMatch[]  @relation("CaseMatches")
   matchedBy        CaseMatch[]  @relation("MatchedCases")
+  
+  currentIoId      String?
+  currentIo        Officer?     @relation("CaseCurrentIO", fields: [currentIoId], references: [id])
+  diaryEntries     CaseDiaryEntry[]
+  evidence         Evidence[]
+  documents        Document[]
 }
 
 enum PersonRole {
@@ -189,6 +198,10 @@ model Person {
   connectionsA Connection[] @relation("PersonA")
   connectionsB Connection[] @relation("PersonB")
   caseMatches  CaseMatch[]
+  
+  custodyStartDate DateTime?
+  evidence         EvidencePerson[]
+  diaryEntries     DiaryEntryPerson[]
 }
 
 model CasePerson {
@@ -338,3 +351,93 @@ model Feedback {
   message ChatMessage @relation(fields: [messageId], references: [id])
   officer Officer     @relation(fields: [officerId], references: [id])
 }
+
+model CaseDiaryEntry {
+  id           String      @id @default(cuid())
+  caseId       String
+  pageNumber   Int
+  authorId     String
+  activityType String
+  narrative    String
+  timestamp    DateTime    @default(now())
+  updatedAt    DateTime    @default(now()) @updatedAt
+  
+  case         Case        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author       Officer     @relation("DiaryEntryAuthor", fields: [authorId], references: [id])
+  
+  evidence     DiaryEntryEvidence[]
+  persons      DiaryEntryPerson[]
+  documents    Document[]
+}
+
+enum EvidenceType {
+  PHOTO
+  VIDEO
+  VOICE
+  FORENSIC
+  MISC
+}
+
+model Evidence {
+  id           String        @id @default(cuid())
+  caseId       String
+  type         EvidenceType
+  description  String
+  addedById    String
+  status       String        @default("ACTIVE")
+  timestamp    DateTime      @default(now())
+  
+  case         Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  addedBy      Officer       @relation(fields: [addedById], references: [id])
+  
+  diaryEntries DiaryEntryEvidence[]
+  documents    Document[]
+  persons      EvidencePerson[]
+}
+
+model Document {
+  id           String          @id @default(cuid())
+  caseId       String
+  name         String
+  path         String
+  metadata     Json            @default("{}")
+  createdAt    DateTime        @default(now())
+  
+  diaryEntryId String?
+  evidenceId   String?
+  
+  case         Case            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  diaryEntry   CaseDiaryEntry? @relation(fields: [diaryEntryId], references: [id], onDelete: SetNull)
+  evidence     Evidence?       @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+}
+
+model DiaryEntryEvidence {
+  diaryEntryId String
+  evidenceId   String
+  
+  diaryEntry   CaseDiaryEntry @relation(fields: [diaryEntryId], references: [id], onDelete: Cascade)
+  evidence     Evidence       @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  
+  @@id([diaryEntryId, evidenceId])
+}
+
+model DiaryEntryPerson {
+  diaryEntryId String
+  personId     String
+  
+  diaryEntry   CaseDiaryEntry @relation(fields: [diaryEntryId], references: [id], onDelete: Cascade)
+  person       Person         @relation(fields: [personId], references: [id], onDelete: Cascade)
+  
+  @@id([diaryEntryId, personId])
+}
+
+model EvidencePerson {
+  evidenceId String
+  personId   String
+  
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  
+  @@id([evidenceId, personId])
+}
+

@@ -13,9 +13,9 @@ Kept separate from ``intake_intel.suggest_legal_sections`` (the chat tool, which
 returns prose for the LLM) so that contract stays stable — this module returns
 structured rows for the UI.
 
-India transitioned from the IPC to the Bharatiya Nyaya Sanhita on 1 July 2024.
+India transitioned from the IPC to the Bharatiya Nyaya Sanhita (BNS) on 1 July 2024.
 Offences are charged under whichever statute was in force on the incident date,
-so both are surfaced together and the caller decides.
+but this system now exclusively focuses on BNS/BNSS naming.
 """
 
 from __future__ import annotations
@@ -41,7 +41,6 @@ class Section:
     def __init__(
         self,
         *,
-        ipc: str,
         bns: str,
         title: str,
         punishment: str,
@@ -52,7 +51,6 @@ class Section:
         conditional: bool = False,
         condition_note: str = "",
     ) -> None:
-        self.ipc = ipc
         self.bns = bns
         self.title = title
         self.punishment = punishment
@@ -64,32 +62,32 @@ class Section:
         self.condition_note = condition_note
 
 
-# Indicative IPC→BNS mapping. Numbering is the commonly cited correspondence;
+# Indicative BNS mapping. Numbering is the commonly cited correspondence;
 # it is a drafting aid, not a substitute for the bare act.
 SECTIONS: tuple[Section, ...] = (
     Section(
-        ipc="379", bns="303(2)", title="Theft",
+        bns="303(2)", title="Theft",
         punishment="Up to 3 years, or fine, or both",
         cognizable=True, bailable=False,
         crime_types=("theft", "vehicle theft"),
         keywords=("stole", "stolen", "theft", "missing from", "took away"),
     ),
     Section(
-        ipc="380", bns="305", title="Theft in a dwelling house",
+        bns="305", title="Theft in a dwelling house",
         punishment="Up to 7 years and fine",
         cognizable=True, bailable=False,
         crime_types=("burglary",),
         keywords=("house", "dwelling", "residence", "apartment", "flat", "home"),
     ),
     Section(
-        ipc="454", bns="331(3)", title="House-breaking to commit an offence",
+        bns="331(3)", title="House-breaking to commit an offence",
         punishment="Up to 3 years and fine",
         cognizable=True, bailable=False,
         crime_types=("burglary",),
         keywords=("broke open", "break-in", "forced entry", "grill", "lock broken", "tool mark"),
     ),
     Section(
-        ipc="457", bns="331(4)", title="House-breaking by night",
+        bns="331(4)", title="House-breaking by night",
         punishment="Up to 5 years and fine",
         cognizable=True, bailable=False,
         crime_types=("burglary",),
@@ -98,14 +96,14 @@ SECTIONS: tuple[Section, ...] = (
         condition_note="Applies only if entry occurred between sunset and sunrise.",
     ),
     Section(
-        ipc="392", bns="309(4)", title="Robbery",
+        bns="309(4)", title="Robbery",
         punishment="Rigorous imprisonment up to 10 years and fine",
         cognizable=True, bailable=False,
         crime_types=("robbery", "chain snatching"),
         keywords=("snatch", "force", "pushed", "threatened", "overpowered", "resisted"),
     ),
     Section(
-        ipc="397", bns="311", title="Robbery with attempt to cause death or grievous hurt",
+        bns="311", title="Robbery with attempt to cause death or grievous hurt",
         punishment="Minimum 7 years rigorous imprisonment",
         cognizable=True, bailable=False,
         crime_types=("robbery",),
@@ -114,7 +112,7 @@ SECTIONS: tuple[Section, ...] = (
         condition_note="Attracts a statutory minimum — apply only with clear proof of a deadly weapon.",
     ),
     Section(
-        ipc="411", bns="317(2)", title="Dishonestly receiving stolen property",
+        bns="317(2)", title="Dishonestly receiving stolen property",
         punishment="Up to 3 years, or fine, or both",
         cognizable=True, bailable=False,
         crime_types=("theft", "vehicle theft", "burglary"),
@@ -123,14 +121,14 @@ SECTIONS: tuple[Section, ...] = (
         condition_note="Add once property is recovered from a person other than the principal accused.",
     ),
     Section(
-        ipc="420", bns="318(4)", title="Cheating and dishonestly inducing delivery of property",
+        bns="318(4)", title="Cheating and dishonestly inducing delivery of property",
         punishment="Up to 7 years and fine",
         cognizable=True, bailable=False,
         crime_types=("fraud", "economic offence", "cyber fraud"),
         keywords=("cheat", "fraud", "duped", "fake", "impersonat", "otp", "upi", "transferred"),
     ),
     Section(
-        ipc="406", bns="316(2)", title="Criminal breach of trust",
+        bns="316(2)", title="Criminal breach of trust",
         punishment="Up to 5 years, or fine, or both",
         cognizable=True, bailable=False,
         crime_types=("fraud", "economic offence"),
@@ -139,7 +137,7 @@ SECTIONS: tuple[Section, ...] = (
         condition_note="Use where property was lawfully entrusted before being misused.",
     ),
     Section(
-        ipc="409", bns="316(5)", title="Criminal breach of trust by public servant / banker",
+        bns="316(5)", title="Criminal breach of trust by public servant / banker",
         punishment="Up to life imprisonment, or up to 10 years and fine",
         cognizable=True, bailable=False,
         crime_types=("economic offence",),
@@ -148,14 +146,14 @@ SECTIONS: tuple[Section, ...] = (
         condition_note="Only where the accused held office or fiduciary capacity.",
     ),
     Section(
-        ipc="323", bns="115(2)", title="Voluntarily causing hurt",
+        bns="115(2)", title="Voluntarily causing hurt",
         punishment="Up to 1 year, or fine up to ₹1,000, or both",
         cognizable=False, bailable=True,
         crime_types=("assault",),
         keywords=("beat", "hit", "slap", "punch", "hurt", "injured"),
     ),
     Section(
-        ipc="324", bns="118(1)", title="Voluntarily causing hurt by dangerous weapon",
+        bns="118(1)", title="Voluntarily causing hurt by dangerous weapon",
         punishment="Up to 3 years, or fine, or both",
         cognizable=True, bailable=False,
         crime_types=("assault",),
@@ -164,7 +162,7 @@ SECTIONS: tuple[Section, ...] = (
         condition_note="Requires a weapon or means likely to cause death.",
     ),
     Section(
-        ipc="325", bns="117(2)", title="Voluntarily causing grievous hurt",
+        bns="117(2)", title="Voluntarily causing grievous hurt",
         punishment="Up to 7 years and fine",
         cognizable=True, bailable=False,
         crime_types=("assault",),
@@ -173,7 +171,7 @@ SECTIONS: tuple[Section, ...] = (
         condition_note="Depends on the medico-legal certificate classifying injury as grievous.",
     ),
     Section(
-        ipc="506", bns="351(2)", title="Criminal intimidation",
+        bns="351(2)", title="Criminal intimidation",
         punishment="Up to 2 years, or fine, or both",
         cognizable=False, bailable=True,
         crime_types=("assault",),
@@ -182,14 +180,14 @@ SECTIONS: tuple[Section, ...] = (
         condition_note="Add where a threat to person, property or reputation is on record.",
     ),
     Section(
-        ipc="302", bns="103(1)", title="Murder",
+        bns="103(1)", title="Murder",
         punishment="Death, or imprisonment for life, and fine",
         cognizable=True, bailable=False,
         crime_types=("murder", "homicide"),
         keywords=("murder", "killed", "death", "deceased", "died"),
     ),
     Section(
-        ipc="363", bns="137(2)", title="Kidnapping",
+        bns="137(2)", title="Kidnapping",
         punishment="Up to 7 years and fine",
         cognizable=True, bailable=False,
         crime_types=("kidnapping", "missing"),
@@ -262,8 +260,8 @@ FAMILY_BY_CRIME_TYPE: dict[str, str] = {
 
 DISCLAIMER = (
     "Suggested framing only. Section selection is the investigating officer's decision — "
-    "verify against the bare act and the facts on record before filing. IPC applies to "
-    f"offences before {BNS_COMMENCEMENT}; BNS applies on or after that date."
+    "verify against the bare act and the facts on record before filing. "
+    f"BNS applies to offences on or after {BNS_COMMENCEMENT}."
 )
 
 
@@ -337,8 +335,7 @@ def predict_sections(crime_type: str | None, summary: str | None = None) -> dict
 
         predictions.append(
             {
-                "id": f"ipc-{section.ipc}",
-                "ipcSection": f"IPC {section.ipc}",
+                "id": f"bns-{section.bns}",
                 "bnsSection": f"BNS {section.bns}",
                 "title": section.title,
                 "punishment": section.punishment,
@@ -352,7 +349,7 @@ def predict_sections(crime_type: str | None, summary: str | None = None) -> dict
         )
 
     # Strongest first; stable tie-break on section number keeps output deterministic.
-    predictions.sort(key=lambda p: (-p["confidence"], p["ipcSection"]))
+    predictions.sort(key=lambda p: (-p["confidence"], p["bnsSection"]))
 
     family = resolve_family(crime_type)
     evidence = EVIDENCE_BY_FAMILY.get(family or "", [])

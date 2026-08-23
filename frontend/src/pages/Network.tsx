@@ -590,7 +590,7 @@ export default function NetworkPage() {
           edges={edges}
           nodeById={nodeById}
           degree={selected ? neighborsOf(selected.id).size : 0}
-          canExpand={!!selected && mode === "explore" && neighborsOf(selected.id).size > 0}
+          canExpand={!!selected && mode === "explore" && expandableIds.has(selected.id)}
           pinned={!!selected && pinnedIds.has(selected.id)}
           onExpand={expand}
           onFocus={seedFrom}

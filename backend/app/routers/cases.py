@@ -426,13 +426,25 @@ Include the following sections:
 2. CASE DETAILS (FIR Number, Date, Station)
 3. DETAILS OF ACCUSED (Name, Status)
 4. BRIEF FACTS OF THE CASE (Based on the summary)
-5. EVIDENCE & WITNESSES (Invent some plausible police procedures taken, e.g., "Site map drawn, statements recorded under Section 161 CrPC")
+5. EVIDENCE, WITNESSES & INVESTIGATION (Use the provided REAL Evidence Registry and Case Diary entries instead of inventing procedures)
 6. CHARGES (Suggest relevant IPC/BNS sections based on the crime type)
 7. CONCLUSION & PRAYER (Requesting the court to take cognizance)
 
 Highlight any MISSING critical information (like "Arrest Memo not attached", "Forensic Report pending") in bold or as a note.
 
 DO NOT output anything other than the markdown document.'''
+
+    diary_rows = fetch_all(
+        'SELECT "activityType", narrative, "timestamp" FROM "CaseDiaryEntry" WHERE "caseId" = %(caseId)s ORDER BY "timestamp" ASC',
+        {"caseId": case_id}
+    )
+    evidence_rows = fetch_all(
+        'SELECT type, description FROM "Evidence" WHERE "caseId" = %(caseId)s ORDER BY "timestamp" ASC',
+        {"caseId": case_id}
+    )
+
+    diary_text = "\n".join(f"- [{d['timestamp'].strftime('%Y-%m-%d')}] {d['activityType']}: {d['narrative']}" for d in diary_rows) or "No diary entries."
+    evidence_text = "\n".join(f"- {e['type']}: {e['description']}" for e in evidence_rows) or "No evidence logged."
 
     user_prompt = f'''
 FIR NUMBER: {case_data["firNumber"]}
@@ -442,6 +454,12 @@ ACCUSED: {accused_list or "None listed"}
 VICTIM: {victim_list or "None listed"}
 SUMMARY: {case_data.get("summary") or "No summary available"}
 RAW TEXT: {case_data.get("rawExtractedText") or "N/A"}
+
+CASE DIARY (Investigation Log):
+{diary_text}
+
+EVIDENCE REGISTRY:
+{evidence_text}
 '''
 
     chargesheet_markdown = await chat_completion(

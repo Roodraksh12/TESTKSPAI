@@ -89,7 +89,7 @@ export function ChargesheetEditor({ caseId, isOpen, onClose }: ChargesheetEditor
     
     const html = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'><title>Chargesheet</title></head>
+      <head><meta charset='utf-8'><title>FR - Final Report</title></head>
       <body>${proseDiv.innerHTML}</body>
       </html>
     `;
@@ -97,7 +97,7 @@ export function ChargesheetEditor({ caseId, isOpen, onClose }: ChargesheetEditor
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Chargesheet_${caseId}.doc`;
+    a.download = `FR_Final_Report_${caseId}.doc`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -115,7 +115,7 @@ export function ChargesheetEditor({ caseId, isOpen, onClose }: ChargesheetEditor
     printWindow.document.write(`
       <html>
         <head>
-          <title>Chargesheet - ${caseId}</title>
+          <title>FR - Final Report - ${caseId}</title>
           <style>
             body { font-family: serif; line-height: 1.6; padding: 40px; color: black; max-width: 800px; margin: auto; }
             h1, h2, h3 { color: black; margin-top: 1.5em; margin-bottom: 0.5em; }
@@ -152,7 +152,7 @@ export function ChargesheetEditor({ caseId, isOpen, onClose }: ChargesheetEditor
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl flex items-center gap-2">
               <FileText className="w-5 h-5 text-teal" />
-              Interactive Chargesheet Draft
+              Interactive FR (Final Report) Draft
             </DialogTitle>
             <div className="flex items-center gap-2 pr-8">
               {saveStatus === "saved" && (
@@ -219,7 +219,7 @@ export function ChargesheetEditor({ caseId, isOpen, onClose }: ChargesheetEditor
           ) : !draft ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-2 p-6 text-center">
               <FileText className="w-16 h-16 text-muted-foreground mb-6 opacity-50" />
-              <h2 className="text-2xl font-medium tracking-tight mb-3">No Draft Found</h2>
+              <h2 className="text-2xl font-medium tracking-tight mb-3">No FR Draft Found</h2>
               <p className="text-muted-foreground max-w-md mb-8">
                 Generate an initial Section 173 CrPC draft using AI. The AI will analyze the FIR and case facts. You can edit the output manually afterwards.
               </p>

@@ -23,7 +23,7 @@ function stripMarkdown(text: string): string {
   clean = clean.replace(/\bBNSS\b/gi, "B N S S");
   clean = clean.replace(/\bSHO\b/gi, "S H O");
   clean = clean.replace(/\bSP\b/gi, "S P");
-  clean = clean.replace(/\bIPC\b/gi, "I P C");
+
   clean = clean.replace(/\bMO\b/g, "M O"); // Case sensitive so it doesn't break words containing 'mo'
 
   return clean;

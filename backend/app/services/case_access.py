@@ -289,7 +289,7 @@ def get_case_with_relations(case_id: str, officer: dict[str, Any]) -> dict[str, 
     case_persons = fetch_all(
         '''
         SELECT cp.id, cp."caseId", cp."personId", cp.role,
-               p.id AS "person_id", p.name, p.role AS "personRole", p.phone, p.address
+               p.id AS "person_id", p.name, p.role AS "personRole", p.phone, p.address, p."custodyStartDate"
         FROM "CasePerson" cp
         JOIN "Person" p ON cp."personId" = p.id
         WHERE cp."caseId" = %(caseId)s
@@ -322,6 +322,7 @@ def get_case_with_relations(case_id: str, officer: dict[str, Any]) -> dict[str, 
                 "role": cp["personRole"],
                 "phone": cp.get("phone"),
                 "address": cp.get("address"),
+                "custodyStartDate": cp.get("custodyStartDate"),
             },
         }
         for cp in case_persons

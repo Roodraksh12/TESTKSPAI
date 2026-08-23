@@ -19,6 +19,8 @@ from app.routers import (
     network,
     search,
     tts,
+    case_diary,
+    evidence,
 )
 from app.routers import settings as settings_router
 
@@ -52,6 +54,8 @@ def create_app() -> FastAPI:
     app.include_router(legal.router)
     app.include_router(chat_sessions.router)
     app.include_router(tts.router)
+    app.include_router(case_diary.router)
+    app.include_router(evidence.router)
 
     @app.on_event("startup")
     def startup_event():

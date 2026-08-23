@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Scale, Info, ChevronDown } from "lucide-react";
-import { apiRequest } from "@/api/client";
 import { Badge, Card, SectionLabel, Skeleton } from "@/components/scrb/primitives";
+import { apiRequest } from "@/api/client";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { LegalSectionHover } from "./LegalSectionHover";
 
 export type SectionPrediction = {
   id: string;
-  ipcSection: string;
   bnsSection: string;
   title: string;
   punishment: string;
@@ -34,7 +34,7 @@ function confidenceTone(confidence: number): "danger" | "amber" | "muted" {
   return "muted";
 }
 
-function SectionRow({ prediction }: { prediction: SectionPrediction }) {
+function SectionRow({ prediction, caseId }: { prediction: SectionPrediction; caseId?: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
@@ -46,9 +46,9 @@ function SectionRow({ prediction }: { prediction: SectionPrediction }) {
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-mono text-[11px] font-semibold text-foreground">{prediction.ipcSection}</span>
-            <span className="text-[10px] text-muted-foreground">·</span>
-            <span className="text-mono text-[11px] text-teal">{prediction.bnsSection}</span>
+            <LegalSectionHover section={prediction.bnsSection} caseId={caseId}>
+              <span className="text-mono text-[11px] font-semibold text-teal">{prediction.bnsSection}</span>
+            </LegalSectionHover>
             {prediction.basis === "conditional" && (
               <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground uppercase tracking-wide">
                 {t("legal.conditional")}
@@ -154,7 +154,7 @@ export function LegalSectionsPanel({
           ) : (
             <div className="space-y-1.5">
               {data.predictions.map((prediction) => (
-                <SectionRow key={prediction.id} prediction={prediction} />
+                <SectionRow key={prediction.id} prediction={prediction} caseId={caseId} />
               ))}
             </div>
           )}

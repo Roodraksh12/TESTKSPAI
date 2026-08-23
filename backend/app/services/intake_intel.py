@@ -188,7 +188,7 @@ def suggest_legal_sections(crime_type: str, summary: str | None = None) -> dict[
     if any(w in blob for w in ("cheat", "fraud", "cheque")):
         return LEGAL_BY_CRIME["fraud"]
     return {
-        "sections": ["Review facts with court section clerk — generic IPC not auto-assigned"],
+        "sections": ["Review facts with court section clerk — generic BNS not auto-assigned"],
         "evidenceNeeded": [
             "Secure scene",
             "Record 161 statements",

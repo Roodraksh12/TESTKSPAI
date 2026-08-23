@@ -7,8 +7,7 @@ from app.deps import get_current_user
 from app.services.case_access import jurisdiction_filter_sql, person_in_scope_sql_for_officer
 
 from app.services.db import fetch_all
-
-
+from app.services import legal_sections
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -27,16 +26,14 @@ def search(
 ) -> dict:
 
     if not q.strip():
-
-        return {"cases": [], "suspects": []}
+        return {"cases": [], "suspects": [], "bns_sections": []}
 
 
 
     words = [w for w in q.split() if w]
 
     if not words:
-
-        return {"cases": [], "suspects": []}
+        return {"cases": [], "suspects": [], "bns_sections": []}
 
 
 
@@ -55,9 +52,13 @@ def search(
         key = f"w{idx}"
 
         case_clauses.append(
-
-            f'(c."firNumber" ILIKE %({key})s OR c.summary ILIKE %({key})s OR c."crimeType" ILIKE %({key})s)'
-
+            f'''(c."firNumber" ILIKE %({key})s 
+                OR c.summary ILIKE %({key})s 
+                OR c."crimeType" ILIKE %({key})s
+                OR EXISTS (SELECT 1 FROM "CaseDiaryEntry" cde WHERE cde."caseId" = c.id AND cde.narrative ILIKE %({key})s)
+                OR EXISTS (SELECT 1 FROM "Evidence" ev WHERE ev."caseId" = c.id AND ev.description ILIKE %({key})s)
+                OR EXISTS (SELECT 1 FROM "Document" doc WHERE doc."caseId" = c.id AND doc.name ILIKE %({key})s)
+            )'''
         )
 
         case_params[key] = f"%{word}%"
@@ -98,11 +99,11 @@ def search(
 
         case["station"] = {"name": case.pop("stationName", None) or "Station"}
 
-    person_scope_sql, person_scope_params = person_in_scope_sql_for_officer(officer, person_alias="p")
+    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
 
     suspect_clauses = []
 
-    suspect_params: dict = {**person_scope_params}
+    suspect_params: dict = {**scope_params}
 
     for idx, word in enumerate(words):
 
@@ -114,27 +115,34 @@ def search(
 
     suspect_where = " OR ".join(suspect_clauses)
 
-
-
     suspects = fetch_all(
-
         f'''
-
-        SELECT DISTINCT p.*
-
+        SELECT DISTINCT ON (p.id) p.*, cp."caseId"
         FROM "Person" p
-
-        WHERE ({suspect_where}){person_scope_sql}
-
+        JOIN "CasePerson" cp ON p.id = cp."personId"
+        JOIN "Case" c ON cp."caseId" = c.id
+        WHERE ({suspect_where}){scope_sql}
         LIMIT 8
-
         ''',
-
         suspect_params,
-
     )
 
+    # Search BNS Sections
+    bns_sections = []
+    lower_q = q.lower()
+    for sec in legal_sections.SECTIONS:
+        if (
+            lower_q in sec.bns.lower()
+            or lower_q in sec.title.lower()
+            or any(lower_q in kw.lower() for kw in sec.keywords)
+        ):
+            bns_sections.append({
+                "bns": sec.bns,
+                "title": sec.title,
+                "punishment": sec.punishment
+            })
+            if len(bns_sections) >= 5:
+                break
 
-
-    return {"cases": cases, "suspects": suspects}
+    return {"cases": cases, "suspects": suspects, "bns_sections": bns_sections}
 

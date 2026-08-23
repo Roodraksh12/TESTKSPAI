@@ -14,3 +14,4 @@ psycopg[binary]
 psycopg_pool
 bcrypt
 edge-tts
+reportlab

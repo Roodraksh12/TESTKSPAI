@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Command } from "cmdk";
-import { Search, FolderClosed, User, Sparkles, MapPin, Zap, BellRing } from "lucide-react";
+import { Search, FolderClosed, User, Sparkles, MapPin, Zap, BellRing, Scale } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "@/api/client";
 import { Badge, IconOrb } from "./primitives";
@@ -17,7 +17,7 @@ export function OmniSearch({
 }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<{ cases: any[]; suspects: any[] }>({ cases: [], suspects: [] });
+  const [results, setResults] = useState<{ cases: any[]; suspects: any[]; bns_sections: any[] }>({ cases: [], suspects: [], bns_sections: [] });
   const [loading, setLoading] = useState(false);
   const [activeValue, setActiveValue] = useState("");
 
@@ -35,7 +35,7 @@ export function OmniSearch({
   useEffect(() => {
     if (!open) {
       setQuery("");
-      setResults({ cases: [], suspects: [] });
+      setResults({ cases: [], suspects: [], bns_sections: [] });
       return;
     }
   }, [open]);
@@ -43,13 +43,13 @@ export function OmniSearch({
   useEffect(() => {
     const fetchResults = async () => {
       if (!query.trim()) {
-        setResults({ cases: [], suspects: [] });
+        setResults({ cases: [], suspects: [], bns_sections: [] });
         return;
       }
       setLoading(true);
       try {
         const data = await apiRequest(`/api/search?q=${encodeURIComponent(query)}`);
-        setResults({ cases: data.cases || [], suspects: data.suspects || [] });
+        setResults({ cases: data.cases || [], suspects: data.suspects || [], bns_sections: data.bns_sections || [] });
       } catch (err) {
         console.error(err);
       } finally {
@@ -64,6 +64,7 @@ export function OmniSearch({
   // Find the currently active item to show in preview
   const activeCase = results.cases?.find(c => `case-${c.id}` === activeValue);
   const activeSuspect = results.suspects?.find(s => `suspect-${s.id}` === activeValue);
+  const activeBns = results.bns_sections?.find(b => `bns-${b.bns}` === activeValue);
   const isActiveQuickAction = activeValue.startsWith("action-");
 
   if (!open) return null;
@@ -130,7 +131,10 @@ export function OmniSearch({
                   <Command.Item
                     key={c.id}
                     value={`case-${c.id}`}
-                    onSelect={() => { onOpenChange(false); navigate(`/cases/${c.id}`); }}
+                    onSelect={() => { 
+                      onOpenChange(false); 
+                      navigate(`/cases/${c.id}?highlight=${encodeURIComponent(query)}`); 
+                    }}
                     className="flex items-center gap-3 px-3 py-3 mt-1 rounded-lg cursor-pointer aria-selected:bg-ink aria-selected:text-white transition-colors group"
                   >
                     <FolderClosed className="w-4 h-4 opacity-70" />
@@ -151,8 +155,8 @@ export function OmniSearch({
                     value={`suspect-${s.id}`}
                     onSelect={() => { 
                       onOpenChange(false); 
-                      if (s.casePersons && s.casePersons.length > 0) {
-                        navigate(`/cases/${s.casePersons[0].caseId}`);
+                      if (s.caseId) {
+                        navigate(`/cases/${s.caseId}?highlight=${encodeURIComponent(s.name)}`);
                       } else {
                         navigate(`/network`); 
                       }
@@ -169,7 +173,25 @@ export function OmniSearch({
               </Command.Group>
             )}
 
-            {query && !loading && results.cases?.length === 0 && results.suspects?.length === 0 && (
+            {results.bns_sections?.length > 0 && (
+              <Command.Group heading="Legal Sections (BNS)" className="px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {results.bns_sections.map(b => (
+                  <Command.Item
+                    key={b.bns}
+                    value={`bns-${b.bns}`}
+                    className="flex items-center gap-3 px-3 py-3 mt-1 rounded-lg cursor-pointer aria-selected:bg-ink aria-selected:text-white transition-colors group"
+                  >
+                    <Scale className="w-4 h-4 opacity-70" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold text-sm truncate">BNS {b.bns}</span>
+                      <span className="text-xs opacity-70 truncate">{b.title}</span>
+                    </div>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
+
+            {query && !loading && results.cases?.length === 0 && results.suspects?.length === 0 && results.bns_sections?.length === 0 && (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 No results found for "{query}"
               </div>
@@ -241,6 +263,24 @@ export function OmniSearch({
                        </div>
                      ))}
                    </div>
+                 </div>
+               </div>
+            ) : activeBns ? (
+               <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                 <div className="flex items-center gap-4">
+                   <div className="w-16 h-16 bg-teal/10 rounded-2xl flex items-center justify-center shadow-sm">
+                     <Scale className="w-8 h-8 text-teal" />
+                   </div>
+                   <div>
+                     <h3 className="text-2xl font-bold font-display text-ink">BNS {activeBns.bns}</h3>
+                     <p className="text-sm font-medium text-teal-800">{activeBns.title}</p>
+                   </div>
+                 </div>
+                 <div className="space-y-2">
+                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Punishment & Details</h4>
+                   <p className="text-sm leading-relaxed text-foreground bg-surface p-4 rounded-xl border border-hairline shadow-sm">
+                     {activeBns.punishment || "No punishment details available."}
+                   </p>
                  </div>
                </div>
             ) : isActiveQuickAction ? (

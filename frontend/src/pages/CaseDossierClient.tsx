@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiRequest } from "@/api/client";
 import {
   ArrowLeft,
@@ -16,6 +16,8 @@ import {
   Loader2,
   ShieldAlert,
   ScrollText,
+  BookOpen,
+  Timer,
 } from "lucide-react";
 import { Card, Badge, Button, IconOrb, SectionLabel } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
@@ -24,20 +26,30 @@ import { PredictiveNextSteps } from "@/components/scrb/predictive-steps";
 import { LegalSectionsPanel } from "@/components/scrb/legal-sections-panel";
 import { toast } from "sonner";
 import { ChargesheetEditor } from "@/components/scrb/ChargesheetEditor";
+import { CaseDiaryTab } from "@/components/scrb/CaseDiaryTab";
+import { EvidenceTab } from "@/components/scrb/EvidenceTab";
+import { EvidenceForm } from "@/components/scrb/EvidenceForm";
+import { HighlightText } from "@/components/scrb/HighlightText";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: FileText },
   { id: "timeline", label: "Timeline", icon: GitBranch },
+  { id: "diary", label: "Case Diary", icon: BookOpen },
   { id: "connections", label: "Connections", icon: Share2 },
   { id: "evidence", label: "Evidence", icon: ImageIcon },
   { id: "matches", label: "Matches", icon: Users },
 ] as const;
 
 export default function CaseDossierClient({ caseData }: { caseData: any }) {
+  const [searchParams] = useSearchParams();
+  const highlight = searchParams.get("highlight");
+
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
   const [matches, setMatches] = useState(caseData.matches || []);
   const [busy, setBusy] = useState<string | null>(null);
   const [showChargesheet, setShowChargesheet] = useState(false);
+  const [showEvidenceForm, setShowEvidenceForm] = useState(false);
+  const [refreshEvidence, setRefreshEvidence] = useState(0);
   const { setPageContext, seedIntakeBrief, setActiveCaseId } = useCopilotStore();
   const navigate = useNavigate();
 
@@ -77,7 +89,31 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
     summary: caseData.summary || "No summary provided.",
     entities: caseData.casePersons.map((cp: any) => cp.person.name),
     matches,
+    casePersons: caseData.casePersons,
   };
+
+  // 60/90 Day FR Timer logic
+  let frDeadlineDays = null;
+  let daysRemaining = null;
+  let isOverdue = false;
+  
+  if (c.casePersons) {
+    const custodyDates = c.casePersons
+      .filter((cp: any) => cp.person.custodyStartDate)
+      .map((cp: any) => new Date(cp.person.custodyStartDate).getTime());
+    
+    if (custodyDates.length > 0) {
+      const firstCustodyDate = new Date(Math.min(...custodyDates));
+      // For simplicity, using 90 days as standard statutory limit for major crimes
+      const statutoryLimitDays = 90; 
+      const deadlineDate = new Date(firstCustodyDate.getTime() + (statutoryLimitDays * 24 * 60 * 60 * 1000));
+      const now = new Date();
+      const diffTime = deadlineDate.getTime() - now.getTime();
+      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      frDeadlineDays = statutoryLimitDays;
+      isOverdue = daysRemaining < 0;
+    }
+  }
 
   const runIntakeInCopilot = async () => {
     setBusy("intake");
@@ -168,6 +204,12 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           <Badge tone="muted">
             <span className="text-mono">{c.firNumber}</span>
           </Badge>
+          {daysRemaining !== null && (
+            <Badge tone={isOverdue ? "danger" : daysRemaining < 15 ? "amber" : "teal"} className="flex items-center gap-1 border-current">
+              <Timer className="w-3 h-3" />
+              {isOverdue ? `FR Overdue by ${Math.abs(daysRemaining)} days` : `FR Due in ${daysRemaining} days`}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -183,6 +225,14 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => setShowEvidenceForm(true)}
+            >
+              <ImageIcon className="h-4 w-4 mr-1.5" />
+              Add/Update Evidence
+            </Button>
             <Button
               variant="secondary"
               size="md"
@@ -210,7 +260,7 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
             </Link>
             <Button variant="secondary" size="md" onClick={() => setShowChargesheet(true)}>
               <ScrollText className="h-4 w-4 mr-1.5" />
-              Chargesheet
+              FR - Final Report
             </Button>
           </div>
         </div>
@@ -239,11 +289,12 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
 
         <div className="mt-6">
           {tab === "overview" && (
-            <Overview c={c} rawExtractedText={caseData.rawExtractedText} />
+            <Overview c={c} rawExtractedText={caseData.rawExtractedText} highlight={highlight} />
           )}
           {tab === "timeline" && <Timeline caseData={caseData} />}
+          {tab === "diary" && <CaseDiaryTab caseId={c.id} />}
           {tab === "connections" && <Connections />}
-          {tab === "evidence" && <Evidence />}
+          {tab === "evidence" && <EvidenceTab caseId={c.id} key={refreshEvidence} />}
           {tab === "matches" && (
             <Matches matches={matches} busy={busy} onUpdate={handleMatch} />
           )}
@@ -254,18 +305,27 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
         isOpen={showChargesheet}
         onClose={() => setShowChargesheet(false)}
       />
+      <EvidenceForm
+        caseId={c.id}
+        isOpen={showEvidenceForm}
+        onClose={() => setShowEvidenceForm(false)}
+        onSuccess={() => {
+          setShowEvidenceForm(false);
+          setRefreshEvidence(prev => prev + 1);
+        }}
+      />
     </div>
   );
 }
 
-function Overview({ c, rawExtractedText }: { c: any; rawExtractedText?: string }) {
+function Overview({ c, rawExtractedText, highlight }: { c: any; rawExtractedText?: string; highlight?: string | null }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div className="glass rounded-3xl p-5 lg:col-span-2 space-y-6">
         <div>
           <SectionLabel className="mb-2">Summary</SectionLabel>
           <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-            {c.summary}
+            <HighlightText text={c.summary} query={highlight} />
           </p>
         </div>
 
@@ -273,7 +333,7 @@ function Overview({ c, rawExtractedText }: { c: any; rawExtractedText?: string }
           <div>
             <SectionLabel className="mb-2">Extracted OCR Data</SectionLabel>
             <div className="glass rounded-2xl p-4 text-xs font-mono text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto custom-scrollbar">
-              {rawExtractedText}
+              <HighlightText text={rawExtractedText} query={highlight} />
             </div>
           </div>
         )}
@@ -288,7 +348,7 @@ function Overview({ c, rawExtractedText }: { c: any; rawExtractedText?: string }
           <ul className="space-y-2">
             {c.entities.map((e: string, i: number) => (
               <li key={i} className="glass rounded-2xl px-3 py-2 text-mono text-xs">
-                {e}
+                <HighlightText text={e} query={highlight} />
               </li>
             ))}
             {c.entities.length === 0 && (
@@ -335,32 +395,6 @@ function Connections() {
           Open network canvas
         </Button>
       </Link>
-    </div>
-  );
-}
-
-function Evidence() {
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-      {[1, 2].map((i) => (
-        <div key={i} className="glass rounded-3xl p-4">
-          <div className="aspect-[4/5] rounded-2xl bg-gradient-to-br from-white/10 to-white/[0.02] p-4">
-            <div className="h-full w-full rounded-xl border border-hairline bg-surface-2 p-3">
-              <p className="text-mono text-[10px] text-muted-foreground">FIR ATTACHMENT #{i}</p>
-              <div className="mt-2 space-y-1.5">
-                {Array.from({ length: 8 }).map((_, k) => (
-                  <div
-                    key={k}
-                    className="h-1.5 rounded bg-muted"
-                    style={{ width: `${60 + ((i * k) % 40)}%` }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">Scanned statement · Page {i}</p>
-        </div>
-      ))}
     </div>
   );
 }

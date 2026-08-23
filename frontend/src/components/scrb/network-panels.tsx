@@ -183,12 +183,18 @@ export function SelectionPanel({
           <p className="text-display mt-1 text-lg leading-tight">{node.label}</p>
           {node.sub && <p className="text-xs text-muted-foreground">{node.sub}</p>}
           {node.detail && <p className="mt-1 text-mono text-[11px] text-muted-foreground">{node.detail}</p>}
-          {node.date && <p className="mt-1 text-mono text-[11px] text-muted-foreground">Incident: {node.date}</p>}
+          {node.date && (
+            <p className="mt-1 text-mono text-[11px] text-muted-foreground">
+              Incident: {new Date(node.date).toLocaleDateString()}
+            </p>
+          )}
           <p className="mt-2 text-xs text-muted-foreground">{degree} direct link(s).</p>
 
           {node.kind === "Case" && (
             <Link
               to={`/cases/${node.id.replace(/^case:/, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-amber/10 border border-amber/20 px-3 py-2 text-[11px] font-medium text-amber hover:bg-amber/15"
             >
               Open case dossier <ExternalLink className="h-3 w-3" />
@@ -198,6 +204,7 @@ export function SelectionPanel({
           <div className="mt-3 flex gap-2">
             {canExpand && (
               <button
+                type="button"
                 onClick={() => onExpand(node.id)}
                 className="flex-1 rounded-xl border border-hairline bg-surface px-3 py-1.5 text-[11px] font-medium hover:bg-muted"
               >
@@ -205,12 +212,14 @@ export function SelectionPanel({
               </button>
             )}
             <button
+              type="button"
               onClick={() => onFocus(node.id)}
               className="flex-1 rounded-xl border border-hairline bg-surface px-3 py-1.5 text-[11px] font-medium hover:bg-muted"
             >
               Focus here
             </button>
             <button
+              type="button"
               onClick={() => onTogglePin(node.id)}
               title={pinned ? "Remove from evidence board" : "Pin to evidence board"}
               className={cn(
