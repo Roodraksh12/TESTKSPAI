@@ -1,106 +1,68 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiRequest } from "@/api/client";
-import { FileText, Loader2, ArrowLeft, Printer, ShieldAlert, Check } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FileText, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { ChargesheetEditor } from "@/components/scrb/ChargesheetEditor";
 
 export default function ChargesheetPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [chargesheet, setChargesheet] = useState("");
-  const [isGenerating, setIsGenerating] = useState(true);
-  const [error, setError] = useState("");
+  const [open, setOpen] = useState(true);
 
-  useEffect(() => {
-    const generate = async () => {
-      try {
-        const data = await apiRequest(`/api/cases/${id}/chargesheet`, {
-          method: "POST",
-        });
-        setChargesheet(data.chargesheet);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsGenerating(false);
-      }
-    };
-    generate();
-  }, [id]);
-
-  const handlePrint = () => {
-    window.print();
+  const returnToCase = () => {
+    setOpen(false);
+    if (id) navigate(`/cases/${id}`);
+    else navigate("/cases");
   };
 
   return (
-    <div className="bg-background min-h-screen">
-      {/* Header */}
-      <div className="bg-ink text-white pt-12 pb-12 px-8 border-b border-ink-2 print:hidden">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate(-1)}
-              className="text-white/70 hover:bg-black/20 hover:text-white rounded-full w-12 h-12 p-0"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </Button>
-            <div>
-              <h1 className="text-[28px] font-medium tracking-tight">Draft Chargesheet (CrPC 173)</h1>
-              <p className="text-white/70 text-[16px]">AI-Generated Legal Draft</p>
-            </div>
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-hairline bg-ink px-6 py-10 text-white">
+        <div className="mx-auto flex max-w-5xl items-center gap-4">
+          <Button
+            variant="ghost"
+            onClick={returnToCase}
+            className="h-11 w-11 rounded-full p-0 text-white/75 hover:bg-white/10 hover:text-white"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+              <FileText className="h-6 w-6 text-teal" /> Structured Final Report
+            </h1>
+            <p className="mt-1 text-sm text-white/65">BNSS section 193 provisional working format</p>
           </div>
-          {!isGenerating && !error && (
-            <Button onClick={handlePrint} className="bg-surface text-ink hover:bg-muted flex items-center gap-2 h-12 px-6 rounded-[8px] text-[16px] font-medium">
-              <Printer className="w-5 h-5" /> Print / Export PDF
-            </Button>
-          )}
         </div>
-      </div>
+      </header>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto p-8 relative z-10 pb-32">
-        {isGenerating ? (
-          <div className="bg-surface-2 rounded-[24px] p-24 flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 bg-surface rounded-full flex items-center justify-center mb-8 shadow-sm">
-              <Loader2 className="w-10 h-10 text-teal animate-spin" />
-            </div>
-            <h2 className="text-[24px] font-medium text-foreground mb-4 tracking-tight">Drafting Legal Document...</h2>
-            <p className="text-[18px] text-muted-foreground max-w-md">
-              The AI is analyzing the FIR, statements, and evidence to draft a Section 173 CrPC final report.
+      <main className="mx-auto max-w-5xl p-6 md:p-10">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-hairline bg-surface p-6 shadow-sm">
+            <ClipboardCheck className="h-7 w-7 text-teal" />
+            <h2 className="mt-4 text-lg font-semibold text-foreground">Structured, officer-controlled preparation</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Accused, alleged sections, evidence, witnesses and documents are selected from the case record and linked to supporting facts before submission.
             </p>
           </div>
-        ) : error ? (
-          <div className="bg-surface-2 rounded-[24px] p-24 flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 bg-danger/10 rounded-full flex items-center justify-center mb-8">
-              <ShieldAlert className="w-10 h-10 text-danger" />
-            </div>
-            <h2 className="text-[24px] font-medium text-danger mb-4 tracking-tight">Generation Failed</h2>
-            <p className="text-[18px] text-muted-foreground">{error}</p>
+          <div className="rounded-2xl border border-hairline bg-surface p-6 shadow-sm">
+            <LockKeyhole className="h-7 w-7 text-teal" />
+            <h2 className="mt-4 text-lg font-semibold text-foreground">No external AI drafting in Phase 1</h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              The report is assembled deterministically from saved records and officer input, with server validation, immutable versions and supervisory approval.
+            </p>
           </div>
-        ) : (
-          <div className="space-y-8">
-            <div className="bg-amber/10 border border-amber/40 p-6 rounded-[16px] flex items-start gap-4 print:hidden">
-              <ShieldAlert className="w-6 h-6 text-amber shrink-0 mt-1" />
-              <div>
-                <h3 className="font-medium text-foreground text-[18px] mb-2">Review Required</h3>
-                <p className="text-muted-foreground text-[15px] leading-relaxed">
-                  This document was automatically generated by AI based on extracted case facts. It may hallucinate legal sections or procedural steps. A human investigating officer must review, edit, and sign this document before submitting to the magistrate. Pay attention to bolded text which highlights missing evidence.
-                </p>
-              </div>
-            </div>
+        </div>
+        <div className="mt-6 rounded-2xl border border-amber/40 bg-amber/10 p-5">
+          <p className="text-sm leading-relaxed text-foreground">
+            This remains a configurable working packet until the Karnataka Police charge-sheet specimen is supplied and mapped. It must not be treated as a notified filing form.
+          </p>
+        </div>
+        <Button className="mt-6 bg-ink text-white hover:bg-ink/90" onClick={() => setOpen(true)}>
+          Open final report builder
+        </Button>
+      </main>
 
-            <div className="bg-surface p-12 rounded-[8px] border border-hairline shadow-sm prose prose-slate dark:prose-invert max-w-none text-[16px] leading-[1.8] print:shadow-none print:border-none print:p-0 font-serif">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {chargesheet}
-              </ReactMarkdown>
-            </div>
-          </div>
-        )}
-      </div>
+      <ChargesheetEditor caseId={id || null} isOpen={open} onClose={returnToCase} />
     </div>
   );
 }

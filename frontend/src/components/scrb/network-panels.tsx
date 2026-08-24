@@ -7,7 +7,15 @@ import { useI18n } from "@/lib/i18n";
 import type { GraphEdge, GraphNode } from "@/lib/scrb/graph-view";
 
 export type Ring = { id: string; label: string; nodeIds: string[]; caseCount: number; personCount: number; vehicleCount: number };
-export type KeyPlayer = { id: string; label: string; kind: string; degree?: number; betweenness?: number; breakdown?: string };
+export type KeyPlayer = {
+  id: string;
+  label: string;
+  kind: string;
+  degree?: number;
+  caseCount?: number;
+  betweenness?: number;
+  breakdown?: string;
+};
 
 export function KeyPlayersPanel({
   hubs,
@@ -30,7 +38,12 @@ export function KeyPlayersPanel({
   return (
     <Card accent="amber" className="p-5 shrink-0">
       <div className="flex items-center justify-between mb-3">
-        <SectionLabel>{t("network.keyPlayers")}</SectionLabel>
+        <div>
+          <SectionLabel>{tab === "hubs" ? "Cross-case entities" : "Bridge entities"}</SectionLabel>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {tab === "hubs" ? "People or vehicles appearing in multiple case files." : "Entities that connect otherwise separate groups."}
+          </p>
+        </div>
         <div className="glass inline-flex rounded-xl p-0.5">
           <button
             onClick={() => onTabChange("hubs")}
@@ -62,7 +75,7 @@ export function KeyPlayersPanel({
         </p>
       ) : (
         <div className="space-y-1.5">
-          {list.map((kp, i) => {
+          {list.slice(0, 5).map((kp, i) => {
             const s = KIND_STYLE[kp.kind as keyof typeof KIND_STYLE] ?? KIND_STYLE.Location;
             return (
               <button
@@ -81,7 +94,9 @@ export function KeyPlayersPanel({
                   <p className="truncate text-[12px] font-medium text-foreground">{kp.label}</p>
                   <p className="text-mono text-[10px] text-muted-foreground truncate">{kp.breakdown}</p>
                 </div>
-                <span className="text-mono text-[11px] font-semibold text-amber shrink-0">{kp.degree}</span>
+                <span className="text-mono text-[10px] font-semibold text-amber shrink-0 text-right">
+                  {tab === "hubs" && kp.caseCount ? `${kp.caseCount} case${kp.caseCount > 1 ? "s" : ""}` : kp.degree}
+                </span>
               </button>
             );
           })}
@@ -96,7 +111,10 @@ export function RingsPanel({ rings, onRevealRing }: { rings: Ring[]; onRevealRin
   return (
     <Card className="p-5 shrink-0">
       <div className="flex items-center justify-between mb-3">
-        <SectionLabel>{t("network.detectedRings")}</SectionLabel>
+        <div>
+          <SectionLabel>Verified case clusters</SectionLabel>
+          <p className="mt-1 text-[10px] text-muted-foreground">Shared FIR entities and officer-confirmed links only.</p>
+        </div>
         <Badge tone="muted">{rings.length}</Badge>
       </div>
       {rings.length === 0 ? (
@@ -105,7 +123,7 @@ export function RingsPanel({ rings, onRevealRing }: { rings: Ring[]; onRevealRin
         </p>
       ) : (
         <div className="space-y-1.5">
-          {rings.slice(0, 5).map((r, i) => (
+          {rings.slice(0, 3).map((r, i) => (
             <button
               key={r.id}
               onClick={() => onRevealRing(r)}

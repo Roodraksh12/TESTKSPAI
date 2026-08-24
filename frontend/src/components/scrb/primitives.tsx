@@ -84,7 +84,7 @@ export function ActionCard({ children, className }: { children: ReactNode; class
 }
 
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "outline" | "ghost";
   size?: "sm" | "md" | "lg";
 };
 
@@ -104,6 +104,7 @@ export function Button({
     primary:
       "bg-ink text-white font-semibold shadow-sm hover:bg-ink-2",
     secondary: "bg-surface border border-hairline text-foreground hover:bg-muted shadow-sm",
+    outline: "bg-transparent border border-hairline text-foreground hover:bg-muted",
     ghost: "text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg",
   }[variant];
   return (

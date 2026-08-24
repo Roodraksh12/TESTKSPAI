@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/scrb/primitives";
 import { Camera, Video, Mic, FlaskConical, FileText, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { apiRequest } from "@/api/client";
 
 const TYPES = [
   { id: "PHOTO", label: "Photo", icon: Camera },
@@ -42,19 +43,11 @@ export function EvidenceForm({
       formData.append("description", description);
       files.forEach(f => formData.append("files", f));
 
-      const response = await fetch(`/api/cases/${caseId}/evidence`, {
+      await apiRequest(`/api/cases/${caseId}/evidence`, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
         body: formData
       });
-      
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || "Upload failed");
-      }
-      
+
       toast.success("Evidence added successfully");
       setDescription("");
       setFiles([]);
@@ -68,7 +61,19 @@ export function EvidenceForm({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(Array.from(e.target.files));
+      const selected = Array.from(e.target.files);
+      if (selected.length > 5) {
+        toast.error("Attach at most 5 evidence files at once");
+        e.target.value = "";
+        return;
+      }
+      const oversized = selected.find((file) => file.size > 20 * 1024 * 1024);
+      if (oversized) {
+        toast.error(`${oversized.name} exceeds the 20 MB limit`);
+        e.target.value = "";
+        return;
+      }
+      setFiles(selected);
     }
   };
 

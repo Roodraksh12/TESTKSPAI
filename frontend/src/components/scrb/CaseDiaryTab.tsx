@@ -1,12 +1,33 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { apiRequest, getToken } from "@/api/client";
+import { apiFetchResponse, apiRequest } from "@/api/client";
 import { Card, Button, Badge, SectionLabel } from "@/components/scrb/primitives";
 import { Loader2, Plus, Mic, MicOff, Save, X, Paperclip, Pencil, Trash2, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
 import { HighlightText } from "@/components/scrb/HighlightText";
-export function CaseDiaryTab({ caseId }: { caseId: string }) {
+
+const DIARY_TIME_ZONE = "Asia/Kolkata";
+
+function formatDiaryDate(diaryDate: string) {
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: DIARY_TIME_ZONE,
+  }).format(new Date(`${diaryDate}T00:00:00+05:30`));
+}
+
+function formatDiaryTime(timestamp: string) {
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: DIARY_TIME_ZONE,
+  }).format(new Date(timestamp));
+}
+
+export function CaseDiaryTab({ caseId, canEdit }: { caseId: string; canEdit: boolean }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
@@ -38,8 +59,11 @@ export function CaseDiaryTab({ caseId }: { caseId: string }) {
   }, [caseId]);
 
   const handleExportPDF = async () => {
+    if (exportStartDate && exportEndDate && exportStartDate > exportEndDate) {
+      toast.error("From date must be on or before the To date");
+      return;
+    }
     try {
-      const token = getToken();
       let url = `/api/cases/${caseId}/diary/export`;
       const queryParams = new URLSearchParams();
       if (exportStartDate) queryParams.append("start_date", exportStartDate);
@@ -48,12 +72,7 @@ export function CaseDiaryTab({ caseId }: { caseId: string }) {
         url += `?${queryParams.toString()}`;
       }
       
-      const res = await fetch(url, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
-      if (!res.ok) throw new Error("Failed to export PDF");
+      const res = await apiFetchResponse(url);
       const blob = await res.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -71,24 +90,25 @@ export function CaseDiaryTab({ caseId }: { caseId: string }) {
 
   const groupedEntries = useMemo(() => {
     if (!data?.entries) return [];
-    
-    // Sort descending by timestamp
-    const sorted = [...data.entries].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    
-    const groups: { dateStr: string, entries: any[] }[] = [];
-    let currentGroup: { dateStr: string, entries: any[] } | null = null;
-    
-    sorted.forEach(entry => {
-      // Create a localized date string (e.g., "August 24, 2026")
-      const dateStr = new Date(entry.timestamp).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
-      if (!currentGroup || currentGroup.dateStr !== dateStr) {
-        currentGroup = { dateStr, entries: [] };
-        groups.push(currentGroup);
-      }
-      currentGroup.entries.push(entry);
-    });
-    
-    return groups;
+
+    const groups = new Map<string, any[]>();
+    for (const entry of data.entries) {
+      // The API supplies this Karnataka calendar date, keeping pages stable
+      // even when a timestamp falls on a different UTC day.
+      const diaryDate = entry.diaryDate || entry.timestamp.slice(0, 10);
+      const entries = groups.get(diaryDate) || [];
+      entries.push(entry);
+      groups.set(diaryDate, entries);
+    }
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([diaryDate, entries]) => ({
+        diaryDate,
+        entries: [...entries].sort(
+          (a, b) => (a.dailyPageNumber ?? a.pageNumber) - (b.dailyPageNumber ?? b.pageNumber)
+        ),
+      }));
   }, [data?.entries]);
 
   const loadDiary = async () => {
@@ -130,9 +150,11 @@ export function CaseDiaryTab({ caseId }: { caseId: string }) {
           <Button variant="outline" onClick={() => setExportModalOpen(true)}>
             <Download className="w-4 h-4 mr-2" /> Export to PDF
           </Button>
-          <Button variant="primary" onClick={() => setIsAdding(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Add Entry
-          </Button>
+          {canEdit && (
+            <Button variant="primary" onClick={() => setIsAdding(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Add Entry
+            </Button>
+          )}
         </div>
       </div>
 
@@ -154,8 +176,11 @@ export function CaseDiaryTab({ caseId }: { caseId: string }) {
       ) : (
         <div className="space-y-8">
           {groupedEntries.map(group => (
-            <div key={group.dateStr} className="space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground pl-2">{group.dateStr}</h3>
+            <div key={group.diaryDate} className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground pl-2">
+                {formatDiaryDate(group.diaryDate)}
+                <span className="ml-2 text-xs font-normal">· {group.entries.length} {group.entries.length === 1 ? "entry" : "entries"}</span>
+              </h3>
               {group.entries.map((entry: any) => {
                 if (editingEntryId === entry.id) {
                   return (
@@ -177,30 +202,32 @@ export function CaseDiaryTab({ caseId }: { caseId: string }) {
                     <div className="flex items-start justify-between border-b border-hairline pb-3 mb-3">
                       <div>
                         <div className="flex gap-2 items-center mb-2">
-                          <Badge tone="teal">Page {entry.pageNumber}</Badge>
-                          <span className="text-xs font-medium text-muted-foreground">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <Badge tone="teal">Page {entry.dailyPageNumber ?? entry.pageNumber}</Badge>
+                          <span className="text-xs font-medium text-muted-foreground">{formatDiaryTime(entry.timestamp)}</span>
                         </div>
                         <p className="text-sm font-medium"><HighlightText text={entry.activityType} query={highlight} /></p>
                         <p className="text-xs text-muted-foreground mt-1">
                           By {entry.author_name} ({entry.author_badge})
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => setEditingEntryId(entry.id)} 
-                          className="p-1.5 text-muted-foreground hover:text-teal hover:bg-surface-3 rounded-md transition-colors"
-                          title="Edit Entry"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteEntry(entry.id)} 
-                          className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-surface-3 rounded-md transition-colors"
-                          title="Delete Entry"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {canEdit && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingEntryId(entry.id)}
+                            className="p-1.5 text-muted-foreground hover:text-teal hover:bg-surface-3 rounded-md transition-colors"
+                            title="Edit Entry"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteEntry(entry.id)}
+                            className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-surface-3 rounded-md transition-colors"
+                            title="Delete Entry"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className="whitespace-pre-wrap text-sm leading-relaxed mb-3">
                       <HighlightText text={entry.narrative} query={highlight} />
@@ -229,6 +256,9 @@ export function CaseDiaryTab({ caseId }: { caseId: string }) {
             <DialogTitle className="text-xl font-medium">Export Case Diary</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Entries are exported oldest to newest. Page numbering restarts at Page 1 for every diary date.
+            </p>
             <div className="grid gap-2">
               <label className="text-sm font-medium text-muted-foreground">From Date (Optional)</label>
               <input 
@@ -345,22 +375,11 @@ function AddEntryForm({ caseId, initialData, onCancel, onSuccess }: { caseId: st
       const formData = new FormData();
       formData.append("file", file);
       
-      const res = await apiRequest(`/api/cases/${caseId}/diary/documents`, {
+      const data = await apiRequest(`/api/cases/${caseId}/diary/documents`, {
         method: "POST",
         body: formData,
-      }, true); // pass true or remove Content-Type in api client if needed, wait `apiRequest` by default sets JSON.
-      // Wait, apiRequest assumes JSON body unless it's FormData, let's just use standard fetch for this if apiRequest doesn't support FormData well.
-      
-      const response = await fetch(`/api/cases/${caseId}/diary/documents`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${getToken()}`
-        },
-        body: formData
       });
-      if (!response.ok) throw new Error("Upload failed");
-      const data = await response.json();
-      
+
       setDocuments(prev => [...prev, { id: data.documentId, name: data.name }]);
       toast.success("Document uploaded");
     } catch (err: any) {

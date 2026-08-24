@@ -11,7 +11,6 @@ import Analytics from "./pages/Analytics.tsx"
 import Hotspots from "./pages/Hotspots.tsx"
 import Cases from "./pages/Cases.tsx"
 import CaseDetail from "./pages/CaseDetail.tsx"
-import Tactical from "./pages/Tactical.tsx"
 import Chargesheet from "./pages/Chargesheet.tsx"
 import Network from "./pages/Network.tsx"
 import FirUpload from "./pages/FirUpload.tsx"
@@ -41,7 +40,8 @@ export default function App() {
             <Route path="/early-warnings" element={<EarlyWarnings />} />
             <Route path="/cases" element={<Cases />} />
             <Route path="/cases/:id" element={<CaseDetail />} />
-            <Route path="/cases/:id/tactical" element={<Tactical />} />
+            {/* Preserve old bookmarks without keeping the removed feature reachable. */}
+            <Route path="/cases/:id/tactical" element={<Navigate to="/cases" replace />} />
             <Route path="/cases/:id/chargesheet" element={<Chargesheet />} />
             <Route path="/network" element={<Network />} />
             <Route path="/fir/upload" element={<FirUpload />} />

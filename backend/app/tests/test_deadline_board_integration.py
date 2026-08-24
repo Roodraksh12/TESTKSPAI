@@ -22,11 +22,10 @@ def test_compliance_board_summary_sums_to_total_cases(sp_officer) -> None:
     assert total > 0
 
 
-def test_compliance_board_has_overdue_rows(sp_officer) -> None:
+def test_compliance_board_does_not_infer_default_bail_from_fir_dates(sp_officer) -> None:
     result = deadline_engine.get_compliance_board(sp_officer)
-    assert result["summary"]["OVERDUE"] >= 10
-    worst = result["board"][0]
-    assert worst["tier"] == "OVERDUE"
+    assert isinstance(result["storageReady"], bool)
+    assert all(row["chargesheet"] is None or row["chargesheet"]["personName"] for row in result["board"])
 
 
 def test_deadline_risks_exclude_healthy_tiers(sp_officer) -> None:

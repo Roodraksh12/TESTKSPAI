@@ -12,6 +12,7 @@ export default function Deadlines() {
   const [board, setBoard] = useState<DeadlineRow[]>([]);
   const [summary, setSummary] = useState<DeadlineSummary>({});
   const [loading, setLoading] = useState(true);
+  const [storageReady, setStorageReady] = useState(true);
   const [editorCaseId, setEditorCaseId] = useState<string | null>(null);
 
   const load = () =>
@@ -19,6 +20,7 @@ export default function Deadlines() {
       .then((payload) => {
         setBoard(payload.board || []);
         setSummary(payload.summary || {});
+        setStorageReady(payload.storageReady !== false);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -69,12 +71,15 @@ export default function Deadlines() {
         )}
       </div>
 
+      {!storageReady && (
+        <Card accent="amber" className="p-5 text-sm text-muted-foreground">
+          Apply database migration 0009_case_custody_clocks.sql to enable verified first-remand clocks. Until then, this board deliberately does not infer default-bail exposure from FIR dates.
+        </Card>
+      )}
+
       <Card className="p-5">
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Clocks anchor to the FIR reported date because arrest/remand dates aren&apos;t tracked in the
-          schema — the legally exact BNSS 187(3) clock runs from first remand. Victim progress updates are
-          a separate statutory duty under BNSS 193(3)(ii). Urgent/Watch thresholds (15/30 days) are
-          configurable operational policy, not law.
+          BNSS 187(3) clocks are per accused and begin from the first Magistrate-authorised remand recorded for this FIR. The 90-day category is selected only after checking the alleged offence&apos;s maximum punishment; the app never guesses it from a crime label. Victim progress updates are a separate statutory duty under BNSS 193(3)(ii). Urgent/Watch thresholds (15/30 days) are configurable operational policy, not law.
         </p>
       </Card>
 

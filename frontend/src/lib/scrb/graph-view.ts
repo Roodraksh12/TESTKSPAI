@@ -18,7 +18,14 @@ export type GraphNode = {
   y?: number;
 };
 
-export type GraphEdge = { from: string; to: string; label: string };
+export type GraphEdge = {
+  from: string;
+  to: string;
+  label: string;
+  /** Whether the relationship is recorded, officer-confirmed, contextual, or still a lead. */
+  category?: "record" | "confirmed" | "context" | "lead";
+  confidence?: number;
+};
 
 /** A node with layout coordinates assigned, in a 0–100 percentage box. */
 export type PositionedNode = GraphNode & { x: number; y: number };
@@ -99,7 +106,10 @@ export function layoutGraph(rawNodes: GraphNode[], edges: GraphEdge[]): Position
   const withServer = rawNodes.every(
     (node) => typeof node.x === "number" && typeof node.y === "number"
   );
-  if (withServer) {
+  // Server coordinates are useful for a very large overview, but a focused
+  // subset needs to be re-laid out around its own centre. Reusing positions
+  // from the 90-node graph was the source of the scattered, overlapping view.
+  if (withServer && n > 18) {
     return rawNodes.map((node) => ({ ...node, x: node.x as number, y: node.y as number }));
   }
 

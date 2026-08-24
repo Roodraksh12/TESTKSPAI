@@ -14,10 +14,9 @@ import {
   GitBranch,
   Sparkles,
   Loader2,
-  ShieldAlert,
   ScrollText,
   BookOpen,
-  Timer,
+  ClipboardList,
 } from "lucide-react";
 import { Card, Badge, Button, IconOrb, SectionLabel } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
@@ -30,17 +29,22 @@ import { CaseDiaryTab } from "@/components/scrb/CaseDiaryTab";
 import { EvidenceTab } from "@/components/scrb/EvidenceTab";
 import { EvidenceForm } from "@/components/scrb/EvidenceForm";
 import { HighlightText } from "@/components/scrb/HighlightText";
+import { CustodyClockPanel } from "@/components/scrb/CustodyClockPanel";
+import { useAuth } from "@/context/AuthContext";
+import { ReportDataTab } from "@/components/scrb/ReportDataTab";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: FileText },
   { id: "timeline", label: "Timeline", icon: GitBranch },
   { id: "diary", label: "Case Diary", icon: BookOpen },
+  { id: "report-data", label: "Report Data", icon: ClipboardList },
   { id: "connections", label: "Connections", icon: Share2 },
   { id: "evidence", label: "Evidence", icon: ImageIcon },
   { id: "matches", label: "Matches", icon: Users },
 ] as const;
 
 export default function CaseDossierClient({ caseData }: { caseData: any }) {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const highlight = searchParams.get("highlight");
 
@@ -52,6 +56,9 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
   const [refreshEvidence, setRefreshEvidence] = useState(0);
   const { setPageContext, seedIntakeBrief, setActiveCaseId } = useCopilotStore();
   const navigate = useNavigate();
+  const canWrite = Boolean(user?.capabilities?.canWriteCases);
+  const isAssignedIo = !caseData.currentIoId || caseData.currentIoId === user?.id;
+  const canEditInvestigationLog = canWrite && isAssignedIo;
 
   useEffect(() => {
     setPageContext(
@@ -91,29 +98,6 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
     matches,
     casePersons: caseData.casePersons,
   };
-
-  // 60/90 Day FR Timer logic
-  let frDeadlineDays = null;
-  let daysRemaining = null;
-  let isOverdue = false;
-  
-  if (c.casePersons) {
-    const custodyDates = c.casePersons
-      .filter((cp: any) => cp.person.custodyStartDate)
-      .map((cp: any) => new Date(cp.person.custodyStartDate).getTime());
-    
-    if (custodyDates.length > 0) {
-      const firstCustodyDate = new Date(Math.min(...custodyDates));
-      // For simplicity, using 90 days as standard statutory limit for major crimes
-      const statutoryLimitDays = 90; 
-      const deadlineDate = new Date(firstCustodyDate.getTime() + (statutoryLimitDays * 24 * 60 * 60 * 1000));
-      const now = new Date();
-      const diffTime = deadlineDate.getTime() - now.getTime();
-      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      frDeadlineDays = statutoryLimitDays;
-      isOverdue = daysRemaining < 0;
-    }
-  }
 
   const runIntakeInCopilot = async () => {
     setBusy("intake");
@@ -204,12 +188,6 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           <Badge tone="muted">
             <span className="text-mono">{c.firNumber}</span>
           </Badge>
-          {daysRemaining !== null && (
-            <Badge tone={isOverdue ? "danger" : daysRemaining < 15 ? "amber" : "teal"} className="flex items-center gap-1 border-current">
-              <Timer className="w-3 h-3" />
-              {isOverdue ? `FR Overdue by ${Math.abs(daysRemaining)} days` : `FR Due in ${daysRemaining} days`}
-            </Badge>
-          )}
         </div>
       </div>
 
@@ -225,14 +203,16 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => setShowEvidenceForm(true)}
-            >
-              <ImageIcon className="h-4 w-4 mr-1.5" />
-              Add/Update Evidence
-            </Button>
+            {canEditInvestigationLog && (
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => setShowEvidenceForm(true)}
+              >
+                <ImageIcon className="h-4 w-4 mr-1.5" />
+                Add/Update Evidence
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="md"
@@ -252,17 +232,19 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
               ) : null}
               Draft update
             </Button>
-            <Link to={`/cases/${caseData.id}/tactical`}>
-              <Button variant="secondary" size="md">
-                <ShieldAlert className="h-4 w-4 mr-1.5" />
-                Tactical view
-              </Button>
-            </Link>
             <Button variant="secondary" size="md" onClick={() => setShowChargesheet(true)}>
               <ScrollText className="h-4 w-4 mr-1.5" />
               FR - Final Report
             </Button>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <CustodyClockPanel
+            caseId={c.id}
+            casePersons={c.casePersons}
+            canEdit={canEditInvestigationLog}
+          />
         </div>
 
         <div className="glass mt-6 inline-flex rounded-2xl p-1 overflow-x-auto max-w-full custom-scrollbar">
@@ -292,7 +274,12 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
             <Overview c={c} rawExtractedText={caseData.rawExtractedText} highlight={highlight} />
           )}
           {tab === "timeline" && <Timeline caseData={caseData} />}
-          {tab === "diary" && <CaseDiaryTab caseId={c.id} />}
+          {tab === "diary" && (
+            <CaseDiaryTab caseId={c.id} canEdit={canEditInvestigationLog} />
+          )}
+          {tab === "report-data" && (
+            <ReportDataTab caseId={c.id} canEdit={canEditInvestigationLog} />
+          )}
           {tab === "connections" && <Connections />}
           {tab === "evidence" && <EvidenceTab caseId={c.id} key={refreshEvidence} />}
           {tab === "matches" && (

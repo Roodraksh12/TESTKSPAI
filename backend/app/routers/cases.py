@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.deps import get_current_user
 from app.services.parallel import invalidate_all
-from app.services import geocoder, intake_intel
+from app.services import deadline_engine, final_reports, geocoder, intake_intel
 from app.services.hierarchy import has_wide_case_scope
 from app.services.case_access import (
     create_audit_log,
@@ -26,7 +27,7 @@ from app.services.db import (
     run_on_connection,
     serialize_rows,
 )
-from app.services.openrouter import chat_completion
+from app.services.custody_clocks import list_case_clocks
 from app.services.warning_engine import refresh_hotspot_warnings
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -63,6 +64,56 @@ class ChargesheetUpdateRequest(BaseModel):
     """
 
     chargesheetDraft: str
+
+
+class CustodyClockRequest(BaseModel):
+    """A court-remand record, not a suspect-identification or arrest record."""
+
+    casePersonId: str = Field(min_length=1, max_length=100)
+    firstRemandAt: datetime
+    windowDays: Literal[60, 90]
+    thresholdBasis: Literal["DEATH_LIFE_OR_TEN_YEARS_OR_MORE", "OTHER_OFFENCE"]
+    legalSectionDetails: str = Field(min_length=2, max_length=1_000)
+    remandOrderReference: str = Field(min_length=2, max_length=500)
+    notes: str | None = Field(default=None, max_length=2_000)
+    acknowledgeFirstRemand: bool
+
+    @model_validator(mode="after")
+    def window_matches_statutory_basis(self):
+        expected_window = 90 if self.thresholdBasis == "DEATH_LIFE_OR_TEN_YEARS_OR_MORE" else 60
+        if self.windowDays != expected_window:
+            raise ValueError("The selected 60/90-day window does not match the stated statutory basis")
+        if not self.acknowledgeFirstRemand:
+            raise ValueError("Confirm that this is the first Magistrate-authorised remand for this FIR")
+        return self
+
+
+class CustodyClockFilingRequest(BaseModel):
+    filedAt: datetime
+    reportReference: str = Field(min_length=2, max_length=500)
+
+
+def _utc_storage_timestamp(value: datetime | str) -> datetime:
+    """Keep timestamp-without-time-zone legacy columns as UTC wall timestamps."""
+    if not isinstance(value, datetime):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc).replace(tzinfo=None)
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _require_assigned_io(case_data: dict, officer: dict) -> None:
+    assigned_io_id = case_data.get("currentIoId")
+    if assigned_io_id and assigned_io_id != officer.get("id"):
+        raise HTTPException(status_code=403, detail="Only the assigned investigating officer can record custody clocks")
+
+
+def _display_date(value: object) -> str:
+    """Return a stable date label for serialized DB timestamps."""
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    text = str(value or "")
+    return text[:10] if len(text) >= 10 else text or "Unknown date"
 
 
 def _find_or_create_person(name: str, role: str) -> dict:
@@ -309,6 +360,180 @@ def get_case(case_id: str, current_user: dict = Depends(get_current_user)) -> di
     return {"case": case_data}
 
 
+@router.get("/{case_id}/custody-clocks")
+def get_custody_clocks(case_id: str, current_user: dict = Depends(get_current_user)) -> dict:
+    """Return only verified, per-accused remand clocks for a visible FIR."""
+    case_data = get_case_with_relations(case_id, current_user["officer"])
+    if not case_data:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    rows, storage_ready = list_case_clocks(case_id)
+    now = datetime.now(timezone.utc)
+    return {
+        "storageReady": storage_ready,
+        "clocks": [deadline_engine.compute_custody_clock(row, now) for row in rows],
+    }
+
+
+@router.post("/{case_id}/custody-clocks")
+def record_custody_clock(
+    case_id: str,
+    payload: CustodyClockRequest,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Record or correct the first Magistrate-authorised remand for one accused."""
+    officer = current_user["officer"]
+    require_case_write(officer)
+    case_data = get_case_with_relations(case_id, officer)
+    if not case_data:
+        raise HTTPException(status_code=404, detail="Case not found")
+    _require_assigned_io(case_data, officer)
+
+    _, storage_ready = list_case_clocks(case_id)
+    if not storage_ready:
+        raise HTTPException(
+            status_code=503,
+            detail="Custody-clock storage is not set up. Apply database migration 0009_case_custody_clocks.sql first.",
+        )
+
+    remand_at = _utc_storage_timestamp(payload.firstRemandAt)
+    if remand_at > datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5):
+        raise HTTPException(status_code=400, detail="First-remand time cannot be in the future")
+
+    case_person = fetch_one(
+        '''
+        SELECT cp.id
+        FROM "CasePerson" cp
+        WHERE cp.id = %(casePersonId)s
+          AND cp."caseId" = %(caseId)s
+          AND cp.role = 'ACCUSED'
+        ''',
+        {"casePersonId": payload.casePersonId, "caseId": case_id},
+    )
+    if not case_person:
+        raise HTTPException(status_code=400, detail="Select an accused linked to this FIR")
+
+    existing = fetch_one(
+        'SELECT id FROM "CaseCustodyClock" WHERE "casePersonId" = %(casePersonId)s',
+        {"casePersonId": payload.casePersonId},
+    )
+    params = {
+        "caseId": case_id,
+        "casePersonId": payload.casePersonId,
+        "firstRemandAt": remand_at,
+        "windowDays": payload.windowDays,
+        "thresholdBasis": payload.thresholdBasis,
+        "legalSectionDetails": payload.legalSectionDetails.strip(),
+        "remandOrderReference": payload.remandOrderReference.strip(),
+        "notes": payload.notes.strip() if payload.notes and payload.notes.strip() else None,
+        "officerId": officer["id"],
+    }
+    if existing:
+        execute(
+            '''
+            UPDATE "CaseCustodyClock"
+            SET "firstRemandAt" = %(firstRemandAt)s,
+                "windowDays" = %(windowDays)s,
+                "thresholdBasis" = %(thresholdBasis)s,
+                "legalSectionDetails" = %(legalSectionDetails)s,
+                "remandOrderReference" = %(remandOrderReference)s,
+                notes = %(notes)s,
+                "updatedById" = %(officerId)s,
+                "updatedAt" = NOW()
+            WHERE id = %(clockId)s
+            ''',
+            {**params, "clockId": existing["id"]},
+        )
+        action = "CORRECT_CUSTODY_CLOCK"
+        details = f"Corrected first-remand record for case-person {payload.casePersonId}"
+    else:
+        execute(
+            '''
+            INSERT INTO "CaseCustodyClock" (
+                id, "caseId", "casePersonId", "firstRemandAt", "windowDays",
+                "thresholdBasis", "legalSectionDetails", "remandOrderReference", notes,
+                "createdById", "updatedById"
+            )
+            VALUES (
+                %(id)s, %(caseId)s, %(casePersonId)s, %(firstRemandAt)s, %(windowDays)s,
+                %(thresholdBasis)s, %(legalSectionDetails)s, %(remandOrderReference)s, %(notes)s,
+                %(officerId)s, %(officerId)s
+            )
+            ''',
+            {**params, "id": new_id()},
+        )
+        action = "RECORD_FIRST_REMAND"
+        details = f"Recorded first-remand clock for case-person {payload.casePersonId}"
+
+    create_audit_log(officer["id"], action, "CASE", case_id, details)
+    invalidate_all()
+    rows, _ = list_case_clocks(case_id)
+    clock = next((row for row in rows if row["casePersonId"] == payload.casePersonId), None)
+    return {
+        "success": True,
+        "clock": deadline_engine.compute_custody_clock(clock, datetime.now(timezone.utc)) if clock else None,
+    }
+
+
+@router.post("/{case_id}/custody-clocks/record-filing")
+def record_final_report_filing(
+    case_id: str,
+    payload: CustodyClockFilingRequest,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Record one actual filing reference against all outstanding accused clocks in a FIR."""
+    officer = current_user["officer"]
+    require_case_write(officer)
+    case_data = get_case_with_relations(case_id, officer)
+    if not case_data:
+        raise HTTPException(status_code=404, detail="Case not found")
+    _require_assigned_io(case_data, officer)
+
+    rows, storage_ready = list_case_clocks(case_id)
+    if not storage_ready:
+        raise HTTPException(
+            status_code=503,
+            detail="Custody-clock storage is not set up. Apply database migration 0009_case_custody_clocks.sql first.",
+        )
+    active_rows = [row for row in rows if not row.get("reportFiledAt")]
+    if not active_rows:
+        raise HTTPException(status_code=400, detail="There are no outstanding custody clocks to mark as filed")
+
+    filed_at = _utc_storage_timestamp(payload.filedAt)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    if filed_at > now_utc + timedelta(minutes=5):
+        raise HTTPException(status_code=400, detail="Filing time cannot be in the future")
+    if any(filed_at < _utc_storage_timestamp(row["firstRemandAt"]) for row in active_rows):
+        raise HTTPException(status_code=400, detail="Filing time cannot be earlier than an outstanding first-remand record")
+
+    execute(
+        '''
+        UPDATE "CaseCustodyClock"
+        SET "reportFiledAt" = %(filedAt)s,
+            "reportReference" = %(reportReference)s,
+            "updatedById" = %(officerId)s,
+            "updatedAt" = NOW()
+        WHERE "caseId" = %(caseId)s
+          AND "reportFiledAt" IS NULL
+        ''',
+        {
+            "caseId": case_id,
+            "filedAt": filed_at,
+            "reportReference": payload.reportReference.strip(),
+            "officerId": officer["id"],
+        },
+    )
+    create_audit_log(
+        officer["id"],
+        "RECORD_FINAL_REPORT_FILING",
+        "CASE",
+        case_id,
+        f"Recorded final-report/charge-sheet filing for {len(active_rows)} custody clock(s)",
+    )
+    invalidate_all()
+    return {"success": True, "updatedClockCount": len(active_rows)}
+
+
 @router.get("/{case_id}/intake")
 def intake(case_id: str, current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
@@ -363,11 +588,10 @@ def update_match(
         payload.matchId,
         payload.status,
         officer,
+        case_id=case_id,
     )
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
-    if result["match"]["caseId"] != case_id:
-        raise HTTPException(status_code=400, detail="Match does not belong to this case")
     return {"success": True, "match": result["match"]}
 
 
@@ -389,6 +613,7 @@ async def update_chargesheet(
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     officer = current_user["officer"]
+    require_case_write(officer)
     case_data = get_case_with_relations(case_id, officer)
     if not case_data:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -397,87 +622,40 @@ async def update_chargesheet(
         'UPDATE "Case" SET "chargesheetDraft" = %(draft)s WHERE id = %(id)s',
         {"draft": payload.chargesheetDraft, "id": case_id},
     )
+    create_audit_log(
+        officer["id"],
+        "UPDATE_CHARGESHEET",
+        "CASE",
+        case_id,
+        "Saved edited chargesheet draft",
+    )
     return {"success": True}
 
 
 async def _generate_chargesheet_markdown(case_id: str, officer: dict) -> str:
-    case_data = get_case_with_relations(case_id, officer)
-    if not case_data:
-        raise HTTPException(status_code=404, detail="Case not found")
+    """Compatibility view backed by the structured, non-AI final report."""
+    require_case_write(officer)
+    result = final_reports.get_report(case_id, officer)
+    if not result.get("storageReady"):
+        raise HTTPException(status_code=503, detail="Apply the isolated final-report migration before creating a draft")
+    if not result.get("report"):
+        result = final_reports.initialize_report(case_id, officer)
+    report = result.get("report")
+    if not report:
+        raise HTTPException(status_code=500, detail="The structured final report could not be initialized")
 
-    accused_list = ", ".join(
-        cp["person"]["name"]
-        for cp in case_data.get("casePersons", [])
-        if cp["role"] == "ACCUSED"
+    chargesheet_markdown = final_reports.render_legacy_markdown(report["payload"])
+    execute(
+        'UPDATE "Case" SET "chargesheetDraft" = %(draft)s WHERE id = %(id)s',
+        {"draft": chargesheet_markdown, "id": case_id},
     )
-    victim_list = ", ".join(
-        cp["person"]["name"]
-        for cp in case_data.get("casePersons", [])
-        if cp["role"] == "VICTIM"
+    create_audit_log(
+        officer["id"],
+        "GENERATE_CHARGESHEET",
+        "CASE",
+        case_id,
+        f'Deterministic compatibility view saved from final-report version {report["versionNumber"]}',
     )
-
-    system_prompt = '''You are a highly experienced Indian Police Service (IPS) officer and legal expert.
-Your task is to draft a highly formal, legally sound "Final Report / Chargesheet under Section 173 CrPC".
-You will be provided with the facts of the case.
-You must return the document formatted beautifully in Markdown.
-
-Include the following sections:
-1. FORMAL HEADING (e.g. FINAL REPORT UNDER SECTION 173 CrPC)
-2. CASE DETAILS (FIR Number, Date, Station)
-3. DETAILS OF ACCUSED (Name, Status)
-4. BRIEF FACTS OF THE CASE (Based on the summary)
-5. EVIDENCE, WITNESSES & INVESTIGATION (Use the provided REAL Evidence Registry and Case Diary entries instead of inventing procedures)
-6. CHARGES (Suggest relevant IPC/BNS sections based on the crime type)
-7. CONCLUSION & PRAYER (Requesting the court to take cognizance)
-
-Highlight any MISSING critical information (like "Arrest Memo not attached", "Forensic Report pending") in bold or as a note.
-
-DO NOT output anything other than the markdown document.'''
-
-    diary_rows = fetch_all(
-        'SELECT "activityType", narrative, "timestamp" FROM "CaseDiaryEntry" WHERE "caseId" = %(caseId)s ORDER BY "timestamp" ASC',
-        {"caseId": case_id}
-    )
-    evidence_rows = fetch_all(
-        'SELECT type, description FROM "Evidence" WHERE "caseId" = %(caseId)s ORDER BY "timestamp" ASC',
-        {"caseId": case_id}
-    )
-
-    diary_text = "\n".join(f"- [{d['timestamp'].strftime('%Y-%m-%d')}] {d['activityType']}: {d['narrative']}" for d in diary_rows) or "No diary entries."
-    evidence_text = "\n".join(f"- {e['type']}: {e['description']}" for e in evidence_rows) or "No evidence logged."
-
-    user_prompt = f'''
-FIR NUMBER: {case_data["firNumber"]}
-CRIME TYPE: {case_data["crimeType"]}
-INCIDENT DATE: {case_data["incidentDate"]}
-ACCUSED: {accused_list or "None listed"}
-VICTIM: {victim_list or "None listed"}
-SUMMARY: {case_data.get("summary") or "No summary available"}
-RAW TEXT: {case_data.get("rawExtractedText") or "N/A"}
-
-CASE DIARY (Investigation Log):
-{diary_text}
-
-EVIDENCE REGISTRY:
-{evidence_text}
-'''
-
-    chargesheet_markdown = await chat_completion(
-        [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.2,
-    )
-    if isinstance(chargesheet_markdown, dict):
-        chargesheet_markdown = chargesheet_markdown.get("content") or "Failed to generate chargesheet."
-
-    if chargesheet_markdown:
-        execute(
-            'UPDATE "Case" SET "chargesheetDraft" = %(draft)s WHERE id = %(id)s',
-            {"draft": chargesheet_markdown, "id": case_id},
-        )
-
     return chargesheet_markdown
 
 

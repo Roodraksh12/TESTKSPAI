@@ -26,11 +26,18 @@ class Settings(BaseSettings):
     bootstrap_badge_id: str = Field(default="KA-IT-0001", alias="BOOTSTRAP_BADGE_ID")
     bootstrap_password: str = Field(default="demo1234", alias="BOOTSTRAP_PASSWORD")
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # A developer-only .env.test can override .env for this clone without ever
+    # replacing the shared environment file. Both names are gitignored.
+    model_config = SettingsConfigDict(env_file=(".env", ".env.test"), env_file_encoding="utf-8", extra="ignore")
 
     @property
     def jwt_secret(self) -> str:
-        return self.supabase_jwt_secret or "change-me"
+        secret = self.supabase_jwt_secret.strip()
+        if not secret:
+            raise RuntimeError(
+                "SUPABASE_JWT_SECRET is required; refusing to sign tokens with an insecure default"
+            )
+        return secret
 
     @property
     def allowed_origin_list(self) -> list[str]:

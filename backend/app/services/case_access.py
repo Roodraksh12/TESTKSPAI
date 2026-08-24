@@ -272,6 +272,13 @@ def require_case_write(officer: dict[str, Any]) -> None:
         raise HTTPException(status_code=403, detail="Your role cannot create or modify cases")
 
 
+def require_fir_upload(officer: dict[str, Any]) -> None:
+    from fastapi import HTTPException
+
+    if not platform_capabilities(officer).get("canUploadFir"):
+        raise HTTPException(status_code=403, detail="Your role cannot upload or draft FIRs")
+
+
 def get_case_with_relations(case_id: str, officer: dict[str, Any]) -> dict[str, Any] | None:
     scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
     case_row = fetch_one(

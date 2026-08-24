@@ -3,8 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { apiRequest } from "@/api/client";
 import { CaseCard } from "@/components/scrb/case-ledger";
 import { CasesFilter } from "@/components/scrb/cases-filter";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Cases() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [cases, setCases] = useState<any[]>([]);
   const [stations, setStations] = useState<{ id: string; name: string }[]>([]);
@@ -18,6 +20,10 @@ export default function Cases() {
   const q = searchParams.get("q") || "";
 
   useEffect(() => {
+    // ProtectedRoute normally guarantees this, but the guard also prevents a
+    // request from being made while a restored session is still being checked.
+    if (!user?.id) return;
+
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -30,7 +36,10 @@ export default function Cases() {
     if (q) params.set("q", q);
     const query = params.toString();
 
-    apiRequest(`/api/cases${query ? `?${query}` : ""}`, { signal: controller.signal })
+    apiRequest(`/api/cases${query ? `?${query}` : ""}`, {
+      signal: controller.signal,
+      fresh: true,
+    })
       .then((payload) => {
         setCases(payload.cases || []);
         setStations(payload.stations || []);
@@ -44,7 +53,7 @@ export default function Cases() {
       });
 
     return () => controller.abort();
-  }, [crimeType, stationId, status, date, q]);
+  }, [crimeType, stationId, status, date, q, user?.id]);
 
   return (
     <div className="flex h-full flex-col gap-6">

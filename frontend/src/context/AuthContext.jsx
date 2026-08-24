@@ -20,14 +20,17 @@ export function AuthProvider({ children }) {
     const stored = getStoredUser()
 
     if (!stored || !getToken()) {
+      setUser(null)
       setLoading(false)
       return
     }
 
-    setUser(stored)
-    setLoading(false)
-
-    apiRequest("/api/auth/me")
+    // The persisted profile is only a display cache.  Do not render protected
+    // routes from it until the token has been verified by the API; otherwise a
+    // user who switches accounts can briefly (or after a reload) see data and
+    // navigation intended for the previous account.
+    setLoading(true)
+    apiRequest("/api/auth/me", { fresh: true })
       .then((data) => {
         if (cancelled || !data?.user) return
         localStorage.setItem(USER_KEY, JSON.stringify(data.user))
@@ -39,7 +42,14 @@ export function AuthProvider({ children }) {
         if (err?.status === 401) {
           clearAuthStorage()
           setUser(null)
+          return
         }
+        // Preserve the last confirmed profile only for a transient network
+        // failure. An explicit authentication failure always signs out.
+        setUser(stored)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
 
     return () => {

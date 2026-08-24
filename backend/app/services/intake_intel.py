@@ -821,6 +821,8 @@ def update_match_status(
     match_id: str,
     status: str,
     officer: dict[str, Any],
+    *,
+    case_id: str | None = None,
 ) -> dict[str, Any]:
     match = fetch_one(
         '''
@@ -828,8 +830,9 @@ def update_match_status(
         FROM "CaseMatch" cm
         JOIN "Case" c ON cm."caseId" = c.id
         WHERE cm.id = %(id)s
+          AND (%(caseId)s IS NULL OR cm."caseId" = %(caseId)s)
         ''',
-        {"id": match_id},
+        {"id": match_id, "caseId": case_id},
     )
     if not match:
         return {"error": "Match not found"}

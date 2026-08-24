@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.deps import get_current_user
 from app.services import intake_intel
-from app.services.case_access import create_audit_log, require_case_write
+from app.services.case_access import create_audit_log, require_case_write, require_fir_upload
 from app.services.job_store import fir_jobs
 from app.services.openrouter import chat_completion
 
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/api/fir", tags=["fir"])
 # handwritten entries are in Kannada, the rest in English. Asking Tesseract for
 # both scripts in one pass recognises far more than English alone.
 OCR_LANGS = "eng+kan"
+MAX_FIR_UPLOAD_BYTES = 20 * 1024 * 1024
 
 # pytesseract is only a wrapper around the `tesseract` CLI; the pip install does
 # not bring the binary. Without it every upload died as an unhandled 500, which
@@ -233,11 +234,15 @@ async def upload_fir(
     The heavy work runs after the response is sent, so the officer can navigate
     away, keep working, or queue another scan without losing this one.
     """
-    content = await file.read()
-    content_type = file.content_type or ""
-    filename = file.filename or "scan"
     officer = current_user["officer"]
     require_case_write(officer)
+    require_fir_upload(officer)
+
+    content = await file.read(MAX_FIR_UPLOAD_BYTES + 1)
+    if len(content) > MAX_FIR_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="FIR scans must be 20 MB or smaller.")
+    content_type = file.content_type or ""
+    filename = file.filename or "scan"
 
     if not (content_type.startswith("image/") or content_type == "application/pdf"):
         raise HTTPException(status_code=415, detail="Only image or PDF FIR scans are supported.")

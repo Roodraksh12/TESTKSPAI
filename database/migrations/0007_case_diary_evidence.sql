@@ -10,7 +10,16 @@ END$$;
 
 -- 2. Add currentIoId to Case
 ALTER TABLE "Case" ADD COLUMN IF NOT EXISTS "currentIoId" text;
-ALTER TABLE "Case" ADD CONSTRAINT "Case_currentIoId_fkey" FOREIGN KEY ("currentIoId") REFERENCES "Officer"(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'Case_currentIoId_fkey'
+    ) THEN
+        ALTER TABLE "Case"
+        ADD CONSTRAINT "Case_currentIoId_fkey"
+        FOREIGN KEY ("currentIoId") REFERENCES "Officer"(id) ON DELETE SET NULL;
+    END IF;
+END$$;
 
 -- 3. Add custodyStartDate to Person
 ALTER TABLE "Person" ADD COLUMN IF NOT EXISTS "custodyStartDate" timestamp(3) without time zone;

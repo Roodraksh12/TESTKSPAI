@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.case_access import jurisdiction_filter_sql, require_case_write
+from app.services.case_access import jurisdiction_filter_sql, require_case_write, require_fir_upload
 from app.services.hierarchy import (
     platform_capabilities,
     required_geo_fields,
@@ -97,6 +97,16 @@ def test_require_case_write_blocks_it() -> None:
     with pytest.raises(HTTPException) as exc:
         require_case_write({"role": "POLICE_IT"})
     assert exc.value.status_code == 403
+
+
+def test_fir_upload_capability_is_enforced() -> None:
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc:
+        require_fir_upload({"role": "CONSTABLE"})
+    assert exc.value.status_code == 403
+
+    require_fir_upload({"role": "SI"})
 
 
 @pytest.fixture(scope="module")

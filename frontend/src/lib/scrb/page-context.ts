@@ -33,11 +33,9 @@ export function usePageContext(): PageContext {
   const caseId = params.id ?? null;
 
   if (pathname.startsWith("/cases/") && caseId) {
-    const leaf = pathname.endsWith("/tactical")
-      ? "the tactical intelligence view"
-      : pathname.endsWith("/chargesheet")
-        ? "the charge sheet draft"
-        : "the case dossier";
+    const leaf = pathname.endsWith("/chargesheet")
+      ? "the charge sheet draft"
+      : "the case dossier";
     return {
       description: `The officer is viewing ${leaf} for case ${caseId}. Questions about "this case" or "this FIR" refer to it.`,
       activeCaseId: caseId,

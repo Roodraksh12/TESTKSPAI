@@ -2,6 +2,7 @@
 node_modules/
 frontend/node_modules/
 backend/.venv/
+backend/uploads/
 **/__pycache__/
 **/*.py[cod]
 *$py.class
@@ -41,6 +42,8 @@ frontend/dist/
 frontend/.vite/
 /build
 /out
+/output/
+/tmp/
 .next/
 
 # Logs / debug

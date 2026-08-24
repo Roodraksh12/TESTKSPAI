@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import os
-import shutil
-from datetime import datetime, timezone
+import html
+import io
+import logging
+from datetime import date, datetime, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-import io
 try:
     from reportlab.lib.pagesizes import letter
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
@@ -17,10 +20,16 @@ except ImportError:
     HAS_REPORTLAB = False
 
 from app.deps import get_current_user
-from app.services.case_access import require_case_write, get_case_with_relations, create_audit_log
-from app.services.db import execute, execute_returning, fetch_all, fetch_one, new_id, fetch_scalar
+from app.services.case_access import (
+    create_audit_log,
+    get_case_with_relations,
+    load_officer_by_id,
+    require_case_write,
+)
+from app.services.db import execute, fetch_all, fetch_one, new_id, fetch_scalar
 
 router = APIRouter(prefix="/api/cases/{case_id}/diary", tags=["case_diary"])
+logger = logging.getLogger(__name__)
 
 
 class DiaryEntryRequest(BaseModel):
@@ -35,9 +44,55 @@ class DiaryEntryRequest(BaseModel):
 class IOUpdateRequest(BaseModel):
     newIoId: str
 
-# Config for uploads
-UPLOAD_DIR = "uploads/documents"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Resolve from the backend directory so the process working directory cannot
+# scatter sensitive uploads elsewhere in the repository.
+UPLOAD_DIR = Path(__file__).resolve().parents[2] / "uploads" / "documents"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+DIARY_TIMEZONE = ZoneInfo("Asia/Kolkata")
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Normalize client/API values to the UTC instants stored in the database."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _stored_utc_timestamp(value: datetime) -> datetime:
+    """Return the UTC wall-clock value for the legacy timestamp-without-TZ column."""
+    return _as_utc(value).replace(tzinfo=None)
+
+
+def _diary_date_for(value: datetime) -> date:
+    """Karnataka calendar day for an instant stored as UTC."""
+    return _as_utc(value).astimezone(DIARY_TIMEZONE).date()
+
+
+def _diary_date_sql(column: str) -> str:
+    """SQL expression for a UTC timestamp-without-TZ rendered in Karnataka time."""
+    return f"(({column} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::date"
+
+
+def _reindex_diary_date(case_id: str, diary_date: date) -> None:
+    """Keep legacy pageNumber aligned with chronological pages for one diary day."""
+    local_date = _diary_date_sql('de.timestamp')
+    execute(
+        f'''
+        WITH numbered AS (
+            SELECT de.id,
+                   ROW_NUMBER() OVER (ORDER BY de.timestamp ASC, de.id ASC)::int AS page_number
+            FROM "CaseDiaryEntry" de
+            WHERE de."caseId" = %(case_id)s
+              AND {local_date} = %(diary_date)s
+        )
+        UPDATE "CaseDiaryEntry" de
+        SET "pageNumber" = numbered.page_number
+        FROM numbered
+        WHERE de.id = numbered.id
+        ''',
+        {"case_id": case_id, "diary_date": diary_date},
+    )
 
 
 @router.get("")
@@ -48,10 +103,16 @@ def list_diary_entries(case_id: str, current_user: dict = Depends(get_current_us
         if not case:
             raise HTTPException(status_code=404, detail="Case not found or access denied")
 
+        local_date = _diary_date_sql('de.timestamp')
         entries = fetch_all(
             '''
             SELECT
                 de.id, de."pageNumber", de."authorId", de."activityType", de.narrative, de.timestamp, de."updatedAt",
+                ''' + local_date + ''' AS "diaryDate",
+                ROW_NUMBER() OVER (
+                    PARTITION BY ''' + local_date + '''
+                    ORDER BY de.timestamp ASC, de.id ASC
+                )::int AS "dailyPageNumber",
                 o.name AS author_name, o."badgeId" AS author_badge,
                 (SELECT json_agg(json_build_object('id', e.id, 'type', e.type, 'description', e.description))
                  FROM "DiaryEntryEvidence" dee
@@ -67,7 +128,7 @@ def list_diary_entries(case_id: str, current_user: dict = Depends(get_current_us
             FROM "CaseDiaryEntry" de
             JOIN "Officer" o ON de."authorId" = o.id
             WHERE de."caseId" = %(case_id)s
-            ORDER BY de.timestamp ASC, de."pageNumber" ASC
+            ORDER BY "diaryDate" DESC, "dailyPageNumber" ASC
             ''',
             {"case_id": case_id}
         )
@@ -104,10 +165,9 @@ def list_diary_entries(case_id: str, current_user: dict = Depends(get_current_us
         }
     except HTTPException:
         raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        logger.exception("Failed to load case diary", exc_info=exc)
+        raise HTTPException(status_code=500, detail="Failed to load case diary") from exc
 
 
 @router.post("")
@@ -126,20 +186,9 @@ def add_diary_entry(
         raise HTTPException(status_code=403, detail="Only the assigned Investigating Officer can add diary entries.")
 
     entry_id = new_id()
-    now = payload.timestamp if payload.timestamp else datetime.now(timezone.utc)
+    now = _stored_utc_timestamp(payload.timestamp or datetime.now(timezone.utc))
     created_at = datetime.now(timezone.utc)
-
-    # Get max page number for this case on this specific date
-    max_page = fetch_scalar(
-        '''
-        SELECT COALESCE(MAX("pageNumber"), 0) 
-        FROM "CaseDiaryEntry" 
-        WHERE "caseId" = %(case_id)s 
-          AND CAST(timestamp AS DATE) = CAST(%(now)s AS DATE)
-        ''',
-        {"case_id": case_id, "now": now}
-    )
-    new_page = (max_page or 0) + 1
+    diary_date = _diary_date_for(now)
 
     execute(
         '''
@@ -149,7 +198,7 @@ def add_diary_entry(
         {
             "id": entry_id,
             "case_id": case_id,
-            "page_number": new_page,
+            "page_number": 0,
             "author_id": officer["id"],
             "activity_type": payload.activityType,
             "narrative": payload.narrative,
@@ -158,25 +207,41 @@ def add_diary_entry(
         }
     )
 
+    _reindex_diary_date(case_id, diary_date)
+    new_page = fetch_scalar(
+        'SELECT "pageNumber" FROM "CaseDiaryEntry" WHERE id = %(id)s',
+        {"id": entry_id},
+    )
+
     # Link Evidence
     for ev_id in payload.linkedEvidenceIds:
         execute(
-            'INSERT INTO "DiaryEntryEvidence" ("diaryEntryId", "evidenceId") VALUES (%(diary_id)s, %(ev_id)s) ON CONFLICT DO NOTHING',
-            {"diary_id": entry_id, "ev_id": ev_id}
+            '''
+            INSERT INTO "DiaryEntryEvidence" ("diaryEntryId", "evidenceId")
+            SELECT %(diary_id)s, e.id FROM "Evidence" e
+            WHERE e.id = %(ev_id)s AND e."caseId" = %(case_id)s
+            ON CONFLICT DO NOTHING
+            ''',
+            {"diary_id": entry_id, "ev_id": ev_id, "case_id": case_id}
         )
 
     # Link Persons
     for person_id in payload.linkedPersonIds:
         execute(
-            'INSERT INTO "DiaryEntryPerson" ("diaryEntryId", "personId") VALUES (%(diary_id)s, %(person_id)s) ON CONFLICT DO NOTHING',
-            {"diary_id": entry_id, "person_id": person_id}
+            '''
+            INSERT INTO "DiaryEntryPerson" ("diaryEntryId", "personId")
+            SELECT %(diary_id)s, cp."personId" FROM "CasePerson" cp
+            WHERE cp."personId" = %(person_id)s AND cp."caseId" = %(case_id)s
+            ON CONFLICT DO NOTHING
+            ''',
+            {"diary_id": entry_id, "person_id": person_id, "case_id": case_id}
         )
 
     # Link Documents
     for doc_id in payload.documentIds:
         execute(
-            'UPDATE "Document" SET "diaryEntryId" = %(diary_id)s WHERE id = %(doc_id)s',
-            {"diary_id": entry_id, "doc_id": doc_id}
+            'UPDATE "Document" SET "diaryEntryId" = %(diary_id)s WHERE id = %(doc_id)s AND "caseId" = %(case_id)s',
+            {"diary_id": entry_id, "doc_id": doc_id, "case_id": case_id}
         )
 
     create_audit_log(officer["id"], "ADD_DIARY_ENTRY", "CASE", case_id, f"Added diary entry pg {new_page}")
@@ -198,13 +263,17 @@ async def upload_document(
     if case.get("currentIoId") and case["currentIoId"] != officer["id"]:
         raise HTTPException(status_code=403, detail="Only the assigned Investigating Officer can upload documents.")
 
+    content = await file.read(MAX_DOCUMENT_BYTES + 1)
+    if len(content) > MAX_DOCUMENT_BYTES:
+        raise HTTPException(status_code=413, detail="Documents must be 20 MB or smaller.")
+    if not content:
+        raise HTTPException(status_code=400, detail="Document is empty.")
+
     doc_id = new_id()
-    # Save the file locally
-    file_extension = os.path.splitext(file.filename)[1] if file.filename else ""
-    local_path = os.path.join(UPLOAD_DIR, f"{doc_id}{file_extension}")
-    
-    with open(local_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    safe_name = Path(file.filename or "Unnamed Document").name
+    file_extension = Path(safe_name).suffix[:16]
+    local_path = UPLOAD_DIR / f"{doc_id}{file_extension}"
+    local_path.write_bytes(content)
 
     # Insert into database
     execute(
@@ -215,15 +284,15 @@ async def upload_document(
         {
             "id": doc_id,
             "case_id": case_id,
-            "name": file.filename or "Unnamed Document",
-            "path": local_path,
+            "name": safe_name,
+            "path": str(local_path),
             "now": datetime.now(timezone.utc)
         }
     )
     
-    create_audit_log(officer["id"], "UPLOAD_DOCUMENT", "CASE", case_id, f"Uploaded document: {file.filename}")
+    create_audit_log(officer["id"], "UPLOAD_DOCUMENT", "CASE", case_id, f"Uploaded document: {safe_name}")
 
-    return {"success": True, "documentId": doc_id, "name": file.filename, "path": local_path}
+    return {"success": True, "documentId": doc_id, "name": safe_name}
 
 
 @router.put("/io")
@@ -237,6 +306,18 @@ def update_current_io(
     case = get_case_with_relations(case_id, officer)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found or access denied")
+
+    target = load_officer_by_id(payload.newIoId)
+    if (
+        not target
+        or target.get("status") == "DISABLED"
+        or not target.get("stationId")
+        or target.get("stationId") != case.get("stationId")
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Investigating Officer must be an active officer from the case station.",
+        )
 
     execute(
         'UPDATE "Case" SET "currentIoId" = %(new_io)s WHERE id = %(case_id)s',
@@ -267,7 +348,8 @@ def update_diary_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Diary entry not found")
 
-    now = payload.timestamp if payload.timestamp else datetime.now(timezone.utc)
+    old_timestamp = entry["timestamp"]
+    now = _stored_utc_timestamp(payload.timestamp or datetime.now(timezone.utc))
     updated_at = datetime.now(timezone.utc)
 
     execute(
@@ -288,11 +370,14 @@ def update_diary_entry(
         }
     )
 
+    _reindex_diary_date(case_id, _diary_date_for(old_timestamp))
+    _reindex_diary_date(case_id, _diary_date_for(now))
+
     if payload.documentIds:
         for doc_id in payload.documentIds:
             execute(
-                'UPDATE "Document" SET "diaryEntryId" = %(diary_id)s WHERE id = %(doc_id)s',
-                {"diary_id": entry_id, "doc_id": doc_id}
+                'UPDATE "Document" SET "diaryEntryId" = %(diary_id)s WHERE id = %(doc_id)s AND "caseId" = %(case_id)s',
+                {"diary_id": entry_id, "doc_id": doc_id, "case_id": case_id}
             )
 
     create_audit_log(officer["id"], "UPDATE_DIARY_ENTRY", "CASE", case_id, f"Updated diary entry pg {entry['pageNumber']}")
@@ -318,19 +403,19 @@ def delete_diary_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Diary entry not found")
 
+    diary_date = _diary_date_for(entry["timestamp"])
     execute('DELETE FROM "CaseDiaryEntry" WHERE id = %(id)s', {"id": entry_id})
+    _reindex_diary_date(case_id, diary_date)
 
     create_audit_log(officer["id"], "DELETE_DIARY_ENTRY", "CASE", case_id, f"Deleted diary entry pg {entry['pageNumber']}")
 
     return {"success": True}
 
-from typing import Optional
-
 @router.get("/export")
 def export_case_diary_pdf(
     case_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     current_user: dict = Depends(get_current_user)
 ):
     if not HAS_REPORTLAB:
@@ -341,9 +426,18 @@ def export_case_diary_pdf(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found or access denied")
 
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=400, detail="Start date must be on or before end date.")
+
+    local_date = _diary_date_sql('de.timestamp')
     query = '''
         SELECT
             de.id, de."pageNumber", de."authorId", de."activityType", de.narrative, de.timestamp, de."updatedAt",
+            ''' + local_date + ''' AS "diaryDate",
+            ROW_NUMBER() OVER (
+                PARTITION BY ''' + local_date + '''
+                ORDER BY de.timestamp ASC, de.id ASC
+            )::int AS "dailyPageNumber",
             o.name AS author_name, o."badgeId" AS author_badge
         FROM "CaseDiaryEntry" de
         JOIN "Officer" o ON de."authorId" = o.id
@@ -352,13 +446,13 @@ def export_case_diary_pdf(
     params = {"case_id": case_id}
 
     if start_date:
-        query += " AND CAST(de.timestamp AS DATE) >= CAST(%(start_date)s AS DATE)"
+        query += f" AND {local_date} >= %(start_date)s"
         params["start_date"] = start_date
     if end_date:
-        query += " AND CAST(de.timestamp AS DATE) <= CAST(%(end_date)s AS DATE)"
+        query += f" AND {local_date} <= %(end_date)s"
         params["end_date"] = end_date
 
-    query += ' ORDER BY de.timestamp ASC, de."pageNumber" ASC'
+    query += ' ORDER BY "diaryDate" ASC, "dailyPageNumber" ASC'
     
     entries = fetch_all(query, params)
 
@@ -370,28 +464,38 @@ def export_case_diary_pdf(
     
     elements = []
     
-    elements.append(Paragraph(f"Case Diary - {case['title']}", styles['Title']))
-    elements.append(Paragraph(f"FIR Number: {case['firNumber']}", styles['Center']))
+    elements.append(Paragraph(f"Case Diary - {html.escape(str(case['firNumber']))}", styles['Title']))
+    elements.append(
+        Paragraph(
+            f"Crime Type: {html.escape(str(case.get('crimeType') or 'Unknown'))}",
+            styles['Center'],
+        )
+    )
     elements.append(Spacer(1, 24))
 
     # Group entries by date
-    current_date_str = None
+    current_diary_date = None
     
     for entry in entries:
+        diary_day = entry["diaryDate"]
+        if isinstance(diary_day, str):
+            diary_day = date.fromisoformat(diary_day)
+        date_str = diary_day.strftime("%B %d, %Y")
+        if diary_day != current_diary_date:
+            elements.append(Spacer(1, 12))
+            elements.append(Paragraph(date_str, styles['Heading2']))
+            current_diary_date = diary_day
+
         dt = entry["timestamp"]
         if isinstance(dt, str):
             dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
-        
-        # Localize or format date
-        date_str = dt.strftime("%B %d, %Y")
-        
-        if date_str != current_date_str:
-            elements.append(Spacer(1, 12))
-            elements.append(Paragraph(date_str, styles['Heading2']))
-            current_date_str = date_str
-            
-        time_str = dt.strftime("%H:%M")
-        header_text = f"<b>{time_str}</b> - Page {entry['pageNumber']} - <i>{entry['activityType']}</i> by {entry['author_name']} ({entry['author_badge']})"
+        time_str = _as_utc(dt).astimezone(DIARY_TIMEZONE).strftime("%H:%M")
+        header_text = (
+            f"<b>{time_str}</b> - Page {entry['dailyPageNumber']} - "
+            f"<i>{html.escape(str(entry['activityType']))}</i> by "
+            f"{html.escape(str(entry['author_name']))} "
+            f"({html.escape(str(entry['author_badge']))})"
+        )
         elements.append(Paragraph(header_text, styles['Normal']))
         elements.append(Spacer(1, 6))
         
@@ -399,7 +503,7 @@ def export_case_diary_pdf(
         paragraphs = entry["narrative"].split('\n')
         for p in paragraphs:
             if p.strip():
-                elements.append(Paragraph(p.strip(), styles['Normal']))
+                elements.append(Paragraph(html.escape(p.strip()), styles['Normal']))
         
         elements.append(Spacer(1, 12))
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.config import Settings, get_settings
@@ -16,6 +16,7 @@ from app.services.case_access import (
 from app.services.db import execute, fetch_all, fetch_one, fetch_scalar, new_id
 from app.services.mailer import send_email
 from app.services.passwords import hash_password
+from app.services.auth_rate_limit import login_attempts
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -35,9 +36,24 @@ class ForgotPasswordRequest(BaseModel):
 
 
 @router.post("/login")
-def login(payload: LoginRequest, settings: Settings = Depends(get_settings)) -> dict:
-    officer = load_officer_by_badge(payload.badgeId.strip())
+def login(
+    payload: LoginRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    badge_id = payload.badgeId.strip()
+    client_ip = request.client.host if request.client else "unknown"
+    retry_after = login_attempts.retry_after(badge_id, client_ip)
+    if retry_after:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed sign-in attempts. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    officer = load_officer_by_badge(badge_id)
     if not officer or not verify_password(payload.password, officer["passwordHash"]):
+        login_attempts.record_failure(badge_id, client_ip)
         raise HTTPException(status_code=401, detail="Invalid badge ID or password")
 
     status_val = officer.get("status") or "ACTIVE"
@@ -45,6 +61,8 @@ def login(payload: LoginRequest, settings: Settings = Depends(get_settings)) -> 
         raise HTTPException(status_code=403, detail="Account disabled")
     if status_val == "PENDING_INVITE":
         raise HTTPException(status_code=403, detail="Invitation not activated")
+
+    login_attempts.record_success(badge_id)
 
     must_change = status_val == "MUST_CHANGE_PASSWORD"
     token = create_access_token(officer, settings, pwd_change_only=must_change)

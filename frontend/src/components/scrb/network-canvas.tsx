@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import { useTheme } from "next-themes";
-import { Car, User, MapPin, FileText, Crosshair } from "lucide-react";
+import { Car, User, MapPin, FileText, Crosshair, Maximize2, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { GraphEdge, NodeKind, PositionedNode } from "@/lib/scrb/graph-view";
 
@@ -21,6 +21,24 @@ const PATH_COLOR = "#3D7C88";
 const VB = { w: 1000, h: 620 };
 const toX = (pct: number) => (pct / 100) * VB.w;
 const toY = (pct: number) => (pct / 100) * VB.h;
+
+const MIN_ZOOM = 0.55;
+const MAX_ZOOM = 3;
+const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 };
+
+type CanvasPoint = { x: number; y: number };
+
+function clampZoom(value: number) {
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
+}
+
+function distanceBetween(a: CanvasPoint, b: CanvasPoint) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function midpointBetween(a: CanvasPoint, b: CanvasPoint): CanvasPoint {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
 
 export function NetworkCanvas({
   positioned,
@@ -48,30 +66,158 @@ export function NetworkCanvas({
 }) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [viewport, setViewport] = useState(DEFAULT_VIEWPORT);
+  const [isPanning, setIsPanning] = useState(false);
+  const pointers = useRef(new Map<number, CanvasPoint>());
+  const drag = useRef<{ pointerId: number; point: CanvasPoint } | null>(null);
+  const pinch = useRef<{ distance: number; midpoint: CanvasPoint; viewport: typeof DEFAULT_VIEWPORT } | null>(null);
+  const suppressNextNodeClick = useRef(false);
   useEffect(() => setMounted(true), []);
   const isDark = mounted && resolvedTheme === "dark";
 
   const posById = new Map(positioned.map((n) => [n.id, n]));
+  // Dense graphs start clean, then reveal labels as an officer zooms in.
+  const showNodeLabels = positioned.length <= 12 || Boolean(pathIds) || viewport.zoom >= 1.45;
+
+  const pointForEvent = (event: ReactPointerEvent<HTMLDivElement> | ReactWheelEvent<HTMLDivElement>): CanvasPoint => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return {
+      x: event.clientX - bounds.left - bounds.width / 2,
+      y: event.clientY - bounds.top - bounds.height / 2,
+    };
+  };
+
+  const zoomAt = useCallback((nextZoom: number | ((currentZoom: number) => number), point: CanvasPoint) => {
+    setViewport((current) => {
+      const zoom = clampZoom(typeof nextZoom === "function" ? nextZoom(current.zoom) : nextZoom);
+      if (zoom === current.zoom) return current;
+      const scaleRatio = zoom / current.zoom;
+      // Keep the entity beneath the pointer fixed while zooming, as on a map.
+      return {
+        zoom,
+        x: point.x - (point.x - current.x) * scaleRatio,
+        y: point.y - (point.y - current.y) * scaleRatio,
+      };
+    });
+  }, []);
+
+  const onWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    zoomAt((currentZoom) => currentZoom * Math.exp(-event.deltaY * 0.0015), pointForEvent(event));
+  };
+
+  const beginPinch = () => {
+    const activePointers = [...pointers.current.values()];
+    if (activePointers.length < 2) return;
+    const [first, second] = activePointers;
+    pinch.current = {
+      distance: distanceBetween(first, second) || 1,
+      midpoint: midpointBetween(first, second),
+      viewport,
+    };
+    drag.current = null;
+    setIsPanning(true);
+  };
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if ((event.target as Element).closest("[data-network-controls]")) return;
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = pointForEvent(event);
+    pointers.current.set(event.pointerId, point);
+    if (pointers.current.size >= 2) {
+      beginPinch();
+      return;
+    }
+    drag.current = { pointerId: event.pointerId, point };
+    suppressNextNodeClick.current = false;
+    setIsPanning(true);
+  };
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pointers.current.has(event.pointerId)) return;
+    const point = pointForEvent(event);
+    pointers.current.set(event.pointerId, point);
+
+    if (pointers.current.size >= 2 && pinch.current) {
+      const [first, second] = [...pointers.current.values()];
+      const nextDistance = distanceBetween(first, second) || 1;
+      const nextMidpoint = midpointBetween(first, second);
+      const nextZoom = clampZoom(pinch.current.viewport.zoom * (nextDistance / pinch.current.distance));
+      const scaleRatio = nextZoom / pinch.current.viewport.zoom;
+      setViewport({
+        zoom: nextZoom,
+        x: nextMidpoint.x - (pinch.current.midpoint.x - pinch.current.viewport.x) * scaleRatio,
+        y: nextMidpoint.y - (pinch.current.midpoint.y - pinch.current.viewport.y) * scaleRatio,
+      });
+      suppressNextNodeClick.current = true;
+      return;
+    }
+
+    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+    const deltaX = point.x - drag.current.point.x;
+    const deltaY = point.y - drag.current.point.y;
+    if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) suppressNextNodeClick.current = true;
+    drag.current.point = point;
+    if (deltaX || deltaY) {
+      setViewport((current) => ({ ...current, x: current.x + deltaX, y: current.y + deltaY }));
+    }
+  };
+
+  const endPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size >= 2) {
+      beginPinch();
+      return;
+    }
+    pinch.current = null;
+    const [remainingId, remainingPoint] = [...pointers.current.entries()][0] || [];
+    drag.current = remainingId !== undefined && remainingPoint ? { pointerId: remainingId, point: remainingPoint } : null;
+    setIsPanning(pointers.current.size > 0);
+  };
+
+  const handleNodeClick = (id: string) => {
+    if (suppressNextNodeClick.current) {
+      suppressNextNodeClick.current = false;
+      return;
+    }
+    onNodeClick(id);
+  };
 
   return (
-    <>
-      {/* dotted grid */}
-      <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-60 text-foreground" aria-hidden>
-        <defs>
-          <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="1" fill="currentColor" fillOpacity="0.1" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#dots)" />
-      </svg>
+    <div
+      className={cn("absolute inset-0 touch-none select-none", isPanning ? "cursor-grabbing" : "cursor-grab")}
+      onWheel={onWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endPointer}
+      onPointerCancel={endPointer}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+          transformOrigin: "center center",
+        }}
+      >
+        {/* The grid moves with the graph, making position changes easy to read. */}
+        <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-60 text-foreground" aria-hidden>
+          <defs>
+            <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="1" fill="currentColor" fillOpacity="0.1" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#dots)" />
+        </svg>
 
-      {positioned.length === 0 ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-6">
-          <Crosshair className="h-6 w-6 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">{emptyHint}</p>
-        </div>
-      ) : (
-        <>
+        {positioned.length === 0 ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-6">
+            <Crosshair className="h-6 w-6 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">{emptyHint}</p>
+          </div>
+        ) : (
+          <>
           <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${VB.w} ${VB.h}`} preserveAspectRatio="xMidYMid meet">
             <g>
               {visibleEdges.map((e, i) => {
@@ -91,6 +237,9 @@ export function NetworkCanvas({
                 const onPath = pathEdgeSet?.has(key);
                 const dimmed = focusId ? !(e.from === focusId || e.to === focusId) : false;
                 const active = onPath ? true : !dimmed;
+                const isContext = e.category === "context";
+                const isLead = e.category === "lead";
+                const showEdgeLabel = Boolean(onPath) || (positioned.length <= 6 && !isContext && !isLead);
                 return (
                   <g key={`${key}-${i}`} style={{ transition: "opacity 0.3s" }} className="text-foreground">
                     <path
@@ -98,22 +247,25 @@ export function NetworkCanvas({
                       d={path}
                       fill="none"
                       stroke={onPath ? PATH_COLOR : "currentColor"}
-                      strokeOpacity={onPath ? 0.9 : active ? 0.35 : 0.12}
-                      strokeWidth={onPath ? 3 : active ? 1.4 : 1}
+                      strokeOpacity={onPath ? 0.9 : isContext || isLead ? (active ? 0.18 : 0.08) : active ? 0.42 : 0.12}
+                      strokeWidth={onPath ? 3 : isContext || isLead ? 1 : active ? 1.4 : 1}
                       strokeLinecap="round"
+                      strokeDasharray={isContext || isLead ? "4 4" : undefined}
                     />
-                    <text
-                      fontSize="10"
-                      fill={onPath ? PATH_COLOR : "currentColor"}
-                      className="text-mono"
-                      style={{ opacity: onPath ? 1 : active ? 0.7 : 0.2 }}
-                      textAnchor="middle"
-                      dy="-4"
-                    >
-                      <textPath href={`#edge-${i}`} startOffset="50%">
-                        {e.label}
-                      </textPath>
-                    </text>
+                    {showEdgeLabel && (
+                      <text
+                        fontSize="10"
+                        fill={onPath ? PATH_COLOR : "currentColor"}
+                        className="text-mono"
+                        style={{ opacity: onPath ? 1 : active ? 0.7 : 0.2 }}
+                        textAnchor="middle"
+                        dy="-4"
+                      >
+                        <textPath href={`#edge-${i}`} startOffset="50%">
+                          {e.label}
+                        </textPath>
+                      </text>
+                    )}
                   </g>
                 );
               })}
@@ -129,6 +281,7 @@ export function NetworkCanvas({
                 return (
                   <g
                     key={n.id}
+                    data-network-node="true"
                     transform={`translate(${toX(n.x)} ${toY(n.y)})`}
                     style={{
                       cursor: "pointer",
@@ -137,7 +290,7 @@ export function NetworkCanvas({
                     }}
                     onMouseEnter={() => onNodeHover(n.id)}
                     onMouseLeave={() => onNodeHover(null)}
-                    onClick={() => onNodeClick(n.id)}
+                    onClick={() => handleNodeClick(n.id)}
                   >
                     {(isFocus || onPath) && (
                       <circle r={r + 14} fill={onPath ? PATH_COLOR : s.dot} opacity="0.15">
@@ -162,7 +315,7 @@ export function NetworkCanvas({
           </svg>
 
           {/* HTML label overlays — crisper text than SVG, and they inherit app fonts. */}
-          {positioned.map((n) => {
+          {showNodeLabels && positioned.map((n) => {
             const s = KIND_STYLE[n.kind];
             const Icon = KIND_ICON[n.kind];
             const isFocus = focusId === n.id;
@@ -193,7 +346,56 @@ export function NetworkCanvas({
             );
           })}
         </>
+        )}
+      </div>
+
+      {positioned.length > 0 && (
+        <div
+          data-network-controls
+          className="absolute left-4 top-4 flex items-center gap-1 rounded-xl border border-hairline bg-surface/95 p-1 shadow-sm backdrop-blur"
+          aria-label="Network map controls"
+        >
+          <button
+            type="button"
+            aria-label="Zoom out"
+            title="Zoom out"
+            onClick={() => zoomAt((currentZoom) => currentZoom - 0.2, { x: 0, y: 0 })}
+            disabled={viewport.zoom <= MIN_ZOOM}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <span className="min-w-10 text-center text-mono text-[10px] text-muted-foreground" aria-live="polite">
+            {Math.round(viewport.zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            aria-label="Zoom in"
+            title="Zoom in"
+            onClick={() => zoomAt((currentZoom) => currentZoom + 0.2, { x: 0, y: 0 })}
+            disabled={viewport.zoom >= MAX_ZOOM}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <span className="mx-0.5 h-5 w-px bg-hairline" aria-hidden />
+          <button
+            type="button"
+            aria-label="Fit network to canvas"
+            title="Fit network to canvas"
+            onClick={() => setViewport(DEFAULT_VIEWPORT)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
-    </>
+
+      {positioned.length > 0 && (
+        <p className="pointer-events-none absolute bottom-4 right-4 rounded-lg bg-surface/85 px-2 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+          Scroll to zoom · drag to pan
+        </p>
+      )}
+    </div>
   );
 }

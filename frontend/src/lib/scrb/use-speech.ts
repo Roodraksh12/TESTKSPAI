@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { apiFetchResponse } from "@/api/client";
 
 // Kannada Unicode block: auto-detect so replies in Kannada get a kn-IN voice
 // without the officer having to toggle anything.
@@ -38,33 +39,56 @@ export function isSpeechSupported(): boolean {
 export function useSpeech() {
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   const stop = useCallback(() => {
+    requestRef.current?.abort();
+    requestRef.current = null;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = "";
       audioRef.current = null;
     }
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
     setSpeakingId(null);
   }, []);
 
-  const speak = useCallback((id: string, text: string) => {
+  const speak = useCallback(async (id: string, text: string) => {
     stop();
-    const clean = stripMarkdown(text);
+    const clean = stripMarkdown(text).slice(0, 5000);
     if (!clean) return;
 
     const lang = KANNADA_RANGE.test(clean) ? "kn-IN" : "en-IN";
-
-    const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
-    const audioUrl = `${API_BASE_URL}/api/tts?text=${encodeURIComponent(clean)}&lang=${lang}`;
-    const audio = new Audio(audioUrl);
-
-    audio.onended = () => setSpeakingId((current) => (current === id ? null : current));
-    audio.onerror = () => setSpeakingId((current) => (current === id ? null : current));
-
-    audioRef.current = audio;
+    const controller = new AbortController();
+    requestRef.current = controller;
     setSpeakingId(id);
-    audio.play().catch(console.error);
+
+    try {
+      const response = await apiFetchResponse(
+        "/api/tts",
+        {
+          method: "POST",
+          body: JSON.stringify({ text: clean, lang }),
+          signal: controller.signal,
+        },
+      );
+      if (requestRef.current !== controller) return;
+
+      const objectUrl = URL.createObjectURL(await response.blob());
+      objectUrlRef.current = objectUrl;
+      const audio = new Audio(objectUrl);
+      audio.onended = stop;
+      audio.onerror = stop;
+      audioRef.current = audio;
+      await audio.play();
+    } catch (error) {
+      if (!controller.signal.aborted) console.error(error);
+      if (requestRef.current === controller) stop();
+    }
   }, [stop]);
 
   const toggle = useCallback(

@@ -16,10 +16,17 @@ ROLE_LABEL = {"ACCUSED": "Accused", "VICTIM": "Victim", "WITNESS": "Witness"}
 EMPTY_GRAPH: dict[str, Any] = {
     "nodes": [],
     "edges": [],
+    "leads": [],
     "rings": [],
     "hubs": [],
     "brokers": [],
-    "meta": {"caseCount": 0, "capped": False},
+    "meta": {
+        "caseCount": 0,
+        "capped": False,
+        "sharedEntityCount": 0,
+        "verifiedLinkCount": 0,
+        "pendingLeadCount": 0,
+    },
 }
 
 
@@ -87,14 +94,43 @@ def build_crime_network(
 
     nodes: dict[str, dict[str, Any]] = {}
     edges: list[dict[str, Any]] = []
+    leads: list[dict[str, Any]] = []
     edge_keys: set[tuple[str, str, str]] = set()
 
-    def add_edge(a: str, b: str, label: str) -> None:
+    def add_edge(
+        a: str,
+        b: str,
+        label: str,
+        category: str = "record",
+        confidence: int | None = None,
+    ) -> None:
         key = (*sorted((a, b)), label)
         if key in edge_keys:
             return
         edge_keys.add(key)
-        edges.append({"from": a, "to": b, "label": label})
+        edge: dict[str, Any] = {"from": a, "to": b, "label": label, "category": category}
+        if confidence is not None:
+            edge["confidence"] = confidence
+        edges.append(edge)
+
+    def add_lead(a: str, b: str, label: str, confidence: int) -> None:
+        """Keep machine-generated suggestions visible but out of operational clusters.
+
+        A pending similarity score is a lead for an officer to review, not a
+        relationship established in the case record. Treating it as an edge
+        made one noisy batch of suggestions merge most cases into one ring.
+        """
+        if a not in nodes or b not in nodes:
+            return
+        leads.append(
+            {
+                "from": a,
+                "to": b,
+                "label": label,
+                "category": "lead",
+                "confidence": confidence,
+            }
+        )
 
     for case in cases:
         case_node_id = f'case:{case["id"]}'
@@ -113,14 +149,18 @@ def build_crime_network(
                 "label": case.get("stationName") or "Station",
                 "kind": "Location",
             }
-        add_edge(case_node_id, loc_node_id, "Reported at")
+        # Station links provide useful orientation in a focused view, but do
+        # not establish a relationship between two cases.
+        add_edge(case_node_id, loc_node_id, "Reported at", category="context")
 
         haystack = f'{case.get("summary") or ""} {case.get("rawExtractedText") or ""}'
         for plate in _extract_plates(haystack):
             vehicle_node_id = f"vehicle:{plate}"
             if vehicle_node_id not in nodes:
                 nodes[vehicle_node_id] = {"id": vehicle_node_id, "label": plate, "kind": "Vehicle"}
-            add_edge(case_node_id, vehicle_node_id, "Vehicle used")
+            # Plates extracted from FIR/OCR text are a reviewable mention until
+            # an officer corroborates them, not a confirmed cross-case link.
+            add_edge(case_node_id, vehicle_node_id, "Vehicle mentioned", category="lead")
 
     for cp in case_persons:
         person_node_id = f'person:{cp["personId"]}'
@@ -141,11 +181,17 @@ def build_crime_network(
         if m.get("matchedCaseId"):
             other = f'case:{m["matchedCaseId"]}'
             if other in nodes:
-                add_edge(case_node_id, other, f"MO match {score}%")
+                if m.get("status") == "CONFIRMED":
+                    add_edge(case_node_id, other, f"Confirmed MO match {score}%", category="confirmed", confidence=score)
+                else:
+                    add_lead(case_node_id, other, f"Possible MO similarity {score}%", score)
         elif m.get("matchedPersonId"):
             other = f'person:{m["matchedPersonId"]}'
             if other in nodes:
-                add_edge(case_node_id, other, f"Identity lead {score}%")
+                if m.get("status") == "CONFIRMED":
+                    add_edge(case_node_id, other, f"Confirmed identity match {score}%", category="confirmed", confidence=score)
+                else:
+                    add_lead(case_node_id, other, f"Possible identity similarity {score}%", score)
 
     for conn in connections:
         a, b = f'person:{conn["personAId"]}', f'person:{conn["personBId"]}'
@@ -154,11 +200,17 @@ def build_crime_network(
 
     node_list = list(nodes.values())
 
+    # Analytical results only use relationships supported by a case record or
+    # explicitly confirmed by an officer. Context and unverified leads remain
+    # available for review but cannot manufacture a hub or merge a case ring.
+    analytical_edges = [
+        edge for edge in edges if edge["category"] in {"record", "confirmed"}
+    ]
     # Rings/hubs/brokers are always computed over the full scoped graph, not
     # whatever subset is currently in view, so the panels stay jurisdiction-complete.
-    rings = graph_engine.find_rings(node_list, edges)
-    hubs = graph_engine.compute_key_players(node_list, edges, limit=8)
-    brokers = graph_engine.compute_brokers(node_list, edges, limit=8)
+    rings = graph_engine.find_rings(node_list, analytical_edges)
+    hubs = graph_engine.compute_key_players(node_list, analytical_edges, limit=8)
+    brokers = graph_engine.compute_brokers(node_list, analytical_edges, limit=8)
 
     visible_nodes, visible_edges = node_list, edges
     if seed_id and seed_id in nodes:
@@ -171,10 +223,18 @@ def build_crime_network(
     return {
         "nodes": visible_nodes,
         "edges": visible_edges,
+        "leads": leads,
         "rings": rings,
         "hubs": hubs,
         "brokers": brokers,
-        "meta": {"caseCount": len(cases), "capped": capped, "layout": "server"},
+        "meta": {
+            "caseCount": len(cases),
+            "capped": capped,
+            "layout": "server",
+            "sharedEntityCount": len(hubs),
+            "verifiedLinkCount": len(analytical_edges),
+            "pendingLeadCount": len(leads),
+        },
     }
 
 

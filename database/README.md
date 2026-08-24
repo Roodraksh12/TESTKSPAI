@@ -24,6 +24,26 @@ districts) and **`OfficerDistrict`** (DIG multi-district); the existing **`Range
 table remains a DySP **subdivision** under a district — not an IGP range.
 Finally apply **`database/migrations/0006_early_warning_notifications.sql`** for
 hotspot-warning lifecycle fields and per-officer read state.
+Then apply **`database/migrations/0007_case_diary_evidence.sql`** for case-diary,
+evidence, document, custody-date, and investigating-officer support.
+Apply **`database/migrations/0008_case_diary_indexes.sql`**, then
+**`database/migrations/0009_case_custody_clocks.sql`**. Migration 0009 adds the
+per-accused BNSS section 187(3) remand clock; it does not reuse the legacy
+person-level custody date because that date is not FIR-specific.
+Apply **`database/migrations/0010_final_report_builder.sql`** only to the isolated
+development/test database while Phase 1 is being evaluated. It adds the
+structured BNSS section 193 working report and immutable version history. The
+original round-one database is intentionally unchanged.
+Then apply **`database/migrations/0011_final_report_phase2_schema.sql`** to the
+same isolated database. Migration 0011 keeps the exact legal snapshot in JSONB,
+adds schema-v2 shape constraints, and indexes template profile, legal regime,
+final-report number, current payload, and immutable version snapshots.
+Then apply **`database/migrations/0012_case_report_sources.sql`** to that isolated
+database. Migration 0012 adds reusable case-party profiles and chronology,
+FIR-to-final legal decisions, property, expert results and evidence assessments.
+These source records are revisioned separately from final-report versions so an
+officer must explicitly refresh an editable draft; approved snapshots are never
+rewritten.
 
 `0001_initial_schema.sql` + `0002_rls_policies.sql` describe an earlier, unused design
 (snake_case tables, Supabase-Auth-linked via `auth.users`/`auth.uid()`). The running
@@ -36,11 +56,20 @@ app authenticates with its own FastAPI JWT (badge ID + bcrypt), not Supabase Aut
 4. Apply `database/migrations/0004_chargesheet_draft.sql`.
 5. Run `backend/scripts/apply_0005.py` (or apply `0005_command_jurisdiction.sql`).
 6. From `backend/`, run `python -m scripts.apply_0006` (or apply `0006_early_warning_notifications.sql`).
-7. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
-   several overdue on the statutory deadline clock, a criminal network with a
+7. Apply `database/migrations/0007_case_diary_evidence.sql`.
+8. Apply `database/migrations/0008_case_diary_indexes.sql`.
+9. Apply `database/migrations/0009_case_custody_clocks.sql`.
+10. From `backend/`, run `python -m scripts.apply_0010` against the isolated test
+    database only.
+11. From `backend/`, run `python -m scripts.apply_0011` against that same isolated
+    test database only.
+12. From `backend/`, run `python -m scripts.apply_0012` against that same isolated
+    test database only.
+13. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
+   a criminal network with a
    detectable ring) — or create demo officers by hand.
-8. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
-9. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
+14. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
+15. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
 
 ## Demo login (after seed + 0004)
 

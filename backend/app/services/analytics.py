@@ -83,9 +83,13 @@ def get_crime_trend(officer: dict[str, Any]) -> dict[str, Any]:
     return {"data": data, "series": series}
 
 
-def compute_crime_velocity(officer: dict[str, Any]) -> list[dict[str, Any]]:
+def compute_crime_velocity(
+    officer: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
     scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
     recent_start = now - timedelta(days=7)
     baseline_start = now - timedelta(days=7 + VELOCITY_BASELINE_WEEKS * 7)
 
@@ -135,8 +139,12 @@ def get_risk_forecast(officer: dict[str, Any]) -> dict[str, Any]:
     return {"axes": axes, "baseline": 50}
 
 
-def get_hotspot_clusters(officer: dict[str, Any]) -> list[dict[str, Any]]:
-    return get_spatial_hotspot_clusters(officer)
+def get_hotspot_clusters(
+    officer: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    return get_spatial_hotspot_clusters(officer, now=now)
 
 
 def get_early_warnings(officer: dict[str, Any], take: int = 6) -> list[dict[str, Any]]:

@@ -102,7 +102,27 @@ def test_key_players_skip_location_and_rank_by_degree() -> None:
     assert "loc:s1" not in hub_ids
     assert hubs[0]["id"] == "person:p1"
     assert hubs[0]["degree"] == 3
+    assert hubs[0]["caseCount"] == 3
     assert hubs[0]["breakdown"] == "3 cases"
+
+
+def test_key_players_do_not_promote_cases_for_their_routine_fir_links() -> None:
+    nodes = [
+        _node("case:busy", "Case", "Busy FIR"),
+        _node("case:one", "Case"),
+        _node("case:two", "Case"),
+        _node("person:one", "Person"),
+        _node("person:two", "Person"),
+        _node("person:shared", "Person", "Shared Person"),
+    ]
+    edges = [
+        _edge("case:busy", "person:one"),
+        _edge("case:busy", "person:two"),
+        _edge("case:one", "person:shared"),
+        _edge("case:two", "person:shared"),
+    ]
+    hubs = compute_key_players(nodes, edges, limit=5)
+    assert [hub["id"] for hub in hubs] == ["person:shared"]
 
 
 def test_find_rings_two_clusters_bridged_by_one_person() -> None:

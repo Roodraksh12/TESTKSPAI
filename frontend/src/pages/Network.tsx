@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-import { Search, Layers, Activity, Route, Compass, Sparkles } from "lucide-react";
+import { Search, Layers, Activity, Route, Compass, Sparkles, CircleAlert, Link2 } from "lucide-react";
 import { apiRequest } from "@/api/client";
 import { Card, SectionLabel, Skeleton } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,23 @@ import { useI18n } from "@/lib/i18n";
 import { buildNetworkBrief, pushNetworkBriefToCopilot } from "@/lib/scrb/network-brief";
 
 type Mode = "explore" | "path";
+const MAX_EXPLORE_NODES = 14;
+
+type NetworkMeta = {
+  caseCount: number;
+  capped: boolean;
+  sharedEntityCount: number;
+  verifiedLinkCount: number;
+  pendingLeadCount: number;
+};
+
+const EMPTY_META: NetworkMeta = {
+  caseCount: 0,
+  capped: false,
+  sharedEntityCount: 0,
+  verifiedLinkCount: 0,
+  pendingLeadCount: 0,
+};
 
 export default function NetworkPage() {
   const navigate = useNavigate();
@@ -36,10 +53,13 @@ export default function NetworkPage() {
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
+  const [leadEdges, setLeadEdges] = useState<GraphEdge[]>([]);
   const [rings, setRings] = useState<Ring[]>([]);
   const [hubs, setHubs] = useState<KeyPlayer[]>([]);
   const [brokers, setBrokers] = useState<KeyPlayer[]>([]);
+  const [meta, setMeta] = useState<NetworkMeta>(EMPTY_META);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [seeded, setSeeded] = useState(false);
 
   const [mode, setMode] = useState<Mode>("explore");
@@ -61,19 +81,25 @@ export default function NetworkPage() {
   const [playerTab, setPlayerTab] = useState<"hubs" | "brokers">("hubs");
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [showLeads, setShowLeads] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    apiRequest("/api/network")
+    apiRequest("/api/network", { fresh: true })
       .then((payload) => {
         if (cancelled) return;
         setNodes(payload.nodes || []);
         setEdges(payload.edges || []);
+        setLeadEdges(payload.leads || []);
         setRings(payload.rings || []);
         setHubs(payload.hubs || []);
         setBrokers(payload.brokers || []);
+        setMeta({ ...EMPTY_META, ...(payload.meta || {}) });
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) setLoadError(err?.message || "Unable to load the investigation network.");
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -86,10 +112,20 @@ export default function NetworkPage() {
   const adjacency = useMemo(() => buildAdjacency(edges), [edges]);
   const neighborsOf = (id: string) => adjacency.get(id) ?? new Set<string>();
 
+  function focusedNeighborhood(id: string, limit = MAX_EXPLORE_NODES) {
+    const kindPriority: Record<NodeKind, number> = { Person: 0, Vehicle: 1, Case: 2, Location: 3 };
+    const orderedNeighbors = Array.from(adjacency.get(id) ?? []).sort((a, b) => {
+      const aNode = nodeById.get(a);
+      const bNode = nodeById.get(b);
+      const kindDiff = (kindPriority[aNode?.kind ?? "Location"] ?? 9) - (kindPriority[bNode?.kind ?? "Location"] ?? 9);
+      if (kindDiff) return kindDiff;
+      return (adjacency.get(b)?.size ?? 0) - (adjacency.get(a)?.size ?? 0);
+    });
+    return new Set([id, ...orderedNeighbors.slice(0, limit - 1)]);
+  }
+
   function seedFrom(id: string) {
-    const next = new Set<string>([id]);
-    (adjacency.get(id) ?? new Set<string>()).forEach((n) => next.add(n));
-    setRevealedIds(next);
+    setRevealedIds(focusedNeighborhood(id));
     setSelectedId(id);
     setMode("explore");
     setPathIds(null);
@@ -99,7 +135,12 @@ export default function NetworkPage() {
     setRevealedIds((prev) => {
       const next = new Set(prev);
       next.add(id);
-      (adjacency.get(id) ?? new Set<string>()).forEach((n) => next.add(n));
+      const remaining = Math.max(0, MAX_EXPLORE_NODES - next.size);
+      Array.from(adjacency.get(id) ?? [])
+        .filter((n) => !next.has(n))
+        .sort((a, b) => (adjacency.get(b)?.size ?? 0) - (adjacency.get(a)?.size ?? 0))
+        .slice(0, remaining)
+        .forEach((n) => next.add(n));
       return next;
     });
   }
@@ -153,10 +194,8 @@ export default function NetworkPage() {
   }
 
   function revealRing(ring: Ring) {
-    setRevealedIds(new Set(ring.nodeIds.slice(0, 60)));
-    setSelectedId(null);
-    setMode("explore");
-    setPathIds(null);
+    const focus = ring.nodeIds.find((id) => nodeById.get(id)?.kind === "Person") ?? ring.nodeIds[0];
+    if (focus) seedFrom(focus);
   }
 
   function togglePin(id: string) {
@@ -223,6 +262,7 @@ export default function NetworkPage() {
   }, [mode, positioned, visibleEdges, adjacency]);
 
   const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
+  const visibleFocus = selected ?? (revealedIds.size ? nodeById.get(Array.from(revealedIds)[0]) ?? null : null);
 
   const kindCounts = useMemo(() => {
     const c: Record<NodeKind, number> = { Case: 0, Vehicle: 0, Person: 0, Location: 0 };
@@ -400,6 +440,18 @@ export default function NetworkPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
+        <Card strong className="p-8 text-center">
+          <CircleAlert className="mx-auto h-6 w-6 text-danger" />
+          <p className="mt-3 text-sm font-medium">The network could not be loaded.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{loadError}</p>
+        </Card>
+      </div>
+    );
+  }
+
   if (nodes.length === 0) {
     return (
       <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
@@ -413,13 +465,16 @@ export default function NetworkPage() {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_340px] max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
       {/* Canvas */}
       <Card strong className="relative overflow-hidden p-5 flex flex-col h-[calc(100vh-10rem)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div>
-            <SectionLabel className="mb-2">{t("network.label")}</SectionLabel>
-            <h1 className="text-display text-2xl">{t("network.title")}</h1>
+        <div className="flex flex-wrap items-start justify-between gap-3 shrink-0">
+          <div className="max-w-xl">
+            <SectionLabel className="mb-2">Investigation network</SectionLabel>
+            <h1 className="text-display text-2xl">Trace links that matter to this investigation.</h1>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Start with a case or person. Clusters use FIR-recorded relationships and officer-confirmed matches; pending AI suggestions remain separate for review.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {/* Mode toggle */}
@@ -460,14 +515,28 @@ export default function NetworkPage() {
           </div>
         </div>
 
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 shrink-0">
+          {[
+            { label: "Cases in scope", value: meta.caseCount },
+            { label: "Shared entities", value: meta.sharedEntityCount },
+            { label: "Verified links", value: meta.verifiedLinkCount },
+            { label: "Unverified leads", value: meta.pendingLeadCount },
+          ].map((metric) => (
+            <div key={metric.label} className="rounded-xl border border-hairline bg-surface-2 px-3 py-2">
+              <p className="text-mono text-[9px] uppercase tracking-wider text-muted-foreground">{metric.label}</p>
+              <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{metric.value}</p>
+            </div>
+          ))}
+        </div>
+
         {/* Search (explore mode only) */}
         {mode === "explore" && (
-          <div className="relative mt-3 shrink-0 max-w-sm">
+          <div className="relative mt-4 shrink-0 max-w-xl">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("network.searchPlaceholder")}
+              placeholder="Focus on a FIR, person, or vehicle…"
               className="w-full rounded-xl border border-hairline bg-surface py-2 pr-3 pl-8 text-xs text-foreground placeholder:text-muted-foreground focus:border-foreground/25 focus:outline-none"
             />
             {searchResults.length > 0 && (
@@ -488,6 +557,15 @@ export default function NetworkPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {mode === "explore" && visibleFocus && (
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-teal/20 bg-teal/5 px-3 py-2 text-xs shrink-0">
+            <Link2 className="h-3.5 w-3.5 shrink-0 text-teal" />
+            <span className="text-muted-foreground">Focused view:</span>
+            <span className="font-medium text-foreground">{visibleFocus.label}</span>
+            <span className="text-muted-foreground">· click a node to inspect its direct evidence</span>
           </div>
         )}
 
@@ -535,7 +613,7 @@ export default function NetworkPage() {
             pathIds={pathIds}
             pathEdgeSet={pathEdgeSet}
             expandableIds={expandableIds}
-            emptyHint={mode === "path" ? "Pick two entities to trace a connection." : "Search or pick a key player to start exploring."}
+            emptyHint={mode === "path" ? "Pick two entities to trace a connection." : "Choose a cross-case entity or search for a case to begin."}
             onNodeClick={onNodeClick}
             onNodeHover={setHoverId}
           />
@@ -566,7 +644,7 @@ export default function NetworkPage() {
           <div className="absolute top-4 right-4 flex items-center gap-2 rounded-2xl border border-hairline bg-surface/90 px-3 py-1.5 text-[11px] shadow-sm backdrop-blur">
             <Activity className="h-3 w-3 text-amber" />
             <span className="text-mono text-muted-foreground">
-              {positioned.length} shown · {nodes.length} total
+              {positioned.length} in focus · {nodes.length} records
             </span>
           </div>
         </div>
@@ -582,6 +660,50 @@ export default function NetworkPage() {
           selectedId={selectedId}
           onSelect={seedFrom}
         />
+
+        {meta.pendingLeadCount > 0 && (
+          <Card className="border-amber/20 bg-amber/5 p-4 shrink-0">
+            <div className="flex items-start gap-2.5">
+              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber" />
+              <div>
+                <p className="text-xs font-medium text-foreground">{meta.pendingLeadCount} unverified similarity leads</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                  These machine-generated suggestions are deliberately excluded from hubs and clusters until an officer confirms them.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowLeads((current) => !current)}
+                  className="mt-2 text-[11px] font-medium text-amber hover:underline"
+                >
+                  {showLeads ? "Hide suggestions" : "Review top suggestions"}
+                </button>
+              </div>
+            </div>
+            {showLeads && (
+              <div className="mt-3 space-y-1.5 border-t border-amber/15 pt-3">
+                {[...leadEdges]
+                  .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+                  .slice(0, 4)
+                  .map((lead, index) => {
+                    const from = nodeById.get(lead.from);
+                    const to = nodeById.get(lead.to);
+                    if (!from || !to) return null;
+                    return (
+                      <button
+                        key={`${lead.from}-${lead.to}-${index}`}
+                        type="button"
+                        onClick={() => seedFrom(lead.from)}
+                        className="block w-full rounded-lg border border-amber/15 bg-surface px-2.5 py-2 text-left transition hover:bg-amber/10"
+                      >
+                        <p className="truncate text-[11px] font-medium text-foreground">{from.label} → {to.label}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{lead.label}</p>
+                      </button>
+                    );
+                  })}
+              </div>
+            )}
+          </Card>
+        )}
 
         <RingsPanel rings={rings} onRevealRing={revealRing} />
 

@@ -15,7 +15,7 @@ from app.services.ai_tools import (
     filter_tools_for_role,
     serialize_tool_result,
 )
-from app.services.case_access import create_audit_log, get_case_with_relations
+from app.services.case_access import create_audit_log, get_case_with_relations, require_fir_upload
 from app.services.openrouter import chat_completion, chat_json
 
 router = APIRouter(prefix="/api", tags=["ai"])
@@ -225,6 +225,7 @@ async def quick_ask(
 @router.post("/ai/draft-fir")
 async def draft_fir(payload: DraftFirRequest, current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
+    require_fir_upload(officer)
     prompt = f'''You are an expert police intake system. You are given raw field notes from a police officer.
 Draft a highly structured, professional First Information Report (FIR) based on these notes.
 

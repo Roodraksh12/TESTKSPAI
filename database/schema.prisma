@@ -119,6 +119,24 @@ model Officer {
 
   currentIoCases     Case[]         @relation("CaseCurrentIO")
   authoredDiaryEntries CaseDiaryEntry[] @relation("DiaryEntryAuthor")
+  custodyClocksCreated CaseCustodyClock[] @relation("CustodyClockCreatedBy")
+  custodyClocksUpdated CaseCustodyClock[] @relation("CustodyClockUpdatedBy")
+  finalReportsCreated  FinalReport[]       @relation("FinalReportCreatedBy")
+  finalReportsUpdated  FinalReport[]       @relation("FinalReportUpdatedBy")
+  finalReportsReviewed FinalReport[]       @relation("FinalReportReviewedBy")
+  finalReportsApproved FinalReport[]       @relation("FinalReportApprovedBy")
+  finalReportVersions  FinalReportVersion[]
+  reportSourceStatesCreated CaseReportSourceState[] @relation("ReportSourceStateCreatedBy")
+  reportSourceStatesUpdated CaseReportSourceState[] @relation("ReportSourceStateUpdatedBy")
+  partyProfilesUpdated CasePartyProfile[] @relation("CasePartyProfileUpdatedBy")
+  partyEventsCreated CasePartyEvent[] @relation("CasePartyEventCreatedBy")
+  legalSectionsCreated CaseLegalSection[] @relation("CaseLegalSectionCreatedBy")
+  legalSectionsUpdated CaseLegalSection[] @relation("CaseLegalSectionUpdatedBy")
+  propertyItemsCreated CasePropertyItem[] @relation("CasePropertyItemCreatedBy")
+  propertyItemsUpdated CasePropertyItem[] @relation("CasePropertyItemUpdatedBy")
+  expertResultsCreated CaseExpertResult[] @relation("CaseExpertResultCreatedBy")
+  expertResultsUpdated CaseExpertResult[] @relation("CaseExpertResultUpdatedBy")
+  evidenceAssessmentsUpdated EvidenceAssessment[] @relation("EvidenceAssessmentUpdatedBy")
 }
 
 model Invitation {
@@ -179,6 +197,15 @@ model Case {
   diaryEntries     CaseDiaryEntry[]
   evidence         Evidence[]
   documents        Document[]
+  custodyClocks    CaseCustodyClock[]
+  finalReports     FinalReport[]
+  reportSourceState CaseReportSourceState?
+  partyProfiles    CasePartyProfile[]
+  partyEvents      CasePartyEvent[]
+  legalSections    CaseLegalSection[]
+  propertyItems    CasePropertyItem[]
+  expertResults    CaseExpertResult[]
+  evidenceAssessments EvidenceAssessment[]
 }
 
 enum PersonRole {
@@ -212,6 +239,254 @@ model CasePerson {
   
   case   Case   @relation(fields: [caseId], references: [id])
   person Person @relation(fields: [personId], references: [id])
+  custodyClock CaseCustodyClock?
+  reportProfile CasePartyProfile?
+  reportEvents CasePartyEvent[]
+}
+
+/// A BNSS 187(3) clock is specific to one accused in one FIR. Do not use
+/// Person.custodyStartDate for this: the same person may be remanded in a
+/// different FIR on a different date.
+model CaseCustodyClock {
+  id                   String     @id @default(cuid())
+  caseId               String
+  casePersonId         String     @unique
+  firstRemandAt        DateTime
+  windowDays           Int
+  thresholdBasis       String
+  legalSectionDetails  String
+  remandOrderReference String
+  notes                String?
+  reportFiledAt        DateTime?
+  reportReference      String?
+  createdById          String
+  updatedById          String
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  case       Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  casePerson CasePerson @relation(fields: [casePersonId], references: [id], onDelete: Cascade)
+  createdBy  Officer    @relation("CustodyClockCreatedBy", fields: [createdById], references: [id])
+  updatedBy  Officer    @relation("CustodyClockUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([caseId, firstRemandAt])
+}
+
+/// A structured BNSS section 193 police-report working copy. `payload` is a
+/// server-normalised, versioned legal snapshot. Schema v2 contains filing
+/// metadata, complainant/victim schedules, accused dispositions and identity
+/// fields, FIR-to-final section decisions, property, expert results, ordered
+/// annexures and officer-authored narrative sections. Migration 0011 enforces
+/// the JSON shape and adds JSON/expression indexes that Prisma cannot express.
+model FinalReport {
+  id              String   @id @default(cuid())
+  caseId          String
+  reportType      String   @default("CHARGE_SHEET")
+  sequenceNumber  Int      @default(1)
+  status          String   @default("DRAFT")
+  formatVersion   String   @default("BNSS193-PROVISIONAL-V1")
+  revision        Int      @default(1)
+  versionNumber   Int      @default(1)
+  payload         Json     @default("{}")
+  validation      Json     @default("{\"issues\":[]}")
+  reviewNote      String?
+  createdById     String
+  updatedById     String
+  reviewedById    String?
+  approvedById    String?
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  lockedAt        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy   Officer  @relation("FinalReportCreatedBy", fields: [createdById], references: [id])
+  updatedBy   Officer  @relation("FinalReportUpdatedBy", fields: [updatedById], references: [id])
+  reviewedBy  Officer? @relation("FinalReportReviewedBy", fields: [reviewedById], references: [id])
+  approvedBy  Officer? @relation("FinalReportApprovedBy", fields: [approvedById], references: [id])
+  versions    FinalReportVersion[]
+
+  @@unique([caseId, reportType, sequenceNumber])
+  @@index([caseId, status])
+  @@index([updatedAt])
+}
+
+/// Immutable workflow snapshots used for change history and auditability.
+model FinalReportVersion {
+  id            String   @id @default(cuid())
+  reportId      String
+  versionNumber Int
+  event         String
+  status        String
+  changedSections String[] @default([])
+  snapshot      Json
+  validation    Json
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  report    FinalReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  createdBy Officer     @relation(fields: [createdById], references: [id])
+
+  @@unique([reportId, versionNumber])
+  @@index([reportId, createdAt])
+}
+
+model CaseReportSourceState {
+  caseId      String   @id
+  revision    Int      @default(0)
+  createdById String
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  case      Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy Officer @relation("ReportSourceStateCreatedBy", fields: [createdById], references: [id])
+  updatedBy Officer @relation("ReportSourceStateUpdatedBy", fields: [updatedById], references: [id])
+}
+
+model CasePartyProfile {
+  casePersonId         String   @id
+  caseId               String
+  isComplainant        Boolean  @default(false)
+  alias                String?
+  parentName           String?
+  birthYear            Int?
+  gender               String?
+  nationality          String?
+  occupation           String?
+  permanentAddress     String?
+  identityStatus       String   @default("NOT_RECORDED")
+  identityType         String?
+  identityReference    String?
+  verificationNotes    String?
+  relationshipToVictim String?
+  injuryOrLoss         String?
+  statementSummary     String?
+  evidenceType         String   @default("ORAL")
+  disposition          String   @default("NOT_RECORDED")
+  dispositionReason    String?
+  bailStatus           String   @default("NOT_RECORDED")
+  regularCriminalNumber String?
+  previousConvictions  String?
+  suretyDetails        String?
+  updatedById          String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  casePerson CasePerson @relation(fields: [casePersonId], references: [id], onDelete: Cascade)
+  case       Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  updatedBy  Officer    @relation("CasePartyProfileUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([caseId])
+}
+
+model CasePartyEvent {
+  id           String   @id @default(cuid())
+  caseId       String
+  casePersonId String
+  eventType    String
+  occurredAt   DateTime
+  reference    String?
+  notes        String?
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  case       Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  casePerson CasePerson @relation(fields: [casePersonId], references: [id], onDelete: Cascade)
+  createdBy  Officer    @relation("CasePartyEventCreatedBy", fields: [createdById], references: [id])
+
+  @@index([caseId, casePersonId, occurredAt])
+}
+
+model CaseLegalSection {
+  id                String   @id @default(cuid())
+  caseId            String
+  catalogId         String?
+  actCode           String
+  sectionNumber     String
+  title             String
+  punishment        String?
+  conditionNote     String?
+  initiallyAlleged  Boolean  @default(false)
+  finalDecision     String   @default("NOT_RECORDED")
+  decisionReason    String?
+  approvalReference String?
+  createdById       String
+  updatedById       String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  case      Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy Officer @relation("CaseLegalSectionCreatedBy", fields: [createdById], references: [id])
+  updatedBy Officer @relation("CaseLegalSectionUpdatedBy", fields: [updatedById], references: [id])
+
+  @@unique([caseId, actCode, sectionNumber])
+  @@index([caseId])
+}
+
+model CasePropertyItem {
+  id                   String   @id @default(cuid())
+  caseId               String
+  sourceEvidenceId     String?
+  category             String   @default("OTHER")
+  description          String
+  quantity             String?
+  estimatedValue       String?
+  recoveryStatus       String   @default("NOT_RECORDED")
+  recoveredAt          DateTime?
+  seizureMemoReference String?
+  disposalStatus       String   @default("NOT_RECORDED")
+  createdById          String
+  updatedById          String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  case           Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  sourceEvidence Evidence? @relation(fields: [sourceEvidenceId], references: [id], onDelete: SetNull)
+  createdBy      Officer   @relation("CasePropertyItemCreatedBy", fields: [createdById], references: [id])
+  updatedBy      Officer   @relation("CasePropertyItemUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([caseId])
+}
+
+model CaseExpertResult {
+  id               String    @id @default(cuid())
+  caseId           String
+  sourceDocumentId String?
+  type             String    @default("OTHER")
+  status           String    @default("NOT_RECORDED")
+  referenceNumber  String?
+  resultDate       DateTime? @db.Date
+  summary          String?
+  createdById      String
+  updatedById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  case           Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  sourceDocument Document? @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+  createdBy      Officer   @relation("CaseExpertResultCreatedBy", fields: [createdById], references: [id])
+  updatedBy      Officer   @relation("CaseExpertResultUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([caseId])
+}
+
+model EvidenceAssessment {
+  evidenceId      String   @id
+  caseId          String
+  resultStatus    String   @default("NOT_RECORDED")
+  resultSummary   String?
+  referenceNumber String?
+  updatedById     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  evidence  Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  updatedBy Officer  @relation("EvidenceAssessmentUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([caseId])
 }
 
 enum RelationType {
@@ -393,6 +668,8 @@ model Evidence {
   diaryEntries DiaryEntryEvidence[]
   documents    Document[]
   persons      EvidencePerson[]
+  assessment   EvidenceAssessment?
+  propertyItems CasePropertyItem[]
 }
 
 model Document {
@@ -409,6 +686,7 @@ model Document {
   case         Case            @relation(fields: [caseId], references: [id], onDelete: Cascade)
   diaryEntry   CaseDiaryEntry? @relation(fields: [diaryEntryId], references: [id], onDelete: SetNull)
   evidence     Evidence?       @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  expertResults CaseExpertResult[]
 }
 
 model DiaryEntryEvidence {
@@ -440,4 +718,3 @@ model EvidencePerson {
   
   @@id([evidenceId, personId])
 }
-

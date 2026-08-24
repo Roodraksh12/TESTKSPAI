@@ -62,7 +62,8 @@ def test_chat_returns_explainability_and_audits_before_llm_call(db_available: bo
     body = response.json()
 
     assert body["toolsUsed"] == ["get_deadline_risks"]
-    assert any(source.startswith("FIR/") for source in body["sources"])
+    # No FIR is surfaced unless a verified first-remand clock exists; the tool
+    # must not fabricate an exposure from the FIR registration date.
     assert len(body["sources"]) <= 6
 
     # Audit must be written before the (mocked) LLM is ever called.

@@ -80,12 +80,20 @@ def _kind_breakdown(neighbour_ids: set[str], node_by_id: dict[str, dict[str, Any
     return " · ".join(parts) if parts else "No connections"
 
 
+def _case_link_count(neighbour_ids: set[str], node_by_id: dict[str, dict[str, Any]]) -> int:
+    """Count the cases an entity actually connects, excluding ambient context."""
+    return sum(1 for nid in neighbour_ids if node_by_id.get(nid, {}).get("kind") == "Case")
+
+
 def compute_key_players(
     nodes: list[dict[str, Any]], edges: list[dict[str, Any]], limit: int = 5
 ) -> list[dict[str, Any]]:
     adjacency = build_adjacency(edges)
     node_by_id = {n["id"]: n for n in nodes}
-    candidates = [n for n in nodes if n.get("kind") != "Location"]
+    # A case is expected to connect to its people, station and documents. It is
+    # not a "key player". Surface only entities that can genuinely recur across
+    # case files, so the ranking answers "who/what links these cases?".
+    candidates = [n for n in nodes if n.get("kind") in {"Person", "Vehicle"}]
     ranked = sorted(candidates, key=lambda n: len(adjacency.get(n["id"], set())), reverse=True)
 
     results = []
@@ -95,12 +103,16 @@ def compute_key_players(
         # a participant in one case, not a hub worth surfacing.
         if len(neighbour_ids) < 2:
             continue
+        case_count = _case_link_count(neighbour_ids, node_by_id)
+        if case_count < 2:
+            continue
         results.append(
             {
                 "id": node["id"],
                 "label": node.get("label"),
                 "kind": node.get("kind"),
                 "degree": len(neighbour_ids),
+                "caseCount": case_count,
                 "breakdown": _kind_breakdown(neighbour_ids, node_by_id),
             }
         )

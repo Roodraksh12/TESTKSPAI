@@ -182,9 +182,13 @@ def build_hotspot_signals(
     return signals
 
 
-def get_hotspot_clusters(officer: dict[str, Any]) -> list[dict[str, Any]]:
+def get_hotspot_clusters(
+    officer: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
     clusters = []
-    for signal in build_hotspot_signals(officer):
+    for signal in build_hotspot_signals(officer, now=now):
         count = signal["count"]
         intensity = "high" if signal["isWarning"] or count >= 3 else "medium" if count == 2 else "low"
         clusters.append(

@@ -53,6 +53,13 @@ def get_pool() -> ConnectionPool:
     return _pool
 
 
+def close_pool() -> None:
+    global _pool
+    if _pool is not None:
+        _pool.close()
+        _pool = None
+
+
 @contextmanager
 def get_conn() -> Iterator[psycopg.Connection]:
     with get_pool().connection() as conn:

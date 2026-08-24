@@ -1,7 +1,10 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.services.db import close_pool, get_pool
 from app.routers import (
     ai,
     audit,
@@ -21,21 +24,34 @@ from app.routers import (
     tts,
     case_diary,
     evidence,
+    final_reports,
+    report_sources,
 )
 from app.routers import settings as settings_router
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Fail closed before serving requests if auth was not configured.
+    _jwt_secret = get_settings().jwt_secret
+    get_pool()
+    try:
+        yield
+    finally:
+        close_pool()
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="KSP Portal API")
+    app = FastAPI(title="KSP Portal API", lifespan=lifespan)
 
-    # app.add_middleware(
-    #     CORSMiddleware,
-    #     allow_origins=settings.allowed_origin_list,
-    #     allow_credentials=True,
-    #     allow_methods=["*"],
-    #     allow_headers=["*"],
-    # )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.allowed_origin_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     app.include_router(health.router)
     app.include_router(auth.router)
@@ -56,11 +72,8 @@ def create_app() -> FastAPI:
     app.include_router(tts.router)
     app.include_router(case_diary.router)
     app.include_router(evidence.router)
-
-    @app.on_event("startup")
-    def startup_event():
-        from app.services.db import get_pool
-        get_pool()
+    app.include_router(final_reports.router)
+    app.include_router(report_sources.router)
 
     return app
 
