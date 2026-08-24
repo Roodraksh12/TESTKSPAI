@@ -1,194 +1,334 @@
-# 🛡️ SCRB Sahayak (KSP Portal)
+# SCRB Sahayak — KSP Investigation Support Portal
 
 <div align="center">
 
-[![Live Demo](https://img.shields.io/badge/🌐_Deployed_App-https%3A%2F%2Fkspai--zgymgiew.onslate.in%2F-blue?style=for-the-badge)](https://kspai-zgymgiew.onslate.in/)
-[![Demo Video](https://img.shields.io/badge/📹_Demo_Video-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/_UJdQK79kRM)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-open-blue?style=for-the-badge)](https://kspai-zgymgiew.onslate.in/)
+[![Demo Video](https://img.shields.io/badge/Demo_Video-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/_UJdQK79kRM)
 
-<br />
-
-<img src="https://img.shields.io/badge/Status-Active-success.svg" alt="Status Active" />
-<img src="https://img.shields.io/badge/Platform-Web-blue.svg" alt="Platform Web" />
-<img src="https://img.shields.io/badge/Language-Bilingual%20(EN%2FKN)-orange.svg" alt="Bilingual" />
-<img src="https://img.shields.io/badge/AI-Gemini%201.5%20Pro-purple.svg" alt="AI Powered" />
+![Status](https://img.shields.io/badge/status-test_build-orange)
+![Frontend](https://img.shields.io/badge/frontend-React_18_%2B_Vite-blue)
+![Backend](https://img.shields.io/badge/backend-FastAPI-teal)
+![Database](https://img.shields.io/badge/database-PostgreSQL-336791)
 
 </div>
 
-> **Next-Generation Bilingual AI-Powered Investigation Copilot & Decision Support System** developed for the Karnataka State Police (KSP). Designed to streamline FIR ingestion, automate entity linkage, visualize organized crime networks, track statutory deadlines, issue predictive early warnings, and provide command-level intelligence in both **English and Kannada**.
+SCRB Sahayak is a bilingual investigation-support prototype for police case
+management, link analysis, statutory-deadline monitoring and officer-controlled
+final-report preparation. It uses jurisdiction-scoped access and keeps formal
+report generation deterministic: the final-report builder does not send case
+content to an external AI service.
 
----
+> The deployed demo may not update at the same time as the `main` branch. For
+> the latest tested functionality, run the repository locally.
 
-## 🔗 Quick Links
+## Current test-build checkpoint
 
-- 🌐 **Live Web Application:** [https://kspai-zgymgiew.onslate.in/](https://kspai-zgymgiew.onslate.in/)
-- 🎥 **Video Walkthrough / Demo:** [https://youtu.be/_UJdQK79kRM](https://youtu.be/_UJdQK79kRM)
+The current `main` branch includes:
 
----
+- persistent, jurisdiction-scoped case directory and case dossiers;
+- FIR/OCR intake and optional OpenRouter-assisted extraction/copilot workflows;
+- date-wise case diary pages with per-day numbering and date-range PDF export;
+- evidence and document linking with assigned-IO write controls;
+- pan, zoom, drag and focus controls for dense cross-case network graphs;
+- per-accused BNSS section 187(3) custody/remand clocks;
+- a statutory deadline board that distinguishes remand clocks from FIR-age
+  progress indicators;
+- deterministic BNSS section 193 final-report working copies, validation,
+  immutable versions, review/return/approval workflow and PDF export;
+- reusable **Report Data** records for parties, accused chronology, legal-section
+  decisions, property, expert results and evidence outcomes;
+- hierarchy-aware RBAC, audit records, login throttling and stale-request fixes;
+- command analytics, hotspots and early-warning indicators; and
+- English/Kannada UI and speech support.
 
-## 📋 Prototype Brief
+The former per-case Tactical View has been removed. Network investigation is
+handled by the Network canvas.
 
-### 1. Problem Statement Addressed
-Law enforcement agencies, such as the Karnataka State Police (KSP), face critical operational bottlenecks:
-- **Manual & Error-Prone Ingestion:** Traditional FIR indexing requires tedious manual data entry, leading to backlogs and missed entity connections across police stations.
-- **Language Barriers:** Field officers operate primarily in native regional scripts (Kannada), while central databases and formal dossiers often require English, creating friction.
-- **Siloed Criminal Intelligence:** Disparate case records conceal underlying organized crime networks, shared aliases, stolen vehicles, and safe houses.
-- **Statutory Lapse Risks:** Strict legal deadlines (60/90 days for filing chargesheets) are frequently missed due to manual tracking, resulting in mandatory default bails.
-- **Reactive Policing:** Command staff lack real-time predictive spatial analytics to preemptively deploy patrols before localized crime spikes occur.
+## Important legal and data boundaries
 
-### 2. Key Features and Functionalities
-- **🎙️ Bilingual Voice-Activated AI Copilot:** Natural hands-free voice interaction in both **English and Kannada** powered by Web Speech API and backend Edge-TTS for querying cases and generating court-ready PDF transcripts.
-- **📄 Automated FIR Ingestion & Explainable OCR:** Zero-data-entry workflow using Tesseract OCR and LLM entity extraction (Suspects, Victims, Vehicles, Modus Operandi, Locations) with sentence-level visual Explainable AI (XAI).
-- **🕸️ Interactive Crime Network Canvas (Link Analysis):** Interactive visual graph plotting invisible connections across cases, shared license plates, mobile numbers, and safe houses to uncover crime rings.
-- **⚡ Predictive Early Warning & Tactical Alert Engine:** Automated pattern recognition algorithms that identify localized crime spikes and broadcast real-time tactical patrol advisories to field officers.
-- **⚖️ Statutory Deadlines & Chargesheet Draft Generator:** Proactive alerts on statutory 60/90-day chargesheet timelines with an in-app `ChargesheetEditor` to generate and edit formal legal drafts.
-- **📈 Command Analytics & Predictive Heatmaps:** Geospatial cluster heatmaps (Leaflet) and 7-day risk forecasts (Radar charts) for district commanders.
-- **🔒 Enterprise Security & Hierarchy-Based RBAC:** Strict jurisdictional siloing (Constable, Inspector, SP, Police IT Admin) backed by tamper-proof audit trails.
+This repository is a software prototype, not an authoritative legal filing
+system or a substitute for an Investigating Officer, prosecutor or Court.
 
-### 3. Technology Stack Used
-- **Frontend SPA:** React 18, TypeScript, Vite, Tailwind CSS, Leaflet Maps, Recharts, Framer Motion, Lucide Icons, Web Speech API.
-- **Backend Services:** FastAPI (Python 3.11+), Pydantic, Python-Jose (JWT Authentication), Passlib (Bcrypt), PyTesseract (OCR Engine), Microsoft Edge-TTS.
-- **Database & Storage:** PostgreSQL (hosted on Supabase) utilizing PostgreSQL `ltree` extension for hierarchical police org-trees and station-level data siloing.
-- **AI & Speech Models:** OpenRouter API (Google Gemini 1.5 Pro) for context-aware bilingual extraction, entity matching, and reasoning; Edge-TTS for multi-lingual speech synthesis.
+- A BNSS section 187(3) 60/90-day clock is recorded per accused and begins from
+  the first Magistrate-authorised remand stored for that case. FIR registration
+  alone does not start that custody clock.
+- The 60- versus 90-day window must be chosen from the applicable alleged
+  offence and punishment threshold and verified by the responsible officer.
+- Final-report validation highlights missing or contradictory data; it does not
+  decide guilt, select sections automatically or certify legal compliance.
+- The current report template profile uses supplied Rajasthan IIF-IV material as
+  a development reference. It is not represented as a notified Karnataka form.
+- The Network canvas searches only data present in this test database. It is not
+  connected to CCTNS, ICJS or a production police/criminal database.
+- Do not put real operational or personally sensitive police data into the demo
+  environment.
 
-### 4. Proposed Impact and Use Case
-- **Rapid Operational Turnaround:** Cuts FIR processing, entity extraction, and dossier synthesis time from hours down to seconds.
-- **Zero Statutory Lapses:** Automated deadline countdowns eliminate procedural default bails by empowering officers with auto-drafted chargesheets well before statutory expiration dates.
-- **Proactive Resource Allocation:** Shifts police operations from reactive incident response to predictive, intelligence-driven patrol deployment.
-- **Grassroots Empowerment:** Enables non-English speaking field officers across Karnataka to leverage advanced AI intelligence in native Kannada via natural voice commands.
+## Main workflows
 
----
+### Case diary
 
-## 🔑 Demo Credentials
+Entries are grouped by the Karnataka calendar date. Page numbering restarts for
+each day: two entries on 24 August are pages 1 and 2, while the first entry on
+23 August is page 1 for that date. PDF export accepts a date range and produces
+entries in chronological, per-day page order.
 
-To test the application across different Role-Based Access Control (RBAC) levels, log in with any of the demo credentials below:
+### Network analysis
 
-| Role / Rank | Badge ID (Service ID) | Password | Access Level & Scope |
-|---|---|---|---|
-| 👑 **Police IT Admin** | `KA-IT-0001` | `demo1234` | Statewide Admin; Officer Management & Invites |
-| 🏬 **Superintendent of Police (SP)** | `KA-SP-9999` | `demo1234` | District Command Overview, Analytics & Audit Logs |
-| 👮 **Inspector (SHO)** | `KA-INS-4471` | `demo1234` | Station-Level Copilot, FIR Ingestion & Link Analysis |
-| 🛡️ **Constable** | `KA-CON-1001` | `demo1234` | Station-Level Case Entry & Officer Profile |
+The Network canvas supports:
 
-> ℹ️ **How to log in:** Open the [Live App](https://kspai-zgymgiew.onslate.in/), enter any **Badge ID** from the table above and password `demo1234`.
+- wheel/trackpad zoom;
+- canvas panning;
+- draggable nodes;
+- fit-to-view and reset controls;
+- search and focused exploration;
+- key-player and detected-cluster panels; and
+- jurisdiction-scoped source records.
 
----
+Graph links are investigative leads and require human verification.
 
-## 🌟 Transformative Features
+### Custody and deadline tracking
 
-SCRB Sahayak isn't just a database; it's an intelligent agent assisting officers at every step of an investigation.
+The custody clock is attached to a case-person record, not to a global person
+record. An officer records:
 
-### 🎙️ 1. Bilingual Voice-Activated AI Copilot
-- **Voice-to-Text & Text-to-Speech:** Integrated Web Speech API and backend Edge-TTS allow hands-free interaction. Ask questions like *"Show me all burglary cases from Vijayanagar"* out loud, and get spoken responses.
-- **English & Kannada Support:** Full native support for Kannada language, ensuring grassroots officers can interact naturally.
-- **Context-Aware Memory:** The copilot remembers the case context across multiple interactions, eliminating the need to repeat details.
-- **Transcript Export:** Chat histories and case queries can be instantly exported to formal PDF transcripts for record-keeping.
+- the first authorised remand date/time;
+- the 60- or 90-day window;
+- the legal basis and relevant section details;
+- the remand order reference; and
+- charge-sheet/final-report filing information when filed.
 
-### 📄 2. Automated FIR Ingestion & Smart Parsing
-- **Zero-Data-Entry Workflow:** Upload a raw FIR text or image, and the system automatically extracts Suspects, Victims, Vehicles, Modus Operandi (MO), and Locations.
-- **Optical Character Recognition (OCR):** Uses Tesseract OCR to read and ingest scanned FIR documents and handwritten Kannada/English text.
-- **Asynchronous Background Processing:** FIR uploads are processed via a resilient background queue with real-time UI polling.
-- **Explainable AI (XAI):** Extracted entities are visually linked back to the exact sentence in the original FIR, ensuring evidence integrity for court verification.
-- **One-Click PDF Dossiers:** Generate comprehensive, court-ready case files and intelligent summaries instantly.
+The deadline board separately displays FIR-age progress where relevant so it is
+not mistaken for the default-bail clock.
 
-### 🕸️ 3. Interactive Crime Network Canvas (Link Analysis)
-- **Visual Graph Rendering:** Advanced SVG/Canvas graphs plot the invisible connections between disparate Cases, Persons, Vehicles, and Locations.
-- **Organized Crime Detection:** Instantly uncover shared license plates, aliases, or safe houses across separate cases.
-- **Drill-Down Mode:** Isolate a single suspect and recursively expand their immediate connection web.
+### Deterministic final-report builder
 
-### ⚡ 4. Predictive Early Warning & Tactical Alert Engine
-- **Automated Spike Detection:** Algorithmic scan of incoming FIR patterns automatically detects localized spikes (e.g., sudden increase in vehicle thefts or burglaries within a station jurisdiction).
-- **Proactive Tactical Advisories:** Generates concrete patrol advice (e.g., *"78% probability of burglary spike in Sector 3; deploy night patrols between 22:00 and 02:00"*).
-- **Real-Time Notification System:** Live unread alert counter, unread/read state tracking, and station-scoped broadcast via `/api/early-warnings`.
-- **Geospatial Alert Pinning:** Alerts are linked to exact coordinates on the command map for immediate tactical deployment.
+1. Open a case and use **Report Data** to record reusable verified facts.
+2. Open **FR – Final Report** and initialise a structured draft.
+3. Use **Refresh case data** to fill empty fields from the saved case records.
+4. Complete officer-authored allegations, section links, narratives and filing
+   metadata.
+5. Save to create an immutable version and resolve blocking validation issues.
+6. Submit for supervisory review; a reviewer can return or approve the report.
+7. Export the saved version to PDF.
 
-### ⚖️ 5. Intelligent Legal Assistant & Statutory Deadlines Tracker
-- **Smart Legal References:** Instantly fetches relevant IPC/BNS sections based on case descriptions.
-- **Automated Deadline Management:** Tracks statutory timelines (e.g., 60/90 days for charge sheets) and sends proactive alerts to Investigating Officers, ensuring zero procedural lapses.
-- **Chargesheet Drafting:** Standalone chargesheet page plus in-app `ChargesheetEditor` (generate, edit, save draft) from Deadlines and case workflows.
+Refreshing case data never overwrites a non-empty officer edit. It adds new
+source-linked records, fills missing values and creates a `SOURCES_REFRESHED`
+version. Approved reports are locked and are not rewritten.
 
-### 📈 6. Command Analytics & Geospatial Hotspots
-- **Predictive Heatmaps:** Geospatial cluster mapping (via Leaflet) highlights emerging crime hotspots.
-- **7-Day Risk Forecast (Radar Chart):** Forward-looking visualizations comparing predicted crime risks against historical baselines.
-- **Multi-Station & District Comparisons:** Allows SPs and Command Staff to evaluate jurisdiction performance and crime trends over 6-month horizons.
-
-### 🔒 7. Enterprise-Grade Security & RBAC
-- **Station-Level Siloing:** Investigating Officers (IO) are strictly limited to data within their jurisdiction.
-- **District Command View:** Superintendents of Police (SP) get macro metrics and district-wide audit logs.
-- **Cascading Invites & Police IT:** Bootstrap Police IT admin invites gazetted ranks; hierarchy-scoped invitations and password resets.
-- **Tamper-Proof Audit Trails:** Every query, view, and export is securely logged.
-
----
-
-## 🗺️ Project Architecture & Stack
-
-SCRB Sahayak uses a modern, separated client-server architecture:
+## Architecture
 
 ```text
-       ┌────────────────────────┐
-       │   React + Vite (SPA)   │
-       │   Tailwind · Leaflet   │
-       └───────────┬────────────┘
-                   │ REST / JWT
-       ┌───────────▼────────────┐
-       │     FastAPI Backend    │
-       │  RBAC · OCR · Alerts   │
-       └─────┬────────────┬─────┘
-             │            │
-       ┌─────▼─────┐  ┌───▼──────────────┐
-       │  Supabase │  │   OpenRouter API │
-       │  Postgres │  │  (Gemini 1.5 Pro)│
-       └───────────┘  └──────────────────┘
+┌──────────────────────────────────┐
+│ React + Vite + TypeScript SPA    │
+│ Tailwind · Leaflet · Recharts    │
+└────────────────┬─────────────────┘
+                 │ REST + JWT
+┌────────────────▼─────────────────┐
+│ FastAPI backend                  │
+│ RBAC · audit · OCR · PDF · TTS   │
+│ deterministic report services   │
+└────────────┬───────────┬─────────┘
+             │           │ optional, selected workflows only
+┌────────────▼──────┐  ┌─▼─────────────────┐
+│ PostgreSQL        │  │ OpenRouter / TTS  │
+│ Supabase or local │  │ copilot/intake    │
+└───────────────────┘  └───────────────────┘
 ```
 
-| Component | Technology | Description |
-|---|---|---|
-| **Frontend** | React 18, Vite, TypeScript, Tailwind CSS, Recharts, Framer Motion, Lucide icons, Leaflet | Responsive SPA for visualization, early warnings UI, and bilingual copilot UX. |
-| **Backend** | FastAPI (Python 3.11+), Pydantic, Python-Jose (JWT), Passlib (Bcrypt), PyTesseract (OCR), Edge-TTS | Async REST API with RBAC, Early Warning engine, OCR ingestion, and speech. |
-| **Database** | PostgreSQL (hosted on Supabase) | Schema for cases, alerts, entity matching, hierarchy (`ltree`), audit logs. |
-| **AI/LLM** | OpenRouter (Gemini 1.5 Pro) | Context-aware routing, FIR summaries, entity extraction, multi-lingual processing. |
-| **TTS** | Edge-TTS (`/api/tts`) | Server-side speech synthesis for Read Aloud on copilot replies. |
+| Layer | Main technologies |
+|---|---|
+| Frontend | React 18, Vite, TypeScript, Tailwind CSS, Leaflet, Recharts, Framer Motion |
+| Backend | Python 3.11+, FastAPI, Pydantic, psycopg, JWT, bcrypt, PyMuPDF, ReportLab |
+| Database | PostgreSQL/Supabase, including `ltree` for hierarchy paths |
+| Optional AI | Configurable OpenRouter model for copilot/intake functions |
+| Speech/OCR | Edge-TTS, Web Speech API, Tesseract OCR |
 
----
+## Repository layout
 
-## 🛠️ Setup & Local Installation
+```text
+backend/                 FastAPI application, services, tests and migration helpers
+database/                SQL migrations, Prisma reference schema and demo seed
+docs/                    Final-report implementation notes
+frontend/                React/Vite application
+```
 
-### 1. Database (Supabase / Postgres)
-1. Apply migrations in order: `0003` → `0004_hierarchy_auth` → `0005_command_jurisdiction` (and any newer migrations such as chargesheet draft). See `database/README.md`.
-2. Load sample data from `database/seed/seed.sql`.
+## Local setup
 
-### 2. Backend Setup
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- PostgreSQL/Supabase connection
+- Tesseract OCR if FIR image OCR is required
+
+On macOS, OCR dependencies can be installed with:
+
+```bash
+brew install tesseract tesseract-lang
+```
+
+### 1. Clone and install the backend
+
+```bash
+git clone https://github.com/Roodraksh12/TESTKSPAI.git
+cd TESTKSPAI/backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Fill at least these backend values:
+
+```dotenv
+DATABASE_URL=postgresql://...
+SUPABASE_JWT_SECRET=replace-with-a-long-random-secret
+ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
+
+`OPENROUTER_API_KEY` is optional for deterministic case, deadline, network,
+diary and final-report functionality. It is required only for the configured AI
+workflows.
+
+For this cloned development workspace, `backend/.env.test` can override `.env`:
+
+```bash
+cp .env.example .env.test
+```
+
+Both files are ignored by Git. Never commit database passwords, JWT secrets,
+service-role keys or police data.
+
+### 2. Prepare the database
+
+Use a separate development/test project. Do not run experimental migrations
+against the original shared round-one database.
+
+The canonical order and base-schema notes are in
+[`database/README.md`](database/README.md). The active schema progresses through:
+
+```text
+0003
+0004 hierarchy/auth + chargesheet draft
+0005
+0006
+0007
+0008
+0009 custody clocks
+0010 final-report builder
+0011 final-report schema v2
+0012 reusable case report sources
+```
+
+For a test database that already has migrations through 0008, run from
+`backend/`:
+
+```bash
+PYTHONPATH=. python -m scripts.apply_0009
+PYTHONPATH=. python -m scripts.apply_0010
+PYTHONPATH=. python -m scripts.apply_0011
+PYTHONPATH=. python -m scripts.apply_0012
+```
+
+Migrations 0010–0012 are currently intended for the isolated development/test
+database while the reporting workflow is reviewed.
+
+### 3. Run the backend
+
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .\.venv\Scripts\activate
-pip install -r requirements.txt
-```
-Install system dependencies for OCR (Tesseract):
-- **macOS**: `brew install tesseract tesseract-lang`
-- **Ubuntu/Debian**: `sudo apt-get install tesseract-ocr tesseract-ocr-kan`
-- **Windows**: Install Tesseract and ensure it is on `PATH` (or use `backend/start_windows.bat` if provided).
-
-```bash
-cp .env.example .env       # Fill DATABASE_URL, OPENROUTER_API_KEY, SUPABASE_JWT_SECRET, optional SMTP_*
+source .venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-- Swagger: http://localhost:8000/docs  
-- Health: http://localhost:8000/health  
 
-### 3. Frontend Client Setup
+- API documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Health endpoint: [http://localhost:8000/health](http://localhost:8000/health)
+
+### 4. Run the frontend
+
+In a second terminal:
+
 ```bash
 cd frontend
 npm install
-cp .env.example .env       # Set VITE_API_URL (and Maps key if used)
+cp .env.example .env
 npm run dev
 ```
-Application URL: http://localhost:5173
 
----
+The frontend uses:
 
-## 🧪 Testing
+```dotenv
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+Open [http://localhost:5173](http://localhost:5173).
+
+## Demo seed accounts
+
+After loading [`database/seed/seed.sql`](database/seed/seed.sql), the default
+development accounts are:
+
+| Role | Badge ID | Seed password | Scope |
+|---|---|---|---|
+| Police IT | `KA-IT-0001` | `demo1234` | Administration/bootstrap |
+| SP | `KA-SP-9999` | `demo1234` | District command |
+| Inspector | `KA-INS-4471` | `demo1234` | Station/IO workflows |
+| Constable | `KA-CON-1001` | `demo1234` | Station-scoped case access |
+
+Change demo passwords for any persistent environment.
+
+## Testing and verification
+
+Backend tests use the database configured in `backend/.env.test` when present.
+Confirm that it points to an isolated test database before running integration
+tests.
 
 ```bash
 cd backend
-pytest
+source .venv/bin/activate
+PYTHONPATH=. pytest -q
 ```
+
+Frontend checks:
+
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+The checkpoint pushed on 24 August 2026 passed 128 backend tests, frontend lint,
+the production build and a reversible report-source → final-report refresh smoke
+test.
+
+## Working together safely
+
+Before starting work:
+
+```bash
+git switch main
+git pull origin main
+git switch -c feature/short-description
+```
+
+After testing:
+
+```bash
+git add <files-you-intend-to-commit>
+git commit -m "feat: describe the change"
+git push -u origin feature/short-description
+```
+
+Open a pull request, review the diff and test results, then merge. Avoid editing
+the same files directly on `main` from two machines at the same time.
+
+## Additional documentation
+
+- [Database and migration guide](database/README.md)
+- [Final-report Phase 2](docs/final-report-phase2.md)
+- [Final-report Phase 3](docs/final-report-phase3.md)
+
+## License and attribution
+
+Add the intended project licence before production distribution. Map tiles and
+other third-party services remain subject to their respective terms.
