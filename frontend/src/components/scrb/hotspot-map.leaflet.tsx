@@ -95,8 +95,10 @@ export default function HotspotMap({
         })}
       </MapContainer>
       {clusters.length === 0 && (
-        <div className="pointer-events-none absolute inset-0 z-[400] flex items-center justify-center bg-surface/60 backdrop-blur-sm">
-          <p className="text-sm text-muted-foreground">No hotspot clusters in your jurisdiction yet.</p>
+        <div className="pointer-events-none absolute inset-0 z-[400] flex items-center justify-center bg-surface/10">
+          <div className="rounded-xl bg-surface/95 px-4 py-2.5 shadow-sm border border-hairline backdrop-blur-md">
+            <p className="text-sm font-medium text-foreground">No hotspot clusters in your jurisdiction yet.</p>
+          </div>
         </div>
       )}
     </div>

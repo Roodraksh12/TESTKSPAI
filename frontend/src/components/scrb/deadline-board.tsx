@@ -173,10 +173,18 @@ export function DeadlineRiskList({ board, onOpenEditor }: { board: DeadlineRow[]
                 )}
               </div>
             ) : (
-              <div className="rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted-foreground">
-                {row.chargesheetStatus === "LEGACY_CASE_COMPLETED"
-                  ? "No first-remand record is available for this completed case."
-                  : "No first remand recorded. FIR registration does not start a BNSS 187(3) custody clock."}
+              <div className="flex items-center justify-between rounded-xl bg-surface-2 p-3">
+                <div className="text-xs leading-relaxed text-muted-foreground">
+                  {row.chargesheetStatus === "LEGACY_CASE_COMPLETED"
+                    ? "No first-remand record is available for this completed case."
+                    : "No first remand recorded. FIR registration does not start a BNSS 187(3) custody clock."}
+                </div>
+                <Link
+                  to={`/cases/${row.caseId}?action=fr`}
+                  className="shrink-0 ml-4 rounded-lg bg-teal/10 border border-teal/20 px-3 py-1.5 text-[11px] font-medium text-teal hover:bg-teal/20 transition-colors"
+                >
+                  Accused Found
+                </Link>
               </div>
             )}
             <div>

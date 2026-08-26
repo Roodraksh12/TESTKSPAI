@@ -18,6 +18,7 @@ export default function Cases() {
   const status = searchParams.get("status") || "";
   const date = searchParams.get("date") || "";
   const q = searchParams.get("q") || "";
+  const hasPendingMatches = searchParams.get("hasPendingMatches") || "";
 
   useEffect(() => {
     // ProtectedRoute normally guarantees this, but the guard also prevents a
@@ -34,6 +35,7 @@ export default function Cases() {
     if (status) params.set("status", status);
     if (date) params.set("date", date);
     if (q) params.set("q", q);
+    if (hasPendingMatches === "true") params.set("hasPendingMatches", "true");
     const query = params.toString();
 
     apiRequest(`/api/cases${query ? `?${query}` : ""}`, {
@@ -53,7 +55,7 @@ export default function Cases() {
       });
 
     return () => controller.abort();
-  }, [crimeType, stationId, status, date, q, user?.id]);
+  }, [crimeType, stationId, status, date, q, hasPendingMatches, user?.id]);
 
   return (
     <div className="flex h-full flex-col gap-6">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import jsPDF from "jspdf";
 import { Search, Layers, Activity, Route, Compass, Sparkles, CircleAlert, Link2 } from "lucide-react";
 import { apiRequest } from "@/api/client";
@@ -49,6 +49,8 @@ const EMPTY_META: NetworkMeta = {
 
 export default function NetworkPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const queryFocusId = searchParams.get("focusId");
   const { t } = useI18n();
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -85,7 +87,9 @@ export default function NetworkPage() {
 
   useEffect(() => {
     let cancelled = false;
-    apiRequest("/api/network", { fresh: true })
+    setLoading(true);
+    const url = queryFocusId ? `/api/network?seedId=${encodeURIComponent(queryFocusId)}` : "/api/network";
+    apiRequest(url, { fresh: true })
       .then((payload) => {
         if (cancelled) return;
         setNodes(payload.nodes || []);
@@ -95,6 +99,7 @@ export default function NetworkPage() {
         setHubs(payload.hubs || []);
         setBrokers(payload.brokers || []);
         setMeta({ ...EMPTY_META, ...(payload.meta || {}) });
+        setSeeded(false); // allow re-seeding local canvas after new fetch
       })
       .catch((err) => {
         console.error(err);
@@ -106,7 +111,7 @@ export default function NetworkPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [queryFocusId]);
 
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const adjacency = useMemo(() => buildAdjacency(edges), [edges]);
@@ -131,6 +136,14 @@ export default function NetworkPage() {
     setPathIds(null);
   }
 
+  function centerGraph(id: string) {
+    if (queryFocusId !== id) {
+      navigate(`?focusId=${encodeURIComponent(id)}`);
+    } else {
+      seedFrom(id);
+    }
+  }
+
   function expand(id: string) {
     setRevealedIds((prev) => {
       const next = new Set(prev);
@@ -149,10 +162,14 @@ export default function NetworkPage() {
   // neighbourhood rather than an empty prompt.
   useEffect(() => {
     if (loading || seeded) return;
-    if (hubs.length > 0) seedFrom(hubs[0].id);
+    if (queryFocusId && nodeById.has(queryFocusId)) {
+      seedFrom(queryFocusId);
+    } else if (hubs.length > 0) {
+      seedFrom(hubs[0].id);
+    }
     setSeeded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, seeded, hubs, adjacency]);
+  }, [loading, seeded, hubs, adjacency, queryFocusId, nodeById]);
 
   function onNodeClick(id: string) {
     if (mode === "path") {
@@ -658,7 +675,7 @@ export default function NetworkPage() {
           tab={playerTab}
           onTabChange={setPlayerTab}
           selectedId={selectedId}
-          onSelect={seedFrom}
+          onSelect={centerGraph}
         />
 
         {meta.pendingLeadCount > 0 && (
@@ -692,7 +709,7 @@ export default function NetworkPage() {
                       <button
                         key={`${lead.from}-${lead.to}-${index}`}
                         type="button"
-                        onClick={() => seedFrom(lead.from)}
+                        onClick={() => centerGraph(lead.from)}
                         className="block w-full rounded-lg border border-amber/15 bg-surface px-2.5 py-2 text-left transition hover:bg-amber/10"
                       >
                         <p className="truncate text-[11px] font-medium text-foreground">{from.label} → {to.label}</p>
@@ -715,7 +732,7 @@ export default function NetworkPage() {
           canExpand={!!selected && mode === "explore" && expandableIds.has(selected.id)}
           pinned={!!selected && pinnedIds.has(selected.id)}
           onExpand={expand}
-          onFocus={seedFrom}
+          onFocus={centerGraph}
           onTogglePin={togglePin}
           onSelectOther={onNodeClick}
           onClear={() => setSelectedId(null)}
@@ -723,7 +740,7 @@ export default function NetworkPage() {
 
         <EvidenceBoardPanel
           pinnedNodes={nodes.filter((n) => pinnedIds.has(n.id))}
-          onFocus={seedFrom}
+          onFocus={centerGraph}
           onUnpin={togglePin}
           onExport={exportBoardPdf}
           exporting={exporting}

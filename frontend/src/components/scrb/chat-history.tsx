@@ -17,15 +17,11 @@ export type ChatSessionSummary = {
 };
 
 export function ChatHistoryPanel({
-  open,
-  onClose,
   currentSessionId,
   refreshKey,
   onNewChat,
   onLoadSession,
 }: {
-  open: boolean;
-  onClose: () => void;
   currentSessionId: string | null;
   /** Bumped by the parent after each reply so the list picks up new sessions. */
   refreshKey: number;
@@ -46,15 +42,14 @@ export function ChatHistoryPanel({
   }, []);
 
   useEffect(() => {
-    if (open) load();
-  }, [open, refreshKey, load]);
+    load();
+  }, [refreshKey, load]);
 
   const handleOpenSession = async (sessionId: string) => {
     setLoadingId(sessionId);
     try {
       const payload = await apiRequest(`/api/chat/sessions/${sessionId}`);
       onLoadSession(sessionId, payload.messages || []);
-      onClose();
     } catch (err) {
       console.error(err);
     } finally {
@@ -76,28 +71,19 @@ export function ChatHistoryPanel({
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="absolute inset-0 z-20 flex">
-      <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={onClose} />
-
-      <aside className="relative z-10 flex h-full w-80 max-w-[85vw] flex-col border-r border-hairline bg-surface shadow-xl">
+      <aside className="flex h-full w-72 flex-col rounded-2xl border border-hairline bg-surface shadow-sm overflow-hidden shrink-0">
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-teal" />
             <h3 className="text-sm font-bold text-foreground">{t("copilot.conversations")}</h3>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
         </div>
 
         <div className="border-b border-hairline p-3">
           <button
             onClick={() => {
               onNewChat();
-              onClose();
             }}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-3 py-2 text-[12px] font-medium text-white transition hover:bg-ink-2 dark:bg-foreground dark:text-background"
           >
@@ -171,6 +157,5 @@ export function ChatHistoryPanel({
           </p>
         </div>
       </aside>
-    </div>
   );
 }

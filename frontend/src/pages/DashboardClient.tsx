@@ -150,7 +150,6 @@ export function DashboardClient({
   } = useCopilotStore();
 
   const { t, lang } = useI18n();
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const [searchParams] = useSearchParams();
@@ -277,6 +276,15 @@ export function DashboardClient({
 
   return (
     <div className="flex h-full gap-5">
+      <div className="hidden xl:block h-full">
+        <ChatHistoryPanel
+          currentSessionId={sessionId}
+          refreshKey={historyRefreshKey}
+          onNewChat={handleNewChat}
+          onLoadSession={handleLoadSession}
+        />
+      </div>
+
       {/* Main: Chatbot Area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Alert banner */}
@@ -293,14 +301,6 @@ export function DashboardClient({
 
         {/* Chat card */}
         <div className="flex flex-col bg-surface rounded-2xl shadow-sm border border-hairline overflow-hidden flex-1 relative">
-          <ChatHistoryPanel
-            open={historyOpen}
-            onClose={() => setHistoryOpen(false)}
-            currentSessionId={sessionId}
-            refreshKey={historyRefreshKey}
-            onNewChat={handleNewChat}
-            onLoadSession={handleLoadSession}
-          />
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-hairline shrink-0">
             <div className="flex items-center gap-3">
@@ -325,24 +325,6 @@ export function DashboardClient({
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               )}
-              <button
-                type="button"
-                onClick={() => setHistoryOpen(true)}
-                title="Past conversations"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-surface-2 px-3 py-1.5 text-[11px] font-medium text-muted-foreground border border-hairline hover:text-foreground"
-              >
-                <History className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{t("copilot.history")}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleNewChat}
-                title="Start a new conversation"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-surface-2 px-3 py-1.5 text-[11px] font-medium text-muted-foreground border border-hairline hover:text-foreground"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{t("copilot.new")}</span>
-              </button>
               <button
                 type="button"
                 disabled={exportingPdf || messages.length === 0}
@@ -536,109 +518,6 @@ export function DashboardClient({
           </div>
         </div>
       </div>
-
-      {/* Right: Dashboard Panel */}
-      <div className="hidden xl:flex flex-col w-72 shrink-0 gap-4 overflow-y-auto">
-        {/* Who is signed in, and exactly what they can see. Making the RBAC
-            scope explicit prevents the "why isn't that case here?" confusion. */}
-        <OfficerCard officer={officer} loading={statsLoading} />
-
-        {/* Anything with a clock or a pending decision attached. */}
-        <AttentionCard attention={attention} loading={statsLoading} />
-
-        {/* Stats — filled async; chat shell never waits */}
-        <div className="space-y-3">
-          <StatCard
-            icon={Briefcase}
-            label={t("dash.openInvestigations")}
-            value={statsLoading ? "—" : openCases}
-            tone="teal"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label={t("dash.clearanceRate")}
-            value={statsLoading ? "—" : `${clearanceRate}%`}
-            tone="default"
-          />
-          <StatCard
-            icon={Activity}
-            label={t("dash.totalCases")}
-            value={statsLoading ? "—" : totalCases}
-            tone="default"
-          />
-        </div>
-
-        {/* Recent Activity */}
-        <div className="rounded-2xl border border-hairline bg-surface p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase">{t("dash.recentCases")}</h3>
-            <Link to="/cases" className="text-[10px] text-teal hover:text-teal/80 font-medium">{t("dash.viewAll")}</Link>
-          </div>
-          <div className="space-y-2">
-            {statsLoading && recentCases.length === 0 ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-12 animate-pulse rounded-xl bg-surface-2" />
-              ))
-            ) : recentCases.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-2">{t("dash.noRecentCases")}</p>
-            ) : null}
-            {recentCases.map((c) => (
-              <Link key={c.id} to={`/cases/${c.id}`}
-                className="flex items-start gap-2.5 rounded-xl p-2.5 hover:bg-surface-2 transition-colors group"
-              >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-muted-foreground">
-                  <FileText className="h-3.5 w-3.5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-medium text-foreground truncate group-hover:text-ink transition-colors">{c.firNumber}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-muted-foreground truncate">{c.crimeType}</span>
-                    <span className={cn("text-[9px] font-medium", STATUS_COLORS[c.status] || "text-muted-foreground")}>
-                      {c.status.replace("_", " ")}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="rounded-2xl border border-hairline bg-surface p-4">
-          <h3 className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase mb-3">{t("dash.quickActions")}</h3>
-          <div className="space-y-1.5">
-            <Link to="/fir/upload"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-foreground hover:bg-surface-2 transition-colors"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber/10 text-amber">
-                <FileText className="h-3.5 w-3.5" />
-              </div>
-              <span className="text-[12px] font-medium">{t("dash.newFirIntake")}</span>
-            </Link>
-            <Link to="/hotspots"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-foreground hover:bg-surface-2 transition-colors"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal/10 text-teal">
-                <MapPin className="h-3.5 w-3.5" />
-              </div>
-              <span className="text-[12px] font-medium">{t("dash.viewHotspots")}</span>
-            </Link>
-            <Link to="/network"
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-foreground hover:bg-surface-2 transition-colors"
-            >
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-2 text-muted-foreground">
-                <Activity className="h-3.5 w-3.5" />
-              </div>
-              <span className="text-[12px] font-medium">{t("dash.entityNetwork")}</span>
-            </Link>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-hairline bg-surface p-4 text-center">
-          <p className="text-[9px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">{t("dash.securedSession")}</p>
-          <p className="mt-1 text-[10px] text-muted-foreground">{t("dash.auditLogged")}</p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -793,7 +672,7 @@ function AttentionCard({ attention, loading }: { attention?: DashboardAttention 
               icon={GitMerge}
               label={t("dash.leadsAwaiting")}
               value={attention.pendingMatches}
-              to="/cases"
+              to="/cases?hasPendingMatches=true"
               tone="amber"
             />
           )}

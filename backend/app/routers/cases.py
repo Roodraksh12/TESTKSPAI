@@ -70,6 +70,7 @@ class CustodyClockRequest(BaseModel):
     """A court-remand record, not a suspect-identification or arrest record."""
 
     casePersonId: str = Field(min_length=1, max_length=100)
+    newAccusedName: str | None = Field(default=None, max_length=200)
     firstRemandAt: datetime
     windowDays: Literal[60, 90]
     thresholdBasis: Literal["DEATH_LIFE_OR_TEN_YEARS_OR_MORE", "OTHER_OFFENCE"]
@@ -140,6 +141,7 @@ def list_cases(
     status: str | None = None,
     date: str | None = None,
     q: str | None = None,
+    hasPendingMatches: str | None = None,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     officer = current_user["officer"]
@@ -177,6 +179,9 @@ def list_cases(
             )
         '''
         params["q"] = f"%{q.strip()}%"
+
+    if hasPendingMatches == "true":
+        filters += ' AND EXISTS (SELECT 1 FROM "CaseMatch" cm WHERE cm."caseId" = c.id AND cm.status = \'PENDING\')'
 
     def _load(conn):
         with conn.cursor() as cur:
@@ -400,26 +405,40 @@ def record_custody_clock(
     if remand_at > datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5):
         raise HTTPException(status_code=400, detail="First-remand time cannot be in the future")
 
-    case_person = fetch_one(
-        '''
-        SELECT cp.id
-        FROM "CasePerson" cp
-        WHERE cp.id = %(casePersonId)s
-          AND cp."caseId" = %(caseId)s
-          AND cp.role = 'ACCUSED'
-        ''',
-        {"casePersonId": payload.casePersonId, "caseId": case_id},
-    )
-    if not case_person:
-        raise HTTPException(status_code=400, detail="Select an accused linked to this FIR")
+    if payload.casePersonId == "ADD_CUSTOM":
+        if not payload.newAccusedName or not payload.newAccusedName.strip():
+            raise HTTPException(status_code=400, detail="Custom accused name required")
+        person = _find_or_create_person(payload.newAccusedName.strip(), "ACCUSED")
+        case_person_id_to_use = new_id()
+        execute(
+            '''
+            INSERT INTO "CasePerson" (id, "caseId", "personId", role)
+            VALUES (%(id)s, %(caseId)s, %(personId)s, 'ACCUSED')
+            ''',
+            {"id": case_person_id_to_use, "caseId": case_id, "personId": person["id"]},
+        )
+    else:
+        case_person = fetch_one(
+            '''
+            SELECT cp.id
+            FROM "CasePerson" cp
+            WHERE cp.id = %(casePersonId)s
+              AND cp."caseId" = %(caseId)s
+              AND cp.role = 'ACCUSED'
+            ''',
+            {"casePersonId": payload.casePersonId, "caseId": case_id},
+        )
+        if not case_person:
+            raise HTTPException(status_code=400, detail="Select an accused linked to this FIR")
+        case_person_id_to_use = payload.casePersonId
 
     existing = fetch_one(
         'SELECT id FROM "CaseCustodyClock" WHERE "casePersonId" = %(casePersonId)s',
-        {"casePersonId": payload.casePersonId},
+        {"casePersonId": case_person_id_to_use},
     )
     params = {
         "caseId": case_id,
-        "casePersonId": payload.casePersonId,
+        "casePersonId": case_person_id_to_use,
         "firstRemandAt": remand_at,
         "windowDays": payload.windowDays,
         "thresholdBasis": payload.thresholdBasis,

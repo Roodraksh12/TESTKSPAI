@@ -54,7 +54,7 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
   const [matches, setMatches] = useState(caseData.matches || []);
   const [busy, setBusy] = useState<string | null>(null);
-  const [showChargesheet, setShowChargesheet] = useState(false);
+  const [showChargesheet, setShowChargesheet] = useState(searchParams.get("action") === "fr");
   const [showEvidenceForm, setShowEvidenceForm] = useState(false);
   const [refreshEvidence, setRefreshEvidence] = useState(0);
   const { setPageContext, seedIntakeBrief, setActiveCaseId } = useCopilotStore();
@@ -286,7 +286,7 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           {tab === "report-data" && (
             <ReportDataTab caseId={c.id} canEdit={canEditInvestigationLog} />
           )}
-          {tab === "connections" && <Connections />}
+          {tab === "connections" && <Connections caseId={c.id} />}
           {tab === "evidence" && <EvidenceTab caseId={c.id} key={refreshEvidence} />}
           {tab === "matches" && (
             <Matches matches={matches} busy={busy} onUpdate={handleMatch} />
@@ -339,12 +339,13 @@ function Overview({ c, rawExtractedText, highlight }: { c: any; rawExtractedText
         <div className="glass rounded-3xl p-5">
           <SectionLabel className="mb-2">Entities</SectionLabel>
           <ul className="space-y-2">
-            {c.entities.map((e: string, i: number) => (
-              <li key={i} className="glass rounded-2xl px-3 py-2 text-mono text-xs">
-                <HighlightText text={e} query={highlight} />
+            {c.casePersons.map((cp: any, i: number) => (
+              <li key={i} className="glass flex items-center justify-between rounded-2xl px-3 py-2 text-mono text-xs">
+                <HighlightText text={cp.person.name} query={highlight} />
+                <Badge tone={cp.role === "ACCUSED" ? "danger" : cp.role === "VICTIM" ? "amber" : "muted"}>{cp.role}</Badge>
               </li>
             ))}
-            {c.entities.length === 0 && (
+            {c.casePersons.length === 0 && (
               <li className="text-xs text-muted-foreground">No entities extracted.</li>
             )}
           </ul>
@@ -377,13 +378,13 @@ function Timeline({ caseData }: { caseData: any }) {
   );
 }
 
-function Connections() {
+function Connections({ caseId }: { caseId: string }) {
   return (
     <div className="glass rounded-3xl p-4">
       <p className="text-sm text-muted-foreground">
         Interactive graph available on the Network canvas.
       </p>
-      <Link to="/network" className="mt-3 inline-flex">
+      <Link to={`/network?focusId=${caseId}`} className="mt-3 inline-flex">
         <Button variant="secondary" size="sm">
           Open network canvas
         </Button>

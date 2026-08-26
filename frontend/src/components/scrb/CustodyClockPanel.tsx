@@ -33,6 +33,7 @@ type CustodyClock = {
 
 type FormValues = {
   casePersonId: string;
+  newAccusedName?: string;
   firstRemandAt: string;
   windowDays: "60" | "90";
   legalSectionDetails: string;
@@ -72,6 +73,7 @@ function inputDateTime(value = new Date()) {
 function initialForm(casePersonId = ""): FormValues {
   return {
     casePersonId,
+    newAccusedName: "",
     firstRemandAt: inputDateTime(),
     windowDays: "60",
     legalSectionDetails: "",
@@ -150,7 +152,7 @@ export function CustodyClockPanel({
   };
 
   const saveRemand = async () => {
-    if (!form.casePersonId || !form.legalSectionDetails.trim() || !form.remandOrderReference.trim()) {
+    if (!form.casePersonId || (form.casePersonId === "ADD_CUSTOM" && !form.newAccusedName?.trim()) || !form.legalSectionDetails.trim() || !form.remandOrderReference.trim()) {
       toast.error("Accused, offence/section details, and remand-order reference are required");
       return;
     }
@@ -164,6 +166,7 @@ export function CustodyClockPanel({
         method: "POST",
         body: JSON.stringify({
           casePersonId: form.casePersonId,
+          newAccusedName: form.casePersonId === "ADD_CUSTOM" ? form.newAccusedName?.trim() : undefined,
           firstRemandAt: new Date(form.firstRemandAt).toISOString(),
           windowDays: Number(form.windowDays),
           thresholdBasis: form.windowDays === "90" ? "DEATH_LIFE_OR_TEN_YEARS_OR_MORE" : "OTHER_OFFENCE",
@@ -295,8 +298,14 @@ export function CustodyClockPanel({
             <label className="block text-xs font-medium text-muted-foreground">Accused
               <Select value={form.casePersonId} onChange={(event) => setForm((current) => ({ ...current, casePersonId: event.target.value }))} className="mt-1">
                 {accused.map((person) => <option key={person.id} value={person.id}>{person.person.name}</option>)}
+                <option value="ADD_CUSTOM">+ Add custom suspect</option>
               </Select>
             </label>
+            {form.casePersonId === "ADD_CUSTOM" && (
+              <label className="block text-xs font-medium text-muted-foreground">Custom suspect name
+                <Input value={form.newAccusedName || ""} onChange={(event) => setForm((current) => ({ ...current, newAccusedName: event.target.value }))} placeholder="Enter full name of suspect" className="mt-1" />
+              </label>
+            )}
             <label className="block text-xs font-medium text-muted-foreground">First Magistrate-authorised remand date and time
               <Input type="datetime-local" value={form.firstRemandAt} max={inputDateTime()} onChange={(event) => setForm((current) => ({ ...current, firstRemandAt: event.target.value }))} className="mt-1" />
             </label>

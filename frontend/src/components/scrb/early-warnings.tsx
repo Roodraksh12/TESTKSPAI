@@ -57,11 +57,10 @@ export function EarlyWarningsFeed({ warnings = [] }: { warnings?: EarlyWarning[]
             <strong className="text-foreground">Reasoning:</strong> {warn.reasoning}
           </p>
 
-          <div className="mt-2 flex items-center justify-between rounded-xl bg-surface-2 p-3">
+          <div className="mt-2 rounded-xl bg-surface-2 p-3">
             <div className="text-xs font-medium text-foreground">
-              <span className="text-muted-foreground mr-1">Recommended:</span> {warn.action}
+              <strong className="text-foreground mr-1">Recommended:</strong> {warn.action}
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
       ))}

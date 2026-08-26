@@ -145,18 +145,20 @@ export default function Analytics() {
           <CrimeTrendChart data={payload?.trend.data} series={payload?.trend.series} />
         </Card>
 
-        <Card accent="amber" className="p-5 flex flex-col">
-          <div className="flex items-center gap-2 mb-4">
+        <Card accent="amber" className="p-5 flex flex-col h-[450px]">
+          <div className="flex items-center gap-2 mb-4 shrink-0">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber/10 text-amber">
               <PieChart className="h-4 w-4" />
             </div>
             <h2 className="text-sm font-semibold tracking-tight">{t("analytics.riskForecast")}</h2>
           </div>
-          <PredictiveRadarChart axes={payload?.forecast.axes} baseline={payload?.forecast.baseline} />
+          <div className="flex-1 min-h-0 flex items-center justify-center">
+            <PredictiveRadarChart axes={payload?.forecast.axes} baseline={payload?.forecast.baseline} />
+          </div>
         </Card>
 
-        <Card accent="amber" className="p-5 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
+        <Card accent="amber" className="p-5 flex flex-col h-[450px]">
+          <div className="flex items-center justify-between mb-4 shrink-0">
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber/10 text-amber">
                 <AlertTriangle className="h-4 w-4" />
@@ -167,7 +169,7 @@ export default function Analytics() {
               {t("analytics.dataDriven")}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto pr-2">
+          <div className="flex-1 overflow-y-auto pr-2 min-h-0">
             <EarlyWarningsFeed warnings={payload?.earlyWarnings} />
           </div>
         </Card>

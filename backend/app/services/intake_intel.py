@@ -830,7 +830,7 @@ def update_match_status(
         FROM "CaseMatch" cm
         JOIN "Case" c ON cm."caseId" = c.id
         WHERE cm.id = %(id)s
-          AND (%(caseId)s IS NULL OR cm."caseId" = %(caseId)s)
+          AND (%(caseId)s::text IS NULL OR cm."caseId" = %(caseId)s)
         ''',
         {"id": match_id, "caseId": case_id},
     )

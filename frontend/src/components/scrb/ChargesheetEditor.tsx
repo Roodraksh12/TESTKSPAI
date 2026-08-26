@@ -1233,13 +1233,12 @@ export function ChargesheetEditor({ caseId, isOpen, onClose }: ChargesheetEditor
           {validation.issues.map((issue) => (
             <div key={issue.key} className={cn("rounded-xl border p-4", issue.severity === "ERROR" ? "border-danger/30 bg-danger/5" : "border-amber/40 bg-amber/5") }>
               <div className="flex items-start gap-3">
-                {issue.severity === "ERROR" ? <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-danger" /> : <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber" />}
+                {issue.severity === "ERROR" ? <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-danger" /> : <FileText className="mt-0.5 h-5 w-5 shrink-0 text-amber" />}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-foreground">{issue.message}</p>
-                    <Badge tone={issue.severity === "ERROR" ? "danger" : "amber"}>{issue.severity}</Badge>
+                    <Badge tone={issue.severity === "ERROR" ? "danger" : "amber"}>{issue.severity === "ERROR" ? "REQUIRED" : "NOTE REQUIRED"}</Badge>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Field: {issue.path}</p>
                   {issue.severity === "EXPLANATION" && (
                     <TextArea
                       rows={2}
@@ -1420,8 +1419,8 @@ export function ChargesheetEditor({ caseId, isOpen, onClose }: ChargesheetEditor
                 <div className="mt-4 hidden rounded-xl border border-hairline bg-surface p-3 md:block">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Saved validation</p>
                   <div className="mt-2 flex items-center gap-2">
-                    {validation.ready ? <CheckCircle2 className="h-4 w-4 text-teal" /> : <AlertTriangle className="h-4 w-4 text-amber" />}
-                    <span className="text-xs font-medium text-foreground">{validation.ready ? "Ready for review" : `${validation.counts.errors} errors`}</span>
+                    {validation.ready ? <CheckCircle2 className="h-4 w-4 text-teal" /> : <FileText className="h-4 w-4 text-amber" />}
+                    <span className="text-xs font-medium text-foreground">{validation.ready ? "Ready for review" : `${validation.counts.errors} pending items`}</span>
                   </div>
                   {dirty && <p className="mt-2 text-[11px] text-amber">Unsaved changes</p>}
                 </div>
