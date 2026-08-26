@@ -7,6 +7,23 @@ export type ChatMessage = {
   kind?: 'intake' | 'normal';
   toolsUsed?: string[];
   sources?: string[];
+  sourceCases?: { id: string; firNumber: string }[];
+  privacy?: AiPrivacyMetadata | null;
+};
+
+export type AiPrivacyMetadata = {
+  processingMode: 'SANITISED_EXTERNAL' | 'PRIVATE_MODEL';
+  provider: string;
+  model: string;
+  external: boolean;
+  retentionPolicy: 'ZDR_REQUIRED' | 'PRIVATE_BOUNDARY';
+  redaction: {
+    applied: boolean;
+    total: number;
+    categories: { category: string; count: number }[];
+  };
+  durationMs: number;
+  privacyProcessingMs: number;
 };
 
 interface CopilotState {

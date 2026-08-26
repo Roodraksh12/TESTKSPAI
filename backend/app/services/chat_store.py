@@ -13,6 +13,7 @@ trail, which already records every CHAT_QUERY.
 from __future__ import annotations
 
 from typing import Any
+import json
 
 from app.services.db import execute, fetch_all, fetch_one, fetch_scalar, new_id, serialize_rows
 
@@ -67,11 +68,17 @@ def append_message(
     role: str,
     content: str,
     source_case_ids: list[str] | None = None,
+    privacy_metadata: dict[str, Any] | None = None,
 ) -> None:
     execute(
         '''
-        INSERT INTO "ChatMessage" (id, "sessionId", role, content, "sourceCaseIds")
-        VALUES (%(id)s, %(sessionId)s, %(role)s, %(content)s, %(sourceCaseIds)s)
+        INSERT INTO "ChatMessage" (
+            id, "sessionId", role, content, "sourceCaseIds", "privacyMetadata"
+        )
+        VALUES (
+            %(id)s, %(sessionId)s, %(role)s, %(content)s, %(sourceCaseIds)s,
+            %(privacyMetadata)s::jsonb
+        )
         ''',
         {
             "id": new_id(),
@@ -79,6 +86,7 @@ def append_message(
             "role": role,
             "content": content,
             "sourceCaseIds": source_case_ids or [],
+            "privacyMetadata": json.dumps(privacy_metadata) if privacy_metadata else None,
         },
     )
 
@@ -153,7 +161,7 @@ def get_session_messages(session_id: str, officer_id: str) -> list[dict[str, Any
         return None
     rows = fetch_all(
         '''
-        SELECT role, content, "sourceCaseIds", "createdAt"
+        SELECT role, content, "sourceCaseIds", "privacyMetadata", "createdAt"
         FROM "ChatMessage"
         WHERE "sessionId" = %(sessionId)s
         ORDER BY "createdAt" ASC
@@ -165,6 +173,7 @@ def get_session_messages(session_id: str, officer_id: str) -> list[dict[str, Any
             "role": "assistant" if row["role"] == ROLE_ASSISTANT else "user",
             "content": row["content"],
             "sources": row.get("sourceCaseIds") or [],
+            "privacy": row.get("privacyMetadata"),
             "createdAt": row.get("createdAt"),
         }
         for row in serialize_rows(rows)

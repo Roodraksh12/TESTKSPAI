@@ -13,6 +13,7 @@ from app.services import legal_sections
 from app.services.db import fetch_one
 from app.services.openrouter import chat_completion
 from app.services.case_access import jurisdiction_filter_sql
+from app.services.ai_privacy import PrivacyContext
 import json
 
 
@@ -128,7 +129,17 @@ async def get_bns_details(
                 f"Respond in JSON format with two keys: 'relevance' (a 2-3 sentence explanation) and 'actionPlan' (a short list of 3-4 bullet points)."
             )
             try:
-                ai_response = await chat_completion([{"role": "user", "content": prompt}])
+                ai_response = await chat_completion(
+                    [{"role": "user", "content": prompt}],
+                    privacy_context=PrivacyContext(
+                        purpose="LEGAL_RELEVANCE_EXPLANATION",
+                        officer_id=officer["id"],
+                        case_ids=(case_id,),
+                        known_sensitive_values={
+                            "CASE_REFERENCE": [case_row["id"], case_row["firNumber"]],
+                        },
+                    ),
+                )
                 
                 # Try to parse JSON from ai_response
                 import re
@@ -142,4 +153,3 @@ async def get_bns_details(
                 pass
 
     return result
-

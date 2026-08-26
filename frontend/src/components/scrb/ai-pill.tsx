@@ -11,6 +11,8 @@ import { apiRequest } from "@/api/client";
 import { usePageContext } from "@/lib/scrb/page-context";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { ExplainChips } from "@/components/scrb/explain-chips";
+import type { AiPrivacyMetadata } from "@/lib/store";
 
 const VoiceEqualizer = ({ isListening }: { isListening: boolean }) => {
   const barsRef = useRef<(HTMLDivElement | null)[]>([]);
@@ -93,6 +95,8 @@ export function AiPill() {
   const [input, setInput] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [sources, setSources] = useState<string[]>([]);
+  const [sourceCases, setSourceCases] = useState<{ id: string; firNumber: string }[]>([]);
+  const [privacy, setPrivacy] = useState<AiPrivacyMetadata | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
@@ -111,6 +115,8 @@ export function AiPill() {
   useEffect(() => {
     setAnswer(null);
     setSources([]);
+    setSourceCases([]);
+    setPrivacy(null);
     setError(null);
   }, [page.description]);
 
@@ -129,6 +135,8 @@ export function AiPill() {
         setInput("");
         setAnswer(null);
         setSources([]);
+        setSourceCases([]);
+        setPrivacy(null);
         setError(null);
       }
     };
@@ -180,6 +188,8 @@ export function AiPill() {
     setError(null);
     setAnswer(null);
     setSources([]);
+    setSourceCases([]);
+    setPrivacy(null);
     try {
       const data = await apiRequest("/api/chat/quick", {
         method: "POST",
@@ -191,6 +201,8 @@ export function AiPill() {
       });
       setAnswer(data.reply || "No response.");
       setSources(data.sources || []);
+      setSourceCases(data.sourceCases || []);
+      setPrivacy(data.privacy || null);
     } catch (err: any) {
       setError(err?.message || "Couldn't reach the assistant.");
     } finally {
@@ -202,6 +214,8 @@ export function AiPill() {
     setInput("");
     setAnswer(null);
     setSources([]);
+    setSourceCases([]);
+    setPrivacy(null);
     setError(null);
     setMode("pill");
   };
@@ -210,6 +224,8 @@ export function AiPill() {
     setInput("");
     setAnswer(null);
     setSources([]);
+    setSourceCases([]);
+    setPrivacy(null);
     setError(null);
     setMode("bubble");
   };
@@ -331,14 +347,28 @@ export function AiPill() {
                               {sources.length > 0 && (
                                 <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-hairline pt-2">
                                   <span className="text-[10px] text-muted-foreground">{t("pill.sources")}:</span>
-                                  {sources.map((s) => (
-                                    <span
-                                      key={s}
-                                      className="text-mono rounded-md bg-teal/10 px-1.5 py-0.5 text-[10px] text-teal"
-                                    >
-                                      {s}
-                                    </span>
-                                  ))}
+                                  {sources.map((sourceFir) => {
+                                    const source = sourceCases.find((item) => item.firNumber === sourceFir);
+                                    const target = source
+                                      ? `/cases/${source.id}`
+                                      : `/cases?q=${encodeURIComponent(sourceFir)}`;
+                                    return (
+                                      <Link
+                                        key={sourceFir}
+                                        to={target}
+                                        onClick={resetToBubble}
+                                        title={`Open ${sourceFir}`}
+                                        className="text-mono rounded-md bg-teal/10 px-1.5 py-0.5 text-[10px] text-teal transition-colors hover:bg-teal/20 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal/40"
+                                      >
+                                        {sourceFir}
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {privacy && (
+                                <div className="mt-2 border-t border-hairline pt-2">
+                                  <ExplainChips privacy={privacy} />
                                 </div>
                               )}
                               <div className="mt-2 flex items-center justify-end gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
@@ -374,7 +404,7 @@ export function AiPill() {
                     />
 
                     <motion.div layout="position" className="flex flex-wrap items-center gap-2">
-                      {!answer &&
+                      {!loading && !answer &&
                         page.prompts.slice(0, 3).map((prompt, i) => (
                           <motion.button
                             key={prompt}

@@ -3,11 +3,16 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.deps import get_current_user
-from app.services import analytics
 from app.services.case_access import jurisdiction_filter_sql
-from app.services.db import execute, fetch_all, fetch_scalar
+from app.services.db import execute, fetch_all, fetch_one, fetch_scalar
 from app.services.hierarchy import is_police_it
-from app.services.warning_engine import WARNING_SOURCE, refresh_hotspot_warnings_if_due
+from app.services.warning_engine import (
+    BASELINE_WINDOW_DAYS,
+    CURRENT_WINDOW_DAYS,
+    MIN_CURRENT_CASES,
+    WARNING_SOURCE,
+    refresh_hotspot_warnings_if_due,
+)
 
 router = APIRouter(prefix="/api/early-warnings", tags=["early-warnings"])
 
@@ -79,10 +84,38 @@ def list_early_warnings(
         ''',
         {**params, "officerId": officer["id"]},
     )
+    summary_row = fetch_one(
+        f'''
+        SELECT COUNT(*)::int AS "activeCount",
+               COUNT(*) FILTER (
+                 WHERE a.severity IN ('HIGH', 'CRITICAL')
+               )::int AS "highCriticalCount",
+               COUNT(DISTINCT a."stationId")::int AS "affectedStations",
+               COUNT(*) FILTER (
+                 WHERE a."expiresAt" IS NOT NULL
+                   AND a."expiresAt" <= NOW() + INTERVAL '24 hours'
+               )::int AS "expiringSoonCount",
+               MAX(a."lastDetectedAt") AS "latestDetectedAt",
+               MIN(a."expiresAt") AS "nextExpiryAt"
+        FROM "Alert" a
+        WHERE {where_sql}
+        ''',
+        params,
+    ) or {}
     return {
         "warnings": warnings,
         "unreadCount": int(unread_count or 0),
-        "forecast": analytics.get_risk_forecast(officer),
+        "summary": {
+            "activeCount": int(summary_row.get("activeCount") or 0),
+            "highCriticalCount": int(summary_row.get("highCriticalCount") or 0),
+            "affectedStations": int(summary_row.get("affectedStations") or 0),
+            "expiringSoonCount": int(summary_row.get("expiringSoonCount") or 0),
+            "latestDetectedAt": summary_row.get("latestDetectedAt"),
+            "nextExpiryAt": summary_row.get("nextExpiryAt"),
+            "currentWindowDays": CURRENT_WINDOW_DAYS,
+            "baselineWindowDays": BASELINE_WINDOW_DAYS,
+            "minimumCases": MIN_CURRENT_CASES,
+        },
         "pollAfterSeconds": 20,
     }
 

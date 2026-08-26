@@ -34,12 +34,28 @@ def test_session_roundtrip_and_delete(officer) -> None:
     session_id = chat_store.create_session(officer["id"])
     try:
         chat_store.append_message(session_id, chat_store.ROLE_USER, "Which cases risk default bail?")
-        chat_store.append_message(session_id, chat_store.ROLE_ASSISTANT, "Three cases.", ["FIR/2026/0001"])
+        chat_store.append_message(
+            session_id,
+            chat_store.ROLE_ASSISTANT,
+            "Three cases.",
+            ["FIR/2026/0001"],
+            privacy_metadata={
+                "processingMode": "SANITISED_EXTERNAL",
+                "provider": "Test provider",
+                "model": "test-model",
+                "external": True,
+                "retentionPolicy": "ZDR_REQUIRED",
+                "redaction": {"applied": True, "total": 1, "categories": []},
+                "durationMs": 1,
+                "privacyProcessingMs": 1,
+            },
+        )
 
         messages = chat_store.get_session_messages(session_id, officer["id"])
         assert messages is not None
         assert [m["role"] for m in messages] == ["user", "assistant"]
         assert messages[1]["sources"] == ["FIR/2026/0001"]
+        assert messages[1]["privacy"]["processingMode"] == "SANITISED_EXTERNAL"
 
         listed = chat_store.list_sessions(officer["id"])
         entry = next((s for s in listed if s["id"] == session_id), None)

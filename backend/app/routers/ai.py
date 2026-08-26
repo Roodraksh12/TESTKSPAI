@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -16,7 +16,8 @@ from app.services.ai_tools import (
     serialize_tool_result,
 )
 from app.services.case_access import create_audit_log, get_case_with_relations, require_fir_upload
-from app.services.openrouter import chat_completion, chat_json
+from app.services.ai_privacy import PrivacyContext, known_values_from_case, merge_public_privacy
+from app.services.openrouter import chat_completion_with_metadata, chat_json
 
 router = APIRouter(prefix="/api", tags=["ai"])
 
@@ -31,20 +32,27 @@ Rules:
 - Never state a fact about a case or person without it coming from a tool result; if tools return nothing relevant, say so plainly instead of guessing.
 - Never assert a suspect match as certain — always phrase as a lead with confidence %, officer must confirm/reject.
 - When discussing patterns, ground only in method, timing, location, prior record — never caste, religion, or community.
+- Use search_cases when the officer asks to find or list case records. Use get_crime_statistics for counts, distributions, trends, busiest stations/districts, or incident-time patterns. Never calculate a total from a truncated search_cases list.
+- State that statistics are limited to the requesting officer's permitted jurisdiction, and do not infer causes from an observed correlation.
 - Prefer run_case_intake when an officer opens a newly saved case or asks "what next" / "brief me".
 - Prefer draft_case_summary for SP/SHO notes — label clearly as DRAFT not filed.
 - Keep responses concise and operational (bullets, numbered actions).
-- If matchId is available and officer says confirm/reject a match, use update_match_status.
+- You have read-only database tools. Never claim to confirm, reject, save, file, send or modify a record; direct the officer to the relevant reviewed UI action.
 - STRICT DOMAIN RESTRICTION: You are strictly a police investigation assistant. If the user asks a question unrelated to policing, crime, law enforcement, or investigations, you must reply with exactly this phrase and nothing else: "Ask relevant questions"'''
 
 
+class ChatHistoryItem(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=8_000)
+
+
 class ChatRequest(BaseModel):
-    message: str
-    pageContext: str | None = None
-    activeCaseId: str | None = None
-    stationId: str | None = None
-    sessionId: str | None = None
-    history: list[dict] = Field(default_factory=list)
+    message: str = Field(min_length=1, max_length=4_000)
+    pageContext: str | None = Field(default=None, max_length=12_000)
+    activeCaseId: str | None = Field(default=None, max_length=100)
+    stationId: str | None = Field(default=None, max_length=100)
+    sessionId: str | None = Field(default=None, max_length=100)
+    history: list[ChatHistoryItem] = Field(default_factory=list, max_length=30)
     # The floating quick-ask pill is a one-shot lookup about the page in front of
     # the officer, not a conversation. Those turns are deliberately not written
     # to ChatSession/ChatMessage so the saved history stays a record of real
@@ -54,23 +62,61 @@ class ChatRequest(BaseModel):
 
 
 class DraftFirRequest(BaseModel):
-    notes: str
+    notes: str = Field(min_length=1, max_length=20_000)
 
 
 class PredictStepsRequest(BaseModel):
-    caseId: str
+    caseId: str = Field(min_length=1, max_length=100)
+
+
+def extract_case_sources(value: Any) -> list[dict[str, str]]:
+    """Collect navigable case references from a jurisdiction-scoped tool result."""
+
+    found: dict[str, dict[str, str]] = {}
+
+    def visit(item: Any) -> None:
+        if isinstance(item, list):
+            for child in item:
+                visit(child)
+            return
+        if not isinstance(item, dict):
+            return
+
+        fir_number = item.get("firNumber")
+        case_id = item.get("caseId") or item.get("id")
+        if (
+            isinstance(fir_number, str)
+            and FIR_NUMBER_RE.fullmatch(fir_number)
+            and isinstance(case_id, str)
+            and case_id
+        ):
+            found.setdefault(
+                fir_number,
+                {"id": case_id, "firNumber": fir_number},
+            )
+
+        for child in item.values():
+            if isinstance(child, (dict, list)):
+                visit(child)
+
+    visit(value)
+    return list(found.values())
 
 
 @router.post("/chat")
 async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_user)) -> dict:
     officer = current_user["officer"]
 
-    # Audited before the LLM call so failed/errored queries are still on record.
+    # The general operational audit deliberately stores no prompt text. Detailed
+    # provider/redaction metadata is written separately to AiRequestAudit.
     create_audit_log(
         officer["id"],
         "CHAT_QUERY",
         "CHAT",
-        details=f'Queried: {payload.message[:80]}...',
+        details=(
+            f"AI request received; persisted={payload.persist}; "
+            f"caseContext={bool(payload.activeCaseId)}; privacyPolicy=backend-enforced"
+        ),
     )
 
     # Persist the question before the model runs, for the same reason the audit
@@ -81,6 +127,13 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
             officer["id"], payload.sessionId, payload.activeCaseId
         )
         chat_store.append_message(session_id, chat_store.ROLE_USER, payload.message)
+
+    active_case = (
+        get_case_with_relations(payload.activeCaseId, officer)
+        if payload.activeCaseId
+        else None
+    )
+    known_sensitive_values = known_values_from_case(active_case)
 
     context_addition = ""
     if payload.pageContext:
@@ -106,8 +159,8 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
 
     formatted_history = [
         {
-            "role": "assistant" if item.get("role") == "assistant" else "user",
-            "content": item.get("content") or "",
+            "role": item.role,
+            "content": item.content,
         }
         for item in payload.history
     ]
@@ -120,14 +173,29 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
 
     tools_used: list[str] = []
     sources: list[str] = []
+    source_cases: dict[str, dict[str, str]] = {}
     final_reply = ""
+    privacy_events: list[dict[str, Any]] = []
+
+    def privacy_context() -> PrivacyContext:
+        return PrivacyContext(
+            purpose="CONVERSATIONAL_ASSISTANT",
+            officer_id=officer["id"],
+            case_ids=(payload.activeCaseId,) if payload.activeCaseId else (),
+            session_id=session_id,
+            tool_names=tuple(dict.fromkeys(tools_used)),
+            known_sensitive_values=known_sensitive_values,
+        )
 
     for _round in range(MAX_TOOL_ROUNDS):
-        response_message = await chat_completion(
+        completion = await chat_completion_with_metadata(
             messages,
             tools=filtered_tools if filtered_tools else None,
             tool_choice="auto" if filtered_tools else None,
+            privacy_context=privacy_context(),
         )
+        privacy_events.append(completion.privacy)
+        response_message = completion.content
         if not isinstance(response_message, dict):
             final_reply = response_message or ""
             break
@@ -161,6 +229,8 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
 
             if tool_name:
                 tools_used.append(tool_name)
+            for source_case in extract_case_sources(tool_result):
+                source_cases.setdefault(source_case["firNumber"], source_case)
             serialized = serialize_tool_result(tool_result)
             sources.extend(FIR_NUMBER_RE.findall(serialized))
 
@@ -174,7 +244,12 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
     else:
         # Exhausted MAX_TOOL_ROUNDS with the model still requesting tools —
         # force a final answer with no tool access so the request can't hang.
-        final_response = await chat_completion(messages)
+        final_completion = await chat_completion_with_metadata(
+            messages,
+            privacy_context=privacy_context(),
+        )
+        privacy_events.append(final_completion.privacy)
+        final_response = final_completion.content
         final_reply = (
             final_response.get("content") or "No response."
             if isinstance(final_response, dict)
@@ -183,14 +258,27 @@ async def chat(payload: ChatRequest, current_user: dict = Depends(get_current_us
 
     reply = final_reply or "No response."
     deduped_sources = list(dict.fromkeys(sources))[:6]
+    navigable_sources = [
+        source_cases[fir_number]
+        for fir_number in deduped_sources
+        if fir_number in source_cases
+    ]
     if session_id:
-        chat_store.append_message(session_id, chat_store.ROLE_ASSISTANT, reply, deduped_sources)
+        chat_store.append_message(
+            session_id,
+            chat_store.ROLE_ASSISTANT,
+            reply,
+            deduped_sources,
+            privacy_metadata=merge_public_privacy(privacy_events),
+        )
 
     return {
         "reply": reply,
         "toolsUsed": list(dict.fromkeys(tools_used)),
         "sources": deduped_sources,
+        "sourceCases": navigable_sources,
         "sessionId": session_id,
+        "privacy": merge_public_privacy(privacy_events),
     }
 
 
@@ -236,7 +324,13 @@ Return JSON with keys: crimeType, incidentDate, location, accusedNames, victimNa
 Raw Notes:
 "{payload.notes}"'''
 
-    extracted = await chat_json([{"role": "user", "content": prompt}])
+    extracted = await chat_json(
+        [{"role": "user", "content": prompt}],
+        privacy_context=PrivacyContext(
+            purpose="FIELD_NOTE_EXTRACTION",
+            officer_id=officer["id"],
+        ),
+    )
     extracted_data = {
         "crimeType": extracted.get("crimeType", "Unknown"),
         "incidentDate": extracted.get("incidentDate", "Unknown"),
@@ -310,6 +404,14 @@ Predict the top 3 most actionable, specific next steps for the investigating off
 
 Return JSON with key "steps" as an array of objects with id (4-letter string), text, rationale. Max 3 steps.'''
 
-    result = await chat_json([{"role": "user", "content": prompt}])
+    result = await chat_json(
+        [{"role": "user", "content": prompt}],
+        privacy_context=PrivacyContext(
+            purpose="NEXT_STEP_SUGGESTION",
+            officer_id=current_user["officer"]["id"],
+            case_ids=(payload.caseId,),
+            known_sensitive_values=known_values_from_case(case_data),
+        ),
+    )
     steps = result.get("steps") or []
     return {"steps": steps[:3]}

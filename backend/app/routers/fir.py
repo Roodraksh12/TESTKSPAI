@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.deps import get_current_user
 from app.services import intake_intel
+from app.services.ai_privacy import PrivacyContext
 from app.services.case_access import create_audit_log, require_case_write, require_fir_upload
 from app.services.job_store import fir_jobs
 from app.services.openrouter import chat_completion
@@ -72,13 +73,18 @@ class ExtractedData(BaseModel):
     modusOperandi: str = ""
 
 
-async def _extract_fir_fields(raw_text: str) -> ExtractedData:
+async def _extract_fir_fields(raw_text: str, officer: dict) -> ExtractedData:
+    privacy_context = PrivacyContext(
+        purpose="FIR_OCR_EXTRACTION",
+        officer_id=officer["id"],
+    )
     completion = await chat_completion(
         [
             {"role": "system", "content": EXTRACT_SYSTEM_PROMPT},
             {"role": "user", "content": f"OCR Text:\n{raw_text}"},
         ],
         response_format={"type": "json_object"},
+        privacy_context=privacy_context,
     )
     response_text = completion if isinstance(completion, str) else completion.get("content") or "{}"
     try:
@@ -95,6 +101,7 @@ async def _extract_fir_fields(raw_text: str) -> ExtractedData:
                 },
             ],
             response_format={"type": "json_object"},
+            privacy_context=privacy_context,
         )
         retry_text = retry if isinstance(retry, str) else retry.get("content") or "{}"
         return ExtractedData.model_validate(json.loads(retry_text))
@@ -148,7 +155,7 @@ async def _process_fir(
         )
 
     stage("Extracting FIR fields")
-    extracted_data = await _extract_fir_fields(raw_text)
+    extracted_data = await _extract_fir_fields(raw_text, officer)
 
     stage("Searching for prior leads")
     station_id = officer.get("stationId")

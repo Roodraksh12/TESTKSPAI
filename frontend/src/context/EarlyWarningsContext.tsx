@@ -11,7 +11,6 @@ import {
 import { toast } from "sonner";
 import { apiRequest } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
-import type { ForecastAxis } from "@/components/scrb/trend-charts";
 
 export type EarlyWarningNotification = {
   id: string;
@@ -46,7 +45,17 @@ export type EarlyWarningNotification = {
 type WarningPayload = {
   warnings: EarlyWarningNotification[];
   unreadCount: number;
-  forecast: { axes: ForecastAxis[]; baseline: number };
+  summary: {
+    activeCount: number;
+    highCriticalCount: number;
+    affectedStations: number;
+    expiringSoonCount: number;
+    latestDetectedAt: string | null;
+    nextExpiryAt: string | null;
+    currentWindowDays: number;
+    baselineWindowDays: number;
+    minimumCases: number;
+  };
   pollAfterSeconds: number;
 };
 
@@ -60,10 +69,22 @@ type EarlyWarningsValue = WarningPayload & {
   markAllRead: () => Promise<void>;
 };
 
+const EMPTY_SUMMARY: WarningPayload["summary"] = {
+  activeCount: 0,
+  highCriticalCount: 0,
+  affectedStations: 0,
+  expiringSoonCount: 0,
+  latestDetectedAt: null,
+  nextExpiryAt: null,
+  currentWindowDays: 7,
+  baselineWindowDays: 28,
+  minimumCases: 3,
+};
+
 const EMPTY_PAYLOAD: WarningPayload = {
   warnings: [],
   unreadCount: 0,
-  forecast: { axes: [], baseline: 50 },
+  summary: EMPTY_SUMMARY,
   pollAfterSeconds: 20,
 };
 
@@ -111,7 +132,7 @@ export function EarlyWarningsProvider({ children }: { children: ReactNode }) {
       setPayload({
         warnings: next.warnings || [],
         unreadCount: next.unreadCount || 0,
-        forecast: next.forecast || { axes: [], baseline: 50 },
+        summary: next.summary || EMPTY_SUMMARY,
         pollAfterSeconds: next.pollAfterSeconds || 20,
       });
       setError(null);

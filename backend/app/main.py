@@ -26,6 +26,7 @@ from app.routers import (
     evidence,
     final_reports,
     report_sources,
+    investigation_plans,
 )
 from app.routers import settings as settings_router
 
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(evidence.router)
     app.include_router(final_reports.router)
     app.include_router(report_sources.router)
+    app.include_router(investigation_plans.router)
 
     return app
 

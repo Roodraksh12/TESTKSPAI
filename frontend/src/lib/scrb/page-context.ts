@@ -76,7 +76,7 @@ export function usePageContext(): PageContext {
       prompts: ["Which zone is highest risk?", "Why is this zone flagged?", "Where should we patrol tonight?"],
     },
     "/early-warnings": {
-      description: "The officer is reviewing active hotspot-derived early warnings and the jurisdiction crime-velocity forecast.",
+      description: "The officer is reviewing explainable hotspot warnings, acknowledgement status, affected stations and warning expiry risk.",
       placeholder: "Ask about these warnings…",
       prompts: ["Why was the top warning triggered?", "Which patrol area needs attention?", "Explain the risk score"],
     },

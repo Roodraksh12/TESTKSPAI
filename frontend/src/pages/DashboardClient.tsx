@@ -234,7 +234,14 @@ export function DashboardClient({
       });
       const finalMessages = [
         ...updatedMessages,
-        { role: "assistant", content: data.reply, toolsUsed: data.toolsUsed, sources: data.sources } as ChatMessage,
+        {
+          role: "assistant",
+          content: data.reply,
+          toolsUsed: data.toolsUsed,
+          sources: data.sources,
+          sourceCases: data.sourceCases,
+          privacy: data.privacy,
+        } as ChatMessage,
       ];
       setMessages(finalMessages);
       setChatHistory(finalMessages);
@@ -264,7 +271,7 @@ export function DashboardClient({
       ? ["Run full intake on this case", "Show MO-similar cases", "Give me the 24–72h checklist", "Draft SP progress note"]
       : DEFAULT_SUGGESTIONS;
 
-  const showChips = messages.length <= 2 || isIntake;
+  const showChips = !isLoading && (messages.length <= 2 || isIntake);
 
   const hasHighAlerts = alertCount > 0;
 
@@ -389,8 +396,13 @@ export function DashboardClient({
                             <span className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-mono">Leads only · Confirm before filing</span>
                           </div>
                         )}
-                        {msg.role === "assistant" && (msg.toolsUsed?.length || msg.sources?.length) ? (
-                          <ExplainChips toolsUsed={msg.toolsUsed} sources={msg.sources} />
+                        {msg.role === "assistant" && (msg.toolsUsed?.length || msg.sources?.length || msg.privacy) ? (
+                          <ExplainChips
+                            toolsUsed={msg.toolsUsed}
+                            sources={msg.sources}
+                            sourceCases={msg.sourceCases}
+                            privacy={msg.privacy}
+                          />
                         ) : null}
                         {msg.role === "assistant" && speech.isSupported && msg.content && (
                           <button

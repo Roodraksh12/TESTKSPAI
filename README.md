@@ -37,7 +37,14 @@ The current `main` branch includes:
   immutable versions, review/return/approval workflow and PDF export;
 - reusable **Report Data** records for parties, accused chronology, legal-section
   decisions, property, expert results and evidence outcomes;
+- versioned per-case **Investigation Plans** with assigned-IO task status, notes,
+  audit records and deterministic routine-document demo drafts;
 - hierarchy-aware RBAC, audit records, login throttling and stale-request fixes;
+- jurisdiction-scoped conversational case search and verified crime-statistics
+  breakdowns by crime, status, station, district, month, weekday or hour;
+- a provider-neutral AI gateway with backend-only sensitive-data tokenisation,
+  per-request Zero Data Retention enforcement for OpenRouter, private-model
+  routing, read-only AI tools and metadata-only privacy audit records;
 - command analytics, hotspots and early-warning indicators; and
 - English/Kannada UI and speech support.
 
@@ -58,10 +65,16 @@ system or a substitute for an Investigating Officer, prosecutor or Court.
   decide guilt, select sections automatically or certify legal compliance.
 - The current report template profile uses supplied Rajasthan IIF-IV material as
   a development reference. It is not represented as a notified Karnataka form.
+- The investigation-plan registry and routine-document templates are explicitly
+  marked `PROVISIONAL_DEMO`. They are not Karnataka Police procedures, standing
+  orders or departmental forms and cannot be filed or transmitted by the app.
 - The Network canvas searches only data present in this test database. It is not
   connected to CCTNS, ICJS or a production police/criminal database.
+- The external-AI privacy layer reduces exposure; rule-based redaction cannot
+  guarantee that every sensitive phrase in arbitrary text will be detected.
 - Do not put real operational or personally sensitive police data into the demo
-  environment.
+  environment. A production police deployment still requires departmental
+  approval, security review and an approved private processing boundary.
 
 ## Main workflows
 
@@ -115,6 +128,23 @@ Refreshing case data never overwrites a non-empty officer edit. It adds new
 source-linked records, fills missing values and creates a `SOURCES_REFRESHED`
 version. Approved reports are locked and are not rewritten.
 
+### Provisional investigation plans
+
+1. Open a case and select **Investigation Plan**.
+2. The assigned IO can initialise a versioned checklist selected from the case's
+   recorded crime type.
+3. Record each task as pending, in progress, completed, blocked or not applicable,
+   with an officer note where needed.
+4. Create an editable routine-document draft from verified case metadata plus
+   officer-entered decision fields.
+5. Review and edit the text outside any filing workflow. The demo never signs,
+   approves, files or transmits the draft.
+
+The starter registry lives in
+`backend/app/data/investigation_playbooks.demo.json`. When a competent department
+provides approved workflows and formats, add a reviewed version rather than
+silently changing the snapshot already attached to existing cases.
+
 ## Architecture
 
 ```text
@@ -129,10 +159,10 @@ version. Approved reports are locked and are not rewritten.
 │ deterministic report services   │
 └────────────┬───────────┬─────────┘
              │           │ optional, selected workflows only
-┌────────────▼──────┐  ┌─▼─────────────────┐
-│ PostgreSQL        │  │ OpenRouter / TTS  │
-│ Supabase or local │  │ copilot/intake    │
-└───────────────────┘  └───────────────────┘
+┌────────────▼──────┐  ┌─▼────────────────────┐
+│ PostgreSQL        │  │ AI provider gateway  │
+│ Supabase or local │  │ private/API + TTS    │
+└───────────────────┘  └──────────────────────┘
 ```
 
 | Layer | Main technologies |
@@ -140,7 +170,7 @@ version. Approved reports are locked and are not rewritten.
 | Frontend | React 18, Vite, TypeScript, Tailwind CSS, Leaflet, Recharts, Framer Motion |
 | Backend | Python 3.11+, FastAPI, Pydantic, psycopg, JWT, bcrypt, PyMuPDF, ReportLab |
 | Database | PostgreSQL/Supabase, including `ltree` for hierarchy paths |
-| Optional AI | Configurable OpenRouter model for copilot/intake functions |
+| Optional AI | Configurable OpenRouter or private OpenAI-compatible endpoint |
 | Speech/OCR | Edge-TTS, Web Speech API, Tesseract OCR |
 
 ## Repository layout
@@ -186,9 +216,51 @@ SUPABASE_JWT_SECRET=replace-with-a-long-random-secret
 ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-`OPENROUTER_API_KEY` is optional for deterministic case, deadline, network,
-diary and final-report functionality. It is required only for the configured AI
-workflows.
+AI calls use a provider gateway. The existing OpenRouter setup remains the
+default and continues to use `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`:
+
+```dotenv
+AI_PROVIDER=openrouter
+OPENROUTER_API_KEY=...
+OPENROUTER_MODEL=openrouter/free
+AI_EXTERNAL_MODE=redacted_only
+```
+
+OpenRouter requests are tokenised on the backend and include
+`provider.zdr=true`. The configured model therefore needs a current,
+tool-capable Zero Data Retention endpoint. Free endpoint availability is not
+guaranteed; an incompatible or rate-limited route fails closed instead of
+falling back to a provider with weaker retention. Check the current endpoint
+list at [OpenRouter's ZDR endpoint](https://openrouter.ai/api/v1/endpoints/zdr).
+
+To use a private or self-hosted API that implements the OpenAI-compatible chat
+completions contract, switch only the backend configuration:
+
+```dotenv
+AI_PROVIDER=openai_compatible
+AI_BASE_URL=http://your-private-ai-host:port/v1
+AI_MODEL=your-deployed-model
+AI_API_KEY=
+AI_PRIVATE_ENDPOINT=true
+```
+
+`AI_API_KEY` may be left empty only when the private endpoint does not require
+authentication. `AI_PRIVATE_ENDPOINT=true` is an explicit trust declaration and
+must never be set for an ordinary third-party endpoint. `AI_REQUEST_TIMEOUT_SECONDS`
+defaults to `90`. OpenRouter or private AI configuration is optional for
+deterministic case, deadline, network, diary and final-report functionality; it
+is required only for AI workflows.
+
+Additional privacy controls are documented in
+[`docs/implementation-change-report.md`](docs/implementation-change-report.md).
+The default local chat-history retention window is 30 days. Preview the purge
+before applying it:
+
+```bash
+cd backend
+PYTHONPATH=. python -m scripts.purge_ai_history
+PYTHONPATH=. python -m scripts.purge_ai_history --apply
+```
 
 For this cloned development workspace, `backend/.env.test` can override `.env`:
 
@@ -218,6 +290,8 @@ The canonical order and base-schema notes are in
 0010 final-report builder
 0011 final-report schema v2
 0012 reusable case report sources
+0013 provisional investigation plans and routine-document drafts
+0014 AI request privacy audit metadata and chat privacy metadata
 ```
 
 For a test database that already has migrations through 0008, run from
@@ -228,10 +302,12 @@ PYTHONPATH=. python -m scripts.apply_0009
 PYTHONPATH=. python -m scripts.apply_0010
 PYTHONPATH=. python -m scripts.apply_0011
 PYTHONPATH=. python -m scripts.apply_0012
+PYTHONPATH=. python -m scripts.apply_0013
+PYTHONPATH=. python -m scripts.apply_0014
 ```
 
-Migrations 0010–0012 are currently intended for the isolated development/test
-database while the reporting workflow is reviewed.
+Migrations 0010–0014 are currently intended for the isolated development/test
+database while the reporting and provisional playbook workflows are reviewed.
 
 ### 3. Run the backend
 
@@ -297,9 +373,10 @@ npm run lint
 npm run build
 ```
 
-The checkpoint pushed on 24 August 2026 passed 128 backend tests, frontend lint,
-the production build and a reversible report-source → final-report refresh smoke
-test.
+The latest local checkpoint passed 169 backend tests, frontend lint and the
+production build. The privacy gateway also passed isolated tokenisation, ZDR,
+private-endpoint, egress-limit and metadata-audit tests. Live free-model capacity
+is external state and is not covered by deterministic tests.
 
 ## Working together safely
 
@@ -327,6 +404,7 @@ the same files directly on `main` from two machines at the same time.
 - [Database and migration guide](database/README.md)
 - [Final-report Phase 2](docs/final-report-phase2.md)
 - [Final-report Phase 3](docs/final-report-phase3.md)
+- [Implementation changes 1–5 and deployment requirements](docs/implementation-change-report.md)
 
 ## License and attribution
 

@@ -13,12 +13,17 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Apply DB migrations in order (see `database/README.md`): **0003 → both 0004 files → 0005 → 0006 → seed**.
+Apply DB migrations in order (see `database/README.md`). The isolated hackathon
+test database currently progresses through migration **0014**; never apply the
+experimental reporting/playbook migrations to the original shared round-one
+database.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\apply_0004.py
 .\.venv\Scripts\python.exe scripts\apply_0005.py
 .\.venv\Scripts\python.exe -m scripts.apply_0006
+.\.venv\Scripts\python.exe -m scripts.apply_0013
+.\.venv\Scripts\python.exe -m scripts.apply_0014
 .\.venv\Scripts\python.exe -m scripts.refresh_early_warnings
 ```
 
@@ -64,3 +69,37 @@ APP_PUBLIC_URL=http://localhost:5173
 ```
 
 If `SMTP_HOST` is empty, invite bodies are logged to the server console. Restart uvicorn after changing SMTP settings.
+
+## AI provider
+
+The default remains OpenRouter, using `OPENROUTER_API_KEY` and
+`OPENROUTER_MODEL`. Every OpenRouter request is locally tokenised and enforces a
+Zero Data Retention route. A selected model without a current ZDR-capable
+endpoint fails closed. To route AI calls to an approved private deployment that
+supports the OpenAI-compatible chat-completions contract, set:
+
+```dotenv
+AI_PROVIDER=openai_compatible
+AI_BASE_URL=http://your-private-ai-host:port/v1
+AI_MODEL=your-deployed-model
+AI_API_KEY=
+AI_PRIVATE_ENDPOINT=true
+```
+
+No router or frontend change is needed when switching providers. Do not mark an
+ordinary third-party endpoint private. Set `AI_EXTERNAL_MODE=disabled` to block
+all external model calls. Set `AI_PRIVACY_AUDIT_REQUIRED=true` in a controlled
+deployment when AI requests must fail if audit metadata cannot be written.
+
+Migration 0014 adds metadata-only `AiRequestAudit` records and assistant-message
+privacy metadata. It does not store prompts, completions or token maps. Preview
+the configured local chat retention policy with:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.purge_ai_history
+.\.venv\Scripts\python.exe -m scripts.purge_ai_history --apply
+```
+
+The purge command is dry-run unless `--apply` is present. See
+`../docs/implementation-change-report.md` for the complete security boundary,
+limitations and deployment decisions.

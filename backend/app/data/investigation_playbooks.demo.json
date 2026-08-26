@@ -1,0 +1,135 @@
+{
+  "profileCode": "KSP-HACKATHON-DEMO",
+  "version": 1,
+  "sourceStatus": "PROVISIONAL_DEMO",
+  "title": "Provisional investigation workflow",
+  "disclaimer": "Hackathon demonstration only. This is not an official Karnataka Police procedure, standing order, legal checklist or departmental document format. Every step and draft requires review by the Investigating Officer and replacement or approval by the competent department before operational use.",
+  "baseSteps": [
+    {
+      "key": "VERIFY_CASE_RECORD",
+      "phase": "INITIAL_REVIEW",
+      "title": "Verify the saved case record",
+      "guidance": "Review the FIR number, incident time, place, parties, allegations and jurisdiction recorded in the system. Correct source records rather than copying an error into later work.",
+      "rationale": "Later tasks and drafts should use verified case data.",
+      "documentTemplateKey": null
+    },
+    {
+      "key": "PRESERVE_TIME_SENSITIVE_MATERIAL",
+      "phase": "INITIAL_REVIEW",
+      "title": "Identify time-sensitive material",
+      "guidance": "Record which physical, digital or documentary material may be lost, overwritten or altered and note the officer-approved preservation action.",
+      "rationale": "The system should expose a decision for the IO; it must not invent a seizure or preservation order.",
+      "documentTemplateKey": "RECORD_PRESERVATION_REQUEST"
+    },
+    {
+      "key": "REVIEW_PARTIES_AND_IDENTIFIERS",
+      "phase": "EARLY_ACTIONS",
+      "title": "Review parties and identifiers",
+      "guidance": "Verify recorded complainant, victim, witness and accused details and mark uncertain identity matches as leads pending officer confirmation.",
+      "rationale": "Name similarity alone is not proof of identity.",
+      "documentTemplateKey": null
+    },
+    {
+      "key": "REGISTER_EVIDENCE_GAPS",
+      "phase": "EARLY_ACTIONS",
+      "title": "Record evidence collected and gaps",
+      "guidance": "Compare the allegation with evidence and expert-result records. Document what is present, pending, unavailable or not applicable.",
+      "rationale": "A visible evidence gap is safer than an unsupported conclusion.",
+      "documentTemplateKey": "EXPERT_EXAMINATION_REQUEST"
+    },
+    {
+      "key": "REVIEW_DATABASE_LEADS",
+      "phase": "FOLLOW_UP",
+      "title": "Review database and linkage leads",
+      "guidance": "Review similar cases, shared identifiers and network links. Confirm or reject each operationally relevant lead before relying on it.",
+      "rationale": "Automated similarity and network results remain investigative leads.",
+      "documentTemplateKey": null
+    },
+    {
+      "key": "SUPERVISORY_PROGRESS_REVIEW",
+      "phase": "SUPERVISORY_REVIEW",
+      "title": "Prepare an officer-reviewed progress update",
+      "guidance": "Summarise completed work, unresolved tasks, evidence gaps and proposed next actions for supervisory review.",
+      "rationale": "The IO remains responsible for accuracy and approval routing.",
+      "documentTemplateKey": "SUPERVISORY_PROGRESS_NOTE"
+    }
+  ],
+  "crimeProfiles": [
+    {
+      "key": "BURGLARY",
+      "aliases": ["burglary", "house breaking", "housebreaking"],
+      "title": "Burglary-focused additions",
+      "steps": [
+        {
+          "key": "BURGLARY_ENTRY_DOCUMENTATION",
+          "phase": "INITIAL_REVIEW",
+          "title": "Document the recorded entry method",
+          "guidance": "Review photographs, descriptions and evidence records concerning the alleged point and method of entry. Record missing documentation without assuming a method.",
+          "rationale": "Entry-method records may support later comparison when verified.",
+          "documentTemplateKey": null
+        },
+        {
+          "key": "BURGLARY_PROPERTY_RECONCILIATION",
+          "phase": "FOLLOW_UP",
+          "title": "Reconcile reported and recovered property",
+          "guidance": "Compare property descriptions, identifiers, estimated values, recovery records and seizure references already saved for the case.",
+          "rationale": "Property details should remain traceable to case records.",
+          "documentTemplateKey": null
+        }
+      ]
+    },
+    {
+      "key": "VEHICLE_THEFT",
+      "aliases": ["vehicle theft", "motor vehicle theft", "car theft", "bike theft"],
+      "title": "Vehicle-theft-focused additions",
+      "steps": [
+        {
+          "key": "VEHICLE_IDENTIFIER_REVIEW",
+          "phase": "INITIAL_REVIEW",
+          "title": "Verify recorded vehicle identifiers",
+          "guidance": "Check that available registration, make, model, colour and other identifiers are recorded from a verified source before circulation or comparison.",
+          "rationale": "Incorrect identifiers can create false matches.",
+          "documentTemplateKey": "RECORD_PRESERVATION_REQUEST"
+        }
+      ]
+    },
+    {
+      "key": "THEFT",
+      "aliases": ["theft", "chain snatching", "snatching"],
+      "title": "Theft-focused additions",
+      "steps": [
+        {
+          "key": "THEFT_PROPERTY_IDENTIFIER_REVIEW",
+          "phase": "EARLY_ACTIONS",
+          "title": "Verify property identifiers and loss description",
+          "guidance": "Review descriptions, serial numbers, distinguishing marks and supporting ownership records saved in the case.",
+          "rationale": "Specific verified identifiers improve later recovery comparison.",
+          "documentTemplateKey": null
+        }
+      ]
+    }
+  ],
+  "documentTemplates": [
+    {
+      "key": "RECORD_PRESERVATION_REQUEST",
+      "title": "Record preservation request",
+      "language": "en",
+      "requiredFields": ["recipient", "recordsRequested", "reason"],
+      "body": "DEMO DRAFT — NOT AN OFFICIAL DEPARTMENTAL FORMAT\n\nTo: $recipient\nFrom: $officerName ($officerBadgeId), $stationName\nReference: $firNumber\nSubject: Request to preserve identified records\n\nCase context from verified records:\nCrime type: $crimeType\nIncident date: $incidentDate\nSummary: $caseSummary\n\nRecords/material identified by the officer:\n$recordsRequested\n\nOfficer-recorded reason and requested preservation period/action:\n$reason\n\nThis draft must be checked, edited and issued only through an authorised departmental process."
+    },
+    {
+      "key": "EXPERT_EXAMINATION_REQUEST",
+      "title": "Expert examination request",
+      "language": "en",
+      "requiredFields": ["recipient", "itemsForExamination", "questionsForExpert"],
+      "body": "DEMO DRAFT — NOT AN OFFICIAL DEPARTMENTAL FORMAT\n\nTo: $recipient\nFrom: $officerName ($officerBadgeId), $stationName\nReference: $firNumber\nSubject: Proposed request for expert examination\n\nCase context from verified records:\nCrime type: $crimeType\nIncident date: $incidentDate\nSummary: $caseSummary\n\nItems/material selected by the officer:\n$itemsForExamination\n\nQuestions recorded for expert consideration:\n$questionsForExpert\n\nThe IO must verify custody, identifiers, applicable authority and the official forwarding format before use."
+    },
+    {
+      "key": "SUPERVISORY_PROGRESS_NOTE",
+      "title": "Supervisory progress note",
+      "language": "en",
+      "requiredFields": ["recipient", "progressSummary", "openIssues", "proposedNextActions"],
+      "body": "DEMO DRAFT — NOT AN OFFICIAL DEPARTMENTAL FORMAT\n\nTo: $recipient\nFrom: $officerName ($officerBadgeId), $stationName\nReference: $firNumber\nSubject: Investigation progress update\n\nCase context from verified records:\nCrime type: $crimeType\nIncident date: $incidentDate\nSummary: $caseSummary\n\nProgress confirmed by the officer:\n$progressSummary\n\nOpen issues/evidence gaps:\n$openIssues\n\nProposed next actions for review:\n$proposedNextActions\n\nThis is an editable working draft and is not filed, approved or transmitted by the system."
+    }
+  ]
+}

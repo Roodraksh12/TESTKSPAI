@@ -17,6 +17,7 @@ import {
   ScrollText,
   BookOpen,
   ClipboardList,
+  ListChecks,
 } from "lucide-react";
 import { Card, Badge, Button, IconOrb, SectionLabel } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
@@ -32,11 +33,13 @@ import { HighlightText } from "@/components/scrb/HighlightText";
 import { CustodyClockPanel } from "@/components/scrb/CustodyClockPanel";
 import { useAuth } from "@/context/AuthContext";
 import { ReportDataTab } from "@/components/scrb/ReportDataTab";
+import { InvestigationPlanTab } from "@/components/scrb/InvestigationPlanTab";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: FileText },
   { id: "timeline", label: "Timeline", icon: GitBranch },
   { id: "diary", label: "Case Diary", icon: BookOpen },
+  { id: "investigation-plan", label: "Investigation Plan", icon: ListChecks },
   { id: "report-data", label: "Report Data", icon: ClipboardList },
   { id: "connections", label: "Connections", icon: Share2 },
   { id: "evidence", label: "Evidence", icon: ImageIcon },
@@ -276,6 +279,9 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           {tab === "timeline" && <Timeline caseData={caseData} />}
           {tab === "diary" && (
             <CaseDiaryTab caseId={c.id} canEdit={canEditInvestigationLog} />
+          )}
+          {tab === "investigation-plan" && (
+            <InvestigationPlanTab caseId={c.id} canEdit={canEditInvestigationLog} />
           )}
           {tab === "report-data" && (
             <ReportDataTab caseId={c.id} canEdit={canEditInvestigationLog} />

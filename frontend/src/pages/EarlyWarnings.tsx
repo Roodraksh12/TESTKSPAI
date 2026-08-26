@@ -9,10 +9,8 @@ import {
   MapPin,
   RefreshCw,
   ShieldAlert,
-  TrendingUp,
 } from "lucide-react";
 import { useEarlyWarnings } from "@/context/EarlyWarningsContext";
-import { PredictiveRadarChart } from "@/components/scrb/trend-charts";
 import { Badge, Button, Card, SectionLabel, StatCard } from "@/components/scrb/primitives";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -27,12 +25,17 @@ function ageLabel(value: string) {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
+function metricLabel(value: number | undefined) {
+  if (typeof value !== "number") return "—";
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
+}
+
 export default function EarlyWarnings() {
   const { t } = useI18n();
   const {
     warnings,
     unreadCount,
-    forecast,
+    summary,
     loading,
     error,
     lastUpdated,
@@ -55,7 +58,9 @@ export default function EarlyWarnings() {
   const highCount = warnings.filter(
     (warning) => warning.severity === "HIGH" || warning.severity === "CRITICAL"
   ).length;
-  const topRisk = warnings.reduce((highest, warning) => Math.max(highest, warning.riskScore), 0);
+  const activeCount = summary.activeCount || warnings.length;
+  const highCriticalCount = summary.highCriticalCount || highCount;
+  const noActiveWarnings = !loading && activeCount === 0;
 
   return (
     <div className="space-y-6">
@@ -93,10 +98,11 @@ export default function EarlyWarnings() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard icon={BellRing} label={t("warnings.active")} value={warnings.length} tone="amber" />
-        <StatCard icon={ShieldAlert} label={t("warnings.highCritical")} value={highCount} tone="danger" />
-        <StatCard icon={TrendingUp} label={t("warnings.topRisk")} value={topRisk ? `${topRisk}%` : "—"} tone="teal" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard icon={BellRing} label={t("warnings.active")} value={activeCount} tone="amber" />
+        <StatCard icon={Clock3} label={t("warnings.awaitingAck")} value={unreadCount} tone="amber" />
+        <StatCard icon={ShieldAlert} label={t("warnings.highCritical")} value={highCriticalCount} tone="danger" />
+        <StatCard icon={MapPin} label={t("warnings.affectedStations")} value={summary.affectedStations} tone="teal" />
       </div>
 
       {error && (
@@ -105,8 +111,61 @@ export default function EarlyWarnings() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.75fr)]">
-        <Card accent="danger" className="p-5">
+      <Card accent={unreadCount > 0 ? "amber" : "teal"} className="p-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_repeat(3,minmax(130px,0.5fr))] lg:items-center">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                unreadCount > 0 ? "bg-amber/10 text-amber" : "bg-teal/10 text-teal"
+              )}
+            >
+              {unreadCount > 0 ? <AlertTriangle className="h-5 w-5" /> : <Check className="h-5 w-5" />}
+            </div>
+            <div>
+              <SectionLabel>{t("warnings.readiness")}</SectionLabel>
+              <h2 className="mt-1 text-sm font-semibold">
+                {noActiveWarnings
+                  ? t("warnings.noThreshold")
+                  : unreadCount > 0
+                    ? `${unreadCount} ${t("warnings.pendingReviewCount")}`
+                    : t("warnings.allAcknowledged")}
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {noActiveWarnings
+                  ? t("warnings.noThresholdHint")
+                  : unreadCount > 0
+                    ? t("warnings.reviewPending")
+                    : t("warnings.monitoringContinues")}
+              </p>
+            </div>
+          </div>
+          <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {t("warnings.latestSignal")}
+            </p>
+            <p className="mt-1 text-sm font-semibold">
+              {summary.latestDetectedAt ? ageLabel(summary.latestDetectedAt) : "—"}
+            </p>
+          </div>
+          <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {t("warnings.expiringSoon")}
+            </p>
+            <p className="mt-1 text-sm font-semibold">{summary.expiringSoonCount}</p>
+          </div>
+          <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {t("warnings.detectionRule")}
+            </p>
+            <p className="mt-1 text-sm font-semibold">
+              {summary.minimumCases}+ · {summary.currentWindowDays}d / {summary.baselineWindowDays}d
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card accent="danger" className="p-5">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold">{t("warnings.activeFeed")}</h2>
@@ -136,15 +195,35 @@ export default function EarlyWarnings() {
           </div>
 
           {loading && warnings.length === 0 ? (
-            <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+            <div className="flex min-h-40 items-center justify-center text-sm text-muted-foreground">
               {t("warnings.loading")}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-hairline bg-surface-2 text-sm text-muted-foreground">
-              {t("warnings.none")}
+            <div className="flex min-h-44 flex-col items-center justify-center rounded-2xl border border-dashed border-hairline bg-surface-2 px-5 py-8 text-center">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-teal/10 text-teal">
+                <Check className="h-5 w-5" />
+              </div>
+              <p className="mt-3 text-sm font-semibold text-foreground">
+                {warnings.length === 0 ? t("warnings.noThreshold") : t("warnings.none")}
+              </p>
+              <p className="mt-1 max-w-lg text-xs leading-relaxed text-muted-foreground">
+                {warnings.length === 0 ? t("warnings.noThresholdHint") : t("warnings.filterHint")}
+              </p>
+              {warnings.length > 0 && filter !== "ALL" ? (
+                <Button size="sm" className="mt-4" onClick={() => setFilter("ALL")}>
+                  {t("warnings.clearFilter")}
+                </Button>
+              ) : (
+                <Link
+                  to="/hotspots"
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+                >
+                  <MapPin className="h-3.5 w-3.5" /> {t("warnings.openHotspots")}
+                </Link>
+              )}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid gap-3 xl:grid-cols-2">
               {filtered.map((warning) => {
                 const query = new URLSearchParams({
                   warning: warning.id,
@@ -186,7 +265,7 @@ export default function EarlyWarnings() {
                                   : "teal"
                             }
                           >
-                            {warning.severity} · {Math.round(warning.riskScore)}%
+                            {warning.severity}
                           </Badge>
                           {!warning.isRead && <span className="h-2 w-2 rounded-full bg-amber" />}
                         </div>
@@ -205,6 +284,36 @@ export default function EarlyWarnings() {
                           <strong className="text-foreground">{t("warnings.evidence")}:</strong>{" "}
                           {warning.reason}
                         </p>
+                        {typeof warning.evidence.currentCount === "number" && (
+                          <div className="mt-3 grid grid-cols-3 gap-2">
+                            <div className="rounded-lg bg-surface-2 px-2.5 py-2">
+                              <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {warning.evidence.currentWindowDays || summary.currentWindowDays}d {t("warnings.caseCount")}
+                              </p>
+                              <p className="mt-0.5 text-sm font-semibold">
+                                {metricLabel(warning.evidence.currentCount)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-surface-2 px-2.5 py-2">
+                              <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {t("warnings.weeklyBaseline")}
+                              </p>
+                              <p className="mt-0.5 text-sm font-semibold">
+                                {metricLabel(warning.evidence.baselineWeekly)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-surface-2 px-2.5 py-2">
+                              <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {t("warnings.change")}
+                              </p>
+                              <p className="mt-0.5 text-sm font-semibold">
+                                {typeof warning.evidence.growthRatio === "number"
+                                  ? `+${Math.round(warning.evidence.growthRatio * 100)}%`
+                                  : t("warnings.newPattern")}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                         <p className="mt-2 rounded-xl bg-surface-2 p-3 text-xs text-foreground">
                           <span className="mr-1 text-muted-foreground">{t("warnings.recommended")}:</span>
                           {warning.action}
@@ -230,24 +339,7 @@ export default function EarlyWarnings() {
               })}
             </div>
           )}
-        </Card>
-
-        <Card accent="teal" className="h-fit p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal/10 text-teal">
-              <TrendingUp className="h-4 w-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold">{t("warnings.forecast")}</h2>
-              <p className="text-[10px] text-muted-foreground">{t("warnings.forecastHint")}</p>
-            </div>
-          </div>
-          <PredictiveRadarChart axes={forecast.axes} baseline={forecast.baseline} />
-          <div className="mt-3 rounded-xl border border-hairline bg-surface-2 p-3 text-xs leading-relaxed text-muted-foreground">
-            {t("warnings.method")}
-          </div>
-        </Card>
-      </div>
+      </Card>
     </div>
   );
 }

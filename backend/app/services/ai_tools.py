@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from app.services import deadline_engine, intake_intel
+from app.services import crime_queries, deadline_engine, intake_intel
 from app.services.case_access import (
     create_audit_log,
     get_case_with_relations,
@@ -14,27 +14,14 @@ from app.services.case_access import (
 from app.services.db import fetch_all, fetch_one
 
 
-async def search_cases(args: dict[str, Any], officer: dict[str, Any]) -> list[dict[str, Any]]:
-    scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
-    clauses = []
-    params: dict[str, Any] = {**scope_params}
-    if args.get("crimeType"):
-        clauses.append('c."crimeType" ILIKE %(crimeType)s')
-        params["crimeType"] = f'%{args["crimeType"]}%'
-    if args.get("status"):
-        clauses.append("c.status = %(status)s")
-        params["status"] = args["status"]
-    where = " AND ".join(clauses) if clauses else "1=1"
-    return fetch_all(
-        f'''
-        SELECT c.id, c."firNumber", c."crimeType", c.summary, c.status, c."incidentDate"
-        FROM "Case" c
-        WHERE {where}{scope_sql}
-        ORDER BY c."reportedDate" DESC
-        LIMIT 5
-        ''',
-        params,
-    )
+async def search_cases(args: dict[str, Any], officer: dict[str, Any]) -> Any:
+    return crime_queries.search_cases(args, officer)
+
+
+async def get_crime_statistics_tool(
+    args: dict[str, Any], officer: dict[str, Any]
+) -> dict[str, Any]:
+    return crime_queries.get_crime_statistics(args, officer)
 
 
 async def get_case_dossier(args: dict[str, Any], officer: dict[str, Any]) -> dict[str, Any]:
@@ -227,16 +214,9 @@ async def suggest_legal_sections_tool(
     return intake_intel.suggest_legal_sections(args["crimeType"])
 
 
-async def update_match_status_tool(
-    args: dict[str, Any], officer: dict[str, Any]
-) -> dict[str, Any]:
-    if args.get("status") not in ("CONFIRMED", "REJECTED"):
-        return {"error": "status must be CONFIRMED or REJECTED"}
-    return intake_intel.update_match_status(args["matchId"], args["status"], officer)
-
-
 TOOL_HANDLERS = {
     "search_cases": lambda args, officer: search_cases(args, officer),
+    "get_crime_statistics": lambda args, officer: get_crime_statistics_tool(args, officer),
     "get_case_dossier": lambda args, officer: get_case_dossier(args, officer),
     "run_case_intake": lambda args, officer: run_case_intake(args, officer),
     "find_identity_matches": lambda args, officer: find_identity_matches_tool(args, officer),
@@ -244,7 +224,6 @@ TOOL_HANDLERS = {
     "get_investigation_checklist": lambda args, officer: get_investigation_checklist_tool(args, officer),
     "draft_case_summary": lambda args, officer: draft_case_summary_tool(args, officer),
     "suggest_legal_sections": lambda args, officer: suggest_legal_sections_tool(args, officer),
-    "update_match_status": lambda args, officer: update_match_status_tool(args, officer),
     "get_person_connections": lambda args, officer: get_person_connections(args, officer),
     "get_similar_cases": lambda args, officer: get_similar_cases(args, officer),
     "get_hotspot_summary": lambda args, officer: get_hotspot_summary(args, officer),
@@ -259,10 +238,100 @@ AVAILABLE_TOOLS = [
         "type": "function",
         "function": {
             "name": "search_cases",
-            "description": "Search cases by crime type or status at the officer's station.",
+            "description": (
+                "Find and list cases inside the officer's permitted jurisdiction. "
+                "Supports FIR, crime, status, station/district, person/role and incident-date filters. "
+                "Use get_crime_statistics instead when the officer asks for counts or breakdowns."
+            ),
             "parameters": {
                 "type": "object",
-                "properties": {"crimeType": {"type": "string"}, "status": {"type": "string"}},
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "General FIR, crime, summary, station, district, person-name or phone search.",
+                    },
+                    "firNumber": {"type": "string"},
+                    "crimeType": {"type": "string"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["OPEN", "UNDER_INVESTIGATION", "CHARGESHEETED", "CLOSED"],
+                    },
+                    "stationName": {"type": "string"},
+                    "districtName": {"type": "string"},
+                    "personName": {"type": "string"},
+                    "personRole": {
+                        "type": "string",
+                        "enum": ["ACCUSED", "VICTIM", "WITNESS"],
+                    },
+                    "timeframe": {
+                        "type": "string",
+                        "enum": ["all_time", "last_7_days", "last_30_days", "this_month", "this_year"],
+                    },
+                    "dateFrom": {
+                        "type": "string",
+                        "description": "Inclusive incident date in YYYY-MM-DD format.",
+                    },
+                    "dateTo": {
+                        "type": "string",
+                        "description": "Inclusive incident date in YYYY-MM-DD format.",
+                    },
+                    "take": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 25,
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_crime_statistics",
+            "description": (
+                "Count and break down verified case records inside the officer's permitted jurisdiction. "
+                "Use for crime patterns, trends, busiest stations/districts, status totals and incident timing."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "crimeType": {"type": "string"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["OPEN", "UNDER_INVESTIGATION", "CHARGESHEETED", "CLOSED"],
+                    },
+                    "stationName": {"type": "string"},
+                    "districtName": {"type": "string"},
+                    "personName": {"type": "string"},
+                    "personRole": {
+                        "type": "string",
+                        "enum": ["ACCUSED", "VICTIM", "WITNESS"],
+                    },
+                    "timeframe": {
+                        "type": "string",
+                        "enum": ["all_time", "last_7_days", "last_30_days", "this_month", "this_year"],
+                    },
+                    "dateFrom": {
+                        "type": "string",
+                        "description": "Inclusive incident date in YYYY-MM-DD format.",
+                    },
+                    "dateTo": {
+                        "type": "string",
+                        "description": "Inclusive incident date in YYYY-MM-DD format.",
+                    },
+                    "groupBy": {
+                        "type": "string",
+                        "enum": [
+                            "crime_type",
+                            "status",
+                            "station",
+                            "district",
+                            "month",
+                            "day_of_week",
+                            "hour_of_day",
+                        ],
+                    },
+                },
             },
         },
     },
@@ -350,21 +419,6 @@ AVAILABLE_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {"caseId": {"type": "string"}, "crimeType": {"type": "string"}},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "update_match_status",
-            "description": "Confirm or reject a pending identity/MO match (officer decision).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "matchId": {"type": "string"},
-                    "status": {"type": "string", "enum": ["CONFIRMED", "REJECTED"]},
-                },
-                "required": ["matchId", "status"],
             },
         },
     },

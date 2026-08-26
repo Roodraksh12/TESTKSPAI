@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import HTTPException
 
+from app.routers import early_warnings
 from app.routers.early_warnings import _active_where, _officer_with_access
 from app.services import warning_engine
 from app.services.hierarchy import platform_capabilities
@@ -130,6 +131,45 @@ def test_warning_scope_fails_closed_without_station() -> None:
     sql, params = _active_where({"role": "CONSTABLE", "stationId": None})
     assert "1=0" in sql
     assert params["warningSource"] == warning_engine.WARNING_SOURCE
+
+
+def test_warning_list_returns_operational_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    latest = datetime(2026, 8, 24, 10, tzinfo=timezone.utc)
+    expires = latest + timedelta(hours=18)
+    monkeypatch.setattr(early_warnings, "refresh_hotspot_warnings_if_due", lambda: None)
+    monkeypatch.setattr(early_warnings, "_active_where", lambda _officer: ("1=1", {}))
+    monkeypatch.setattr(early_warnings, "fetch_all", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(early_warnings, "fetch_scalar", lambda *_args, **_kwargs: 2)
+    monkeypatch.setattr(
+        early_warnings,
+        "fetch_one",
+        lambda *_args, **_kwargs: {
+            "activeCount": 4,
+            "highCriticalCount": 2,
+            "affectedStations": 3,
+            "expiringSoonCount": 1,
+            "latestDetectedAt": latest,
+            "nextExpiryAt": expires,
+        },
+    )
+
+    payload = early_warnings.list_early_warnings(
+        limit=50,
+        current_user={"officer": {"id": "officer-1", "role": "INSPECTOR"}},
+    )
+
+    assert payload["unreadCount"] == 2
+    assert payload["summary"] == {
+        "activeCount": 4,
+        "highCriticalCount": 2,
+        "affectedStations": 3,
+        "expiringSoonCount": 1,
+        "latestDetectedAt": latest,
+        "nextExpiryAt": expires,
+        "currentWindowDays": warning_engine.CURRENT_WINDOW_DAYS,
+        "baselineWindowDays": warning_engine.BASELINE_WINDOW_DAYS,
+        "minimumCases": warning_engine.MIN_CURRENT_CASES,
+    }
 
 
 @pytest.mark.parametrize(

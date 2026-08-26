@@ -44,6 +44,15 @@ FIR-to-final legal decisions, property, expert results and evidence assessments.
 These source records are revisioned separately from final-report versions so an
 officer must explicitly refresh an editable draft; approved snapshots are never
 rewritten.
+Then apply **`database/migrations/0013_investigation_playbooks.sql`** only to the
+same isolated database. It stores versioned per-case playbook snapshots, task
+status/notes and editable routine-document drafts. The starter registry is
+explicitly `PROVISIONAL_DEMO`; it is not an official departmental procedure or
+form and the application provides no filing or transmission action for it.
+Then apply **`database/migrations/0014_ai_privacy_audit.sql`** only to that
+isolated database. It adds metadata-only LLM request audits and assistant-message
+privacy metadata. It deliberately has no columns for prompts, completions or
+temporary redaction-token maps.
 
 `0001_initial_schema.sql` + `0002_rls_policies.sql` describe an earlier, unused design
 (snake_case tables, Supabase-Auth-linked via `auth.users`/`auth.uid()`). The running
@@ -65,11 +74,15 @@ app authenticates with its own FastAPI JWT (badge ID + bcrypt), not Supabase Aut
     test database only.
 12. From `backend/`, run `python -m scripts.apply_0012` against that same isolated
     test database only.
-13. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
+13. From `backend/`, run `python -m scripts.apply_0013` against that same isolated
+    test database only.
+14. From `backend/`, run `python -m scripts.apply_0014` against that same isolated
+    test database only.
+15. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
    a criminal network with a
    detectable ring) — or create demo officers by hand.
-14. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
-15. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
+16. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
+17. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
 
 ## Demo login (after seed + 0004)
 
