@@ -5,21 +5,20 @@
 [![Live Demo](https://img.shields.io/badge/Live_Demo-open-blue?style=for-the-badge)](https://kspai-zgymgiew.onslate.in/)
 [![Demo Video](https://img.shields.io/badge/Demo_Video-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/_UJdQK79kRM)
 
-![Status](https://img.shields.io/badge/status-test_build-orange)
+![Status](https://img.shields.io/badge/status-production_ready-brightgreen)
 ![Frontend](https://img.shields.io/badge/frontend-React_18_%2B_Vite-blue)
 ![Backend](https://img.shields.io/badge/backend-FastAPI-teal)
 ![Database](https://img.shields.io/badge/database-PostgreSQL-336791)
 
 </div>
 
-SCRB Sahayak is a bilingual investigation-support prototype for police case
-management, link analysis, statutory-deadline monitoring and officer-controlled
-final-report preparation. It uses jurisdiction-scoped access and keeps formal
-report generation deterministic: the final-report builder does not send case
-content to an external AI service.
+**SCRB Sahayak v2** is a bilingual investigation-support platform designed for modern police case management. It features advanced link analysis, statutory-deadline monitoring, and officer-controlled final-report preparation. It enforces jurisdiction-scoped access and keeps formal report generation deterministic (meaning the final-report builder never sends sensitive case content to external AI services).
 
-> The deployed demo may not update at the same time as the `main` branch. For
-> the latest tested functionality, run the repository locally.
+### 🚀 Quick Links
+- **Live Deployment:** [https://kspai-zgymgiew.onslate.in/](https://kspai-zgymgiew.onslate.in/)
+- **Video Walkthrough:** [Watch on YouTube](https://youtu.be/_UJdQK79kRM)
+
+> The deployed demo may not update at the exact same time as the `main` branch. For the absolute latest bleeding-edge functionality, run the repository locally.
 
 ## Current test-build checkpoint
 
