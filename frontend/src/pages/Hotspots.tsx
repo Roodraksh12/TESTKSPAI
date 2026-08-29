@@ -15,6 +15,7 @@ export default function Hotspots() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [operationalAlerts, setOperationalAlerts] = useState<any[]>([]);
   const [clusters, setClusters] = useState<HotspotCluster[]>([]);
   const [dailyVolume, setDailyVolume] = useState<DailyVolume[]>([]);
   const [sparklinePath, setSparklinePath] = useState<SparklinePath>(null);
@@ -28,12 +29,13 @@ export default function Hotspots() {
     else setRefreshing(true);
     try {
       const payload = await apiRequest("/api/hotspots");
-        setAlerts(payload.alerts || []);
-        setClusters(payload.clusters || []);
-        setDailyVolume(payload.dailyVolume || []);
-        setSparklinePath(payload.sparklinePath || null);
-        setLoadedOnce(true);
-        setError("");
+      setAlerts(payload.alerts || []);
+      setOperationalAlerts(payload.operationalAlerts || []);
+      setClusters(payload.clusters || []);
+      setDailyVolume(payload.dailyVolume || []);
+      setSparklinePath(payload.sparklinePath || null);
+      setLoadedOnce(true);
+      setError("");
     } catch (loadError) {
       console.error(loadError);
       setError("Hotspot information could not be refreshed.");
@@ -86,14 +88,17 @@ export default function Hotspots() {
 
       <div className="space-y-6">
         <Card accent="amber" className="p-6">
-          <SectionLabel className="mb-3">{t("hotspots.riskRanking")}</SectionLabel>
+          <SectionLabel className="mb-1">{t("hotspots.statisticalRanking")}</SectionLabel>
+          <p className="mb-3 text-xs text-muted-foreground">
+            {t("hotspots.statisticalHint")}
+          </p>
           <div className="space-y-3">
             {loading && !loadedOnce ? (
               Array.from({ length: 4 }).map((_, index) => (
                 <Skeleton key={index} className="h-16 rounded-2xl" />
               ))
             ) : alerts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("hotspots.noAlerts")}</p>
+              <p className="text-sm text-muted-foreground">{t("hotspots.noStatistical")}</p>
             ) : (
               alerts.map((h) => {
                 const isHighRisk = h.riskScore >= 80;
@@ -121,6 +126,30 @@ export default function Hotspots() {
         </Card>
 
         <Card className="p-6">
+          <SectionLabel className="mb-1">{t("hotspots.operationalAlerts")}</SectionLabel>
+          <p className="mb-3 text-xs text-muted-foreground">
+            {t("hotspots.operationalHint")}
+          </p>
+          {loading && !loadedOnce ? (
+            <Skeleton className="h-20 rounded-xl" />
+          ) : operationalAlerts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("hotspots.noOperational")}</p>
+          ) : (
+            <div className="space-y-2">
+              {operationalAlerts.map((alert) => (
+                <div key={alert.id} className="rounded-2xl border border-hairline p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-medium">{alert.zoneLabel}</p>
+                    <Badge tone="muted">{t("hotspots.operationalBadge")}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{alert.reason}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-6">
           <SectionLabel className="mb-3">{t("hotspots.sevenDayTrend")}</SectionLabel>
           {loading && !loadedOnce ? (
             <Skeleton className="h-24 w-full rounded-xl" />
@@ -143,7 +172,7 @@ export default function Hotspots() {
       </div>
       </div>
       {refreshing && loadedOnce && (
-        <p className="text-right text-xs text-muted-foreground">Refreshing hotspot data…</p>
+        <p className="text-right text-xs text-muted-foreground">{t("hotspots.refreshing")}</p>
       )}
     </div>
   );

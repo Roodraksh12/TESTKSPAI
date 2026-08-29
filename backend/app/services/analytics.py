@@ -4,11 +4,10 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.services import deadline_engine
 from app.services.case_access import jurisdiction_filter_sql
 from app.services.db import fetch_all, fetch_scalar
-from app.services.hierarchy import has_wide_case_scope
 from app.services.warning_engine import get_hotspot_clusters as get_spatial_hotspot_clusters
+from app.services.warning_engine import WARNING_SOURCE
 
 # Every number here comes from a DB query — no hardcoded arrays, no random().
 
@@ -149,7 +148,6 @@ def get_hotspot_clusters(
 
 def get_early_warnings(officer: dict[str, Any], take: int = 6) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
-    wide_scope = has_wide_case_scope(officer.get("role"))
 
     scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="a")
     alerts = fetch_all(
@@ -157,11 +155,12 @@ def get_early_warnings(officer: dict[str, Any], take: int = 6) -> list[dict[str,
         SELECT a.type, a."zoneLabel", a."riskScore", a.reason
         FROM "Alert" a
         WHERE a.status = 'ACTIVE'
+          AND a.source = %(warningSource)s
           AND (a."expiresAt" IS NULL OR a."expiresAt" > NOW())
           {scope_sql}
         ORDER BY a."riskScore" DESC
         ''',
-        scope_params,
+        {"warningSource": WARNING_SOURCE, **scope_params},
     )
     for alert in alerts:
         warnings.append(
@@ -176,45 +175,6 @@ def get_early_warnings(officer: dict[str, Any], take: int = 6) -> list[dict[str,
             }
         )
 
-    for v in compute_crime_velocity(officer):
-        if v["risk"] >= 65 and v["recentCount"] >= 2:
-            warnings.append(
-                {
-                    "type": "ANOMALY",
-                    "probability": v["risk"],
-                    "location": "District-wide" if wide_scope else "Station jurisdiction",
-                    "timeframe": "Next 7 days",
-                    "reasoning": (
-                        f'{v["recentCount"]} {v["crimeType"]} cases in the last 7 days '
-                        f'vs a baseline of {v["baselineWeekly"]:.1f}/week.'
-                    ),
-                    "action": f'Increase patrols for {v["crimeType"]} hotspots.',
-                    "urgency": "high" if v["risk"] >= 80 else "medium",
-                }
-            )
-
-    deadline_added = 0
-    for risk in deadline_engine.get_deadline_risks(officer, take=10):
-        if deadline_added >= 3:
-            break
-        if risk["tier"] not in ("OVERDUE", "URGENT"):
-            continue
-        warnings.append(
-            {
-                "type": "DEADLINE",
-                "probability": 95 if risk["tier"] == "OVERDUE" else 85,
-                "location": risk["firNumber"],
-                "timeframe": f'{abs(risk["daysLeft"])} days {"overdue" if risk["daysLeft"] < 0 else "remaining"}',
-                "reasoning": (
-                    f'{risk["firNumber"]} ({risk["crimeType"]}) is {risk["tier"].lower()} '
-                    f'on the {risk["statute"]} charge-sheet clock.'
-                ),
-                "action": "Prioritise charge-sheet filing to avoid default bail.",
-                "urgency": "high",
-            }
-        )
-        deadline_added += 1
-
     warnings.sort(key=lambda w: w["probability"], reverse=True)
     return warnings[:take]
 
@@ -223,22 +183,22 @@ def get_high_risk_summary(officer: dict[str, Any]) -> dict[str, Any]:
     scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="a")
     active_sql = " AND a.status = 'ACTIVE' AND (a.\"expiresAt\" IS NULL OR a.\"expiresAt\" > NOW())"
     high_risk_zones = fetch_scalar(
-        f'SELECT COUNT(*) FROM "Alert" a WHERE a."riskScore" >= 70{active_sql}{scope_sql}',
-        scope_params,
+        f'SELECT COUNT(*) FROM "Alert" a WHERE a."riskScore" >= 70 AND a.source = %(warningSource)s{active_sql}{scope_sql}',
+        {"warningSource": WARNING_SOURCE, **scope_params},
     )
     open_alerts = fetch_scalar(
-        f'SELECT COUNT(*) FROM "Alert" a WHERE 1=1{active_sql}{scope_sql}',
-        scope_params,
+        f'SELECT COUNT(*) FROM "Alert" a WHERE a.source = %(warningSource)s{active_sql}{scope_sql}',
+        {"warningSource": WARNING_SOURCE, **scope_params},
     )
     top = fetch_all(
         f'''
         SELECT a."zoneLabel", a."riskScore"
         FROM "Alert" a
-        WHERE 1=1{active_sql}{scope_sql}
+        WHERE a.source = %(warningSource)s{active_sql}{scope_sql}
         ORDER BY a."riskScore" DESC
         LIMIT 1
         ''',
-        scope_params,
+        {"warningSource": WARNING_SOURCE, **scope_params},
     )
     top_zone = (
         {"zoneLabel": top[0]["zoneLabel"], "riskScore": round(float(top[0]["riskScore"] or 0))}
