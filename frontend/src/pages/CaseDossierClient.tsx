@@ -247,6 +247,7 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
             caseId={c.id}
             casePersons={c.casePersons}
             canEdit={canEditInvestigationLog}
+            openRemandOnMount={searchParams.get("action") === "remand"}
           />
         </div>
 

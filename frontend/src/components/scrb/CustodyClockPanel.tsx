@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, FileCheck2, Gavel, Loader2, Pencil, ShieldAlert, Timer } from "lucide-react";
 import { apiRequest } from "@/api/client";
 import { Badge, Button, Card, Input, SectionLabel, Select } from "@/components/scrb/primitives";
@@ -33,7 +33,6 @@ type CustodyClock = {
 
 type FormValues = {
   casePersonId: string;
-  newAccusedName?: string;
   firstRemandAt: string;
   windowDays: "60" | "90";
   legalSectionDetails: string;
@@ -73,7 +72,6 @@ function inputDateTime(value = new Date()) {
 function initialForm(casePersonId = ""): FormValues {
   return {
     casePersonId,
-    newAccusedName: "",
     firstRemandAt: inputDateTime(),
     windowDays: "60",
     legalSectionDetails: "",
@@ -102,10 +100,12 @@ export function CustodyClockPanel({
   caseId,
   casePersons,
   canEdit,
+  openRemandOnMount = false,
 }: {
   caseId: string;
   casePersons: CasePerson[];
   canEdit: boolean;
+  openRemandOnMount?: boolean;
 }) {
   const accused = useMemo(() => casePersons.filter((item) => item.role === "ACCUSED"), [casePersons]);
   const [clocks, setClocks] = useState<CustodyClock[]>([]);
@@ -116,6 +116,7 @@ export function CustodyClockPanel({
   const [filingAt, setFilingAt] = useState(inputDateTime());
   const [filingReference, setFilingReference] = useState("");
   const [saving, setSaving] = useState(false);
+  const handledInitialRemandOpen = useRef(false);
 
   const load = async () => {
     try {
@@ -133,6 +134,22 @@ export function CustodyClockPanel({
     setLoading(true);
     void load();
   }, [caseId]);
+
+  useEffect(() => {
+    if (
+      !openRemandOnMount ||
+      handledInitialRemandOpen.current ||
+      loading ||
+      !storageReady ||
+      !canEdit ||
+      accused.length === 0
+    ) {
+      return;
+    }
+    handledInitialRemandOpen.current = true;
+    setForm(initialForm(accused[0].id));
+    setMode("remand");
+  }, [accused, canEdit, loading, openRemandOnMount, storageReady]);
 
   const openRemand = (clock?: CustodyClock) => {
     if (clock) {
@@ -152,7 +169,7 @@ export function CustodyClockPanel({
   };
 
   const saveRemand = async () => {
-    if (!form.casePersonId || (form.casePersonId === "ADD_CUSTOM" && !form.newAccusedName?.trim()) || !form.legalSectionDetails.trim() || !form.remandOrderReference.trim()) {
+    if (!form.casePersonId || !form.legalSectionDetails.trim() || !form.remandOrderReference.trim()) {
       toast.error("Accused, offence/section details, and remand-order reference are required");
       return;
     }
@@ -166,7 +183,6 @@ export function CustodyClockPanel({
         method: "POST",
         body: JSON.stringify({
           casePersonId: form.casePersonId,
-          newAccusedName: form.casePersonId === "ADD_CUSTOM" ? form.newAccusedName?.trim() : undefined,
           firstRemandAt: new Date(form.firstRemandAt).toISOString(),
           windowDays: Number(form.windowDays),
           thresholdBasis: form.windowDays === "90" ? "DEATH_LIFE_OR_TEN_YEARS_OR_MORE" : "OTHER_OFFENCE",
@@ -213,6 +229,7 @@ export function CustodyClockPanel({
   const hasActiveClock = clocks.some((clock) => clock.filingStatus === "NOT_FILED");
 
   return (
+    <div id="custody-clock" className="scroll-mt-24">
     <Card accent="danger" className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex gap-3">
@@ -298,14 +315,8 @@ export function CustodyClockPanel({
             <label className="block text-xs font-medium text-muted-foreground">Accused
               <Select value={form.casePersonId} onChange={(event) => setForm((current) => ({ ...current, casePersonId: event.target.value }))} className="mt-1">
                 {accused.map((person) => <option key={person.id} value={person.id}>{person.person.name}</option>)}
-                <option value="ADD_CUSTOM">+ Add custom suspect</option>
               </Select>
             </label>
-            {form.casePersonId === "ADD_CUSTOM" && (
-              <label className="block text-xs font-medium text-muted-foreground">Custom suspect name
-                <Input value={form.newAccusedName || ""} onChange={(event) => setForm((current) => ({ ...current, newAccusedName: event.target.value }))} placeholder="Enter full name of suspect" className="mt-1" />
-              </label>
-            )}
             <label className="block text-xs font-medium text-muted-foreground">First Magistrate-authorised remand date and time
               <Input type="datetime-local" value={form.firstRemandAt} max={inputDateTime()} onChange={(event) => setForm((current) => ({ ...current, firstRemandAt: event.target.value }))} className="mt-1" />
             </label>
@@ -359,5 +370,6 @@ export function CustodyClockPanel({
         </DialogContent>
       </Dialog>
     </Card>
+    </div>
   );
 }
