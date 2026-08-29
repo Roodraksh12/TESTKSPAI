@@ -30,10 +30,22 @@ RESULT_TTL_SECONDS = 30 * 60
 
 
 class Job:
-    def __init__(self, job_id: str, officer_id: str, filename: str) -> None:
+    def __init__(
+        self,
+        job_id: str,
+        officer_id: str,
+        filename: str,
+        *,
+        document_content: bytes | None = None,
+        document_content_type: str | None = None,
+    ) -> None:
         self.id = job_id
         self.officer_id = officer_id
         self.filename = filename
+        # Original scan bytes are private job state and are never serialized in
+        # an API response. They exist only until the confirmed Case is saved.
+        self.document_content = document_content
+        self.document_content_type = document_content_type
         self.status: JobStatus = "queued"
         self.stage: str = "Queued"
         self.result: dict[str, Any] | None = None
@@ -64,8 +76,21 @@ class JobStore:
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
 
-    def create(self, officer_id: str, filename: str) -> Job:
-        job = Job(uuid.uuid4().hex[:16], officer_id, filename)
+    def create(
+        self,
+        officer_id: str,
+        filename: str,
+        *,
+        document_content: bytes | None = None,
+        document_content_type: str | None = None,
+    ) -> Job:
+        job = Job(
+            uuid.uuid4().hex[:16],
+            officer_id,
+            filename,
+            document_content=document_content,
+            document_content_type=document_content_type,
+        )
         with self._lock:
             self._jobs[job.id] = job
             self._evict_expired()
@@ -78,6 +103,24 @@ class JobStore:
             if job is None or job.officer_id != officer_id:
                 return None
             return job
+
+    def get_document(self, job_id: str, officer_id: str) -> dict[str, Any] | None:
+        """Return a completed job's private scan only to the owning officer."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if (
+                job is None
+                or job.officer_id != officer_id
+                or job.status != "done"
+                or job.document_content is None
+                or not job.document_content_type
+            ):
+                return None
+            return {
+                "filename": job.filename,
+                "contentType": job.document_content_type,
+                "content": job.document_content,
+            }
 
     def list_for(self, officer_id: str) -> list[Job]:
         with self._lock:

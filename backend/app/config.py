@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     ai_chat_retention_days: int = Field(default=30, alias="AI_CHAT_RETENTION_DAYS")
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
     openrouter_model: str = Field(default="", alias="OPENROUTER_MODEL")
+    openrouter_zdr_required: bool = Field(default=True, alias="OPENROUTER_ZDR_REQUIRED")
     allowed_origins: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
         alias="ALLOWED_ORIGINS",

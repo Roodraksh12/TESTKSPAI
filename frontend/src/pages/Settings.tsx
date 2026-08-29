@@ -61,7 +61,7 @@ export default function Settings() {
             <SectionLabel>{t("settings.fairness")}</SectionLabel>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-foreground">
-            SCRB Sahayak surfaces suggestions to support — never replace — an investigator&apos;s judgement. All AI-generated conclusions cite source records and expose a confidence score. No arrest, detention or coercive action may be initiated on an AI suggestion alone; human confirmation is required. Every query, source view and confirmation is written to an immutable audit log accessible to supervisory officers and oversight bodies.
+            SCRB Sahayak surfaces suggestions to support — never replace — an investigator&apos;s judgement. Grounded workflows show available source-case references and privacy information; output without supporting records must be treated as unverified. No arrest, detention or coercive action may be initiated from an AI suggestion alone. Important searches, record views and officer confirmations are retained in the prototype audit trail for supervisory review.
           </p>
         </Card>
       </div>

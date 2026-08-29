@@ -39,12 +39,12 @@ export function ExplainChips({
             <p className="mt-1">{privacy.provider} · {privacy.model}</p>
             <p className="mt-1">
               {privacy.external
-                ? `${privacy.redaction.total} sensitive value${privacy.redaction.total === 1 ? "" : "s"} tokenised before transmission. Zero-data-retention routing was required.`
+                ? `${privacy.redaction.total} sensitive value${privacy.redaction.total === 1 ? "" : "s"} tokenised before transmission. ${privacy.retentionPolicy === "ZDR_REQUIRED" ? "Zero-data-retention routing was required." : "Zero-data-retention routing is paused; use synthetic demo data only."}`
                 : "Processed through the administrator-approved private endpoint."}
             </p>
             {privacy.redaction.categories.length > 0 && (
               <p className="mt-1">
-                Categories: {privacy.redaction.categories.map((item) => `${item.category.replaceAll("_", " ")} (${item.count})`).join(", ")}.
+                Categories: {privacy.redaction.categories.map((item) => `${item.category.replace(/_/g, " ")} (${item.count})`).join(", ")}.
               </p>
             )}
             <p className="mt-1">Privacy processing: {privacy.privacyProcessingMs} ms · model request: {privacy.durationMs} ms.</p>

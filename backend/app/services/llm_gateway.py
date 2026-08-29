@@ -74,7 +74,7 @@ def resolve_provider_config(
             api_key=api_key,
             timeout_seconds=timeout,
             private_endpoint=False,
-            zdr_required=True,
+            zdr_required=settings.openrouter_zdr_required,
         )
 
     if provider == "openai_compatible":
@@ -236,7 +236,13 @@ async def chat_completion_with_metadata(
             "provider": provider.display_name,
             "model": provider.model,
             "external": external,
-            "retentionPolicy": "ZDR_REQUIRED" if external else "PRIVATE_BOUNDARY",
+            "retentionPolicy": (
+                "ZDR_REQUIRED"
+                if external and provider.zdr_required
+                else "PROVIDER_DEFAULT"
+                if external
+                else "PRIVATE_BOUNDARY"
+            ),
             "redaction": {
                 "applied": bool(redaction_counts),
                 "total": sum(redaction_counts.values()),

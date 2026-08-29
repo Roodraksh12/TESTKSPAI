@@ -17,6 +17,8 @@ def test_expected_routes_are_registered() -> None:
         "/api/admin/password-resets/{request_id}/fulfill",
         "/api/cases",
         "/api/cases/{case_id}",
+        "/api/cases/{case_id}/fir-document",
+        "/api/cases/{case_id}/fir-document/content",
         "/api/cases/{case_id}/intake",
         "/api/cases/{case_id}/draft",
         "/api/cases/{case_id}/matches",

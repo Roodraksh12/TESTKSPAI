@@ -78,7 +78,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Header
     "header.searchPlaceholder": "Search cases, entities, hotspots...",
     "header.notifications": "Notifications",
-    "brand.subtitle": "Karnataka Police",
+    "brand.subtitle": "Hackathon Prototype",
 
     // Predictive early warnings
     "warnings.label": "Predictive intelligence",
@@ -195,7 +195,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "analytics.liveSync": "Live Data Sync",
     "analytics.totalActive": "Total Active Investigations",
     "analytics.clearanceYtd": "Clearance Rate (YTD)",
-    "analytics.highRiskZones": "High Risk Zones",
+    "analytics.highRiskZones": "Active Statistical Warnings",
     "analytics.caseMix": "Caseload by Crime Type",
     "analytics.browseCases": "Browse all cases",
     "analytics.noCases": "No cases in your jurisdiction yet.",
@@ -207,10 +207,18 @@ export const translations: Record<Language, Record<string, string>> = {
     // Hotspots
     "hotspots.label": "Live Hotspots",
     "hotspots.title": "Risk map",
-    "hotspots.subtitle": "Predictive risk assessment and spatial anomalies.",
+    "hotspots.subtitle": "Recent spatial patterns and clearly separated operational notices.",
     "hotspots.riskRanking": "Risk ranking",
     "hotspots.noAlerts": "No active hotspot alerts for your jurisdiction.",
     "hotspots.sevenDayTrend": "7-day trend",
+    "hotspots.statisticalRanking": "Statistical warning ranking",
+    "hotspots.statisticalHint": "The same verified 7-day versus 28-day detections shown on Early Warnings.",
+    "hotspots.noStatistical": "No statistical hotspot threshold breaches.",
+    "hotspots.operationalAlerts": "Operational alerts",
+    "hotspots.operationalHint": "Manually entered or legacy notices. These are not statistical predictions.",
+    "hotspots.noOperational": "No active operational alerts.",
+    "hotspots.operationalBadge": "Operational",
+    "hotspots.refreshing": "Refreshing hotspot data…",
 
     // Network
     "network.label": "Entity Network",
@@ -334,7 +342,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Header
     "header.searchPlaceholder": "ಪ್ರಕರಣ, ವ್ಯಕ್ತಿ, ಅಪಾಯದ ತಾಣ ಹುಡುಕಿ...",
     "header.notifications": "ಅಧಿಸೂಚನೆಗಳು",
-    "brand.subtitle": "ಕರ್ನಾಟಕ ಪೊಲೀಸ್",
+    "brand.subtitle": "ಹ್ಯಾಕಥಾನ್ ಮಾದರಿ",
 
     // Predictive early warnings
     "warnings.label": "ಮುನ್ಸೂಚನಾ ಗುಪ್ತಚರ",
@@ -451,7 +459,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "analytics.liveSync": "ನೇರ ಮಾಹಿತಿ ಸಿಂಕ್",
     "analytics.totalActive": "ಒಟ್ಟು ಸಕ್ರಿಯ ತನಿಖೆಗಳು",
     "analytics.clearanceYtd": "ಇತ್ಯರ್ಥ ಪ್ರಮಾಣ (ವರ್ಷದಿಂದ)",
-    "analytics.highRiskZones": "ಹೆಚ್ಚು ಅಪಾಯದ ವಲಯಗಳು",
+    "analytics.highRiskZones": "ಸಕ್ರಿಯ ಅಂಕಿಅಂಶ ಆಧಾರಿತ ಎಚ್ಚರಿಕೆಗಳು",
     "analytics.caseMix": "ಅಪರಾಧ ಪ್ರಕಾರವಾರು ಪ್ರಕರಣಗಳು",
     "analytics.browseCases": "ಎಲ್ಲಾ ಪ್ರಕರಣಗಳನ್ನು ನೋಡಿ",
     "analytics.noCases": "ನಿಮ್ಮ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಇನ್ನೂ ಪ್ರಕರಣಗಳಿಲ್ಲ.",
@@ -463,10 +471,18 @@ export const translations: Record<Language, Record<string, string>> = {
     // Hotspots
     "hotspots.label": "ನೇರ ಅಪಾಯದ ತಾಣಗಳು",
     "hotspots.title": "ಅಪಾಯ ನಕ್ಷೆ",
-    "hotspots.subtitle": "ಮುನ್ಸೂಚಕ ಅಪಾಯ ಮೌಲ್ಯಮಾಪನ ಮತ್ತು ಸ್ಥಳ ವೈಪರೀತ್ಯಗಳು.",
+    "hotspots.subtitle": "ಇತ್ತೀಚಿನ ಸ್ಥಳೀಯ ಮಾದರಿಗಳು ಮತ್ತು ಪ್ರತ್ಯೇಕ ಕಾರ್ಯಾಚರಣಾ ಸೂಚನೆಗಳು.",
     "hotspots.riskRanking": "ಅಪಾಯ ಶ್ರೇಣಿ",
     "hotspots.noAlerts": "ನಿಮ್ಮ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ಸಕ್ರಿಯ ಎಚ್ಚರಿಕೆಗಳಿಲ್ಲ.",
     "hotspots.sevenDayTrend": "7 ದಿನಗಳ ಪ್ರವೃತ್ತಿ",
+    "hotspots.statisticalRanking": "ಅಂಕಿಅಂಶ ಆಧಾರಿತ ಎಚ್ಚರಿಕೆ ಶ್ರೇಣಿ",
+    "hotspots.statisticalHint": "ಮುನ್ನೆಚ್ಚರಿಕೆ ಪುಟದಲ್ಲಿರುವ ಅದೇ ಪರಿಶೀಲಿತ 7 ದಿನ ಮತ್ತು 28 ದಿನಗಳ ಹೋಲಿಕೆ.",
+    "hotspots.noStatistical": "ಅಂಕಿಅಂಶದ ಮಿತಿಯನ್ನು ಮೀರಿದ ಹಾಟ್‌ಸ್ಪಾಟ್ ಎಚ್ಚರಿಕೆಗಳಿಲ್ಲ.",
+    "hotspots.operationalAlerts": "ಕಾರ್ಯಾಚರಣಾ ಸೂಚನೆಗಳು",
+    "hotspots.operationalHint": "ಕೈಯಾರೆ ನಮೂದಿಸಿದ ಅಥವಾ ಹಳೆಯ ಸೂಚನೆಗಳು. ಇವು ಅಂಕಿಅಂಶ ಆಧಾರಿತ ಮುನ್ಸೂಚನೆಗಳಲ್ಲ.",
+    "hotspots.noOperational": "ಸಕ್ರಿಯ ಕಾರ್ಯಾಚರಣಾ ಸೂಚನೆಗಳಿಲ್ಲ.",
+    "hotspots.operationalBadge": "ಕಾರ್ಯಾಚರಣೆ",
+    "hotspots.refreshing": "ಹಾಟ್‌ಸ್ಪಾಟ್ ಮಾಹಿತಿಯನ್ನು ನವೀಕರಿಸಲಾಗುತ್ತಿದೆ…",
 
     // Network
     "network.label": "ವ್ಯಕ್ತಿ ಜಾಲ",

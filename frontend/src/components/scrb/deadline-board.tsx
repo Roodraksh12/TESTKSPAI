@@ -157,11 +157,11 @@ export function DeadlineRiskList({ board, onOpenEditor }: { board: DeadlineRow[]
             )}
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
             {row.chargesheet ? (
-              <div>
+              <section className="rounded-xl border border-danger/15 bg-danger/[0.025] p-3" aria-label="Default-bail custody clock">
                 <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase mb-1.5">
-                  {t("deadlines.chargeSheetFiling")} · {row.chargesheet.statute}
+                  Default-bail custody clock · {row.chargesheet.statute}
                 </p>
                 <p className="mb-1.5 text-[11px] text-muted-foreground">
                   {row.chargesheet.personName ? `Accused: ${row.chargesheet.personName} · ` : ""}
@@ -171,28 +171,38 @@ export function DeadlineRiskList({ board, onOpenEditor }: { board: DeadlineRow[]
                 {row.tier === "OVERDUE" && (
                   <p className="mt-1.5 text-[11px] text-danger">{row.chargesheet.consequence}.</p>
                 )}
-              </div>
+              </section>
             ) : (
-              <div className="flex items-center justify-between rounded-xl bg-surface-2 p-3">
-                <div className="text-xs leading-relaxed text-muted-foreground">
-                  {row.chargesheetStatus === "LEGACY_CASE_COMPLETED"
-                    ? "No first-remand record is available for this completed case."
-                    : "No first remand recorded. FIR registration does not start a BNSS 187(3) custody clock."}
+              <section className="rounded-xl border border-hairline bg-surface-2 p-3" aria-label="Default-bail custody clock not started">
+                <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase mb-1.5">
+                  Default-bail custody clock · BNSS 187(3)
+                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs leading-relaxed text-muted-foreground">
+                    {row.chargesheetStatus === "LEGACY_CASE_COMPLETED"
+                      ? "No first-remand record is available for this completed case."
+                      : "No first remand recorded. FIR registration does not start a BNSS 187(3) custody clock."}
+                  </div>
+                  {row.chargesheetStatus !== "LEGACY_CASE_COMPLETED" && (
+                    <Link
+                      to={`/cases/${row.caseId}?action=remand#custody-clock`}
+                      className="shrink-0 rounded-lg bg-teal/10 border border-teal/20 px-3 py-1.5 text-[11px] font-medium text-teal hover:bg-teal/20 transition-colors"
+                    >
+                      Record first remand
+                    </Link>
+                  )}
                 </div>
-                <Link
-                  to={`/cases/${row.caseId}?action=fr`}
-                  className="shrink-0 ml-4 rounded-lg bg-teal/10 border border-teal/20 px-3 py-1.5 text-[11px] font-medium text-teal hover:bg-teal/20 transition-colors"
-                >
-                  Accused Found
-                </Link>
-              </div>
+              </section>
             )}
-            <div>
+            <section className="rounded-xl border border-teal/15 bg-teal/[0.025] p-3" aria-label="Victim progress update reminder">
               <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase mb-1.5">
                 {t("deadlines.victimUpdate")} · {row.victim.statute}
               </p>
-              <ClockProgress clock={row.victim} label="FIR" />
-            </div>
+              <p className="mb-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                Separate FIR-based duty. This reminder does not start or change the per-accused default-bail custody clock.
+              </p>
+              <ClockProgress clock={row.victim} label="FIR registration" />
+            </section>
           </div>
         </Card>
       ))}

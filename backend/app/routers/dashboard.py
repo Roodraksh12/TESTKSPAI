@@ -6,6 +6,7 @@ from app.services.hierarchy import has_wide_case_scope, platform_capabilities, s
 from app.services.case_access import jurisdiction_filter_sql
 from app.services.db import run_on_connection, serialize_row, serialize_rows
 from app.services.parallel import analytics_cache, gather
+from app.services.warning_engine import WARNING_SOURCE
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -45,9 +46,13 @@ def dashboard(current_user: dict = Depends(get_current_user)) -> dict:
             cur.execute(
                 f'''
                 SELECT COUNT(*) AS total FROM "Alert" a
-                WHERE a."riskScore" >= 80{alert_scope_sql}
+                WHERE a."riskScore" >= 80
+                  AND a.source = %(warningSource)s
+                  AND a.status = 'ACTIVE'
+                  AND (a."expiresAt" IS NULL OR a."expiresAt" > NOW())
+                  {alert_scope_sql}
                 ''',
-                alert_scope_params,
+                {"warningSource": WARNING_SOURCE, **alert_scope_params},
             )
             high_risk_alerts = int((serialize_row(cur.fetchone()) or {}).get("total") or 0)
 

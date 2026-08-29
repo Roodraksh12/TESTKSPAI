@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 
 from app.deps import get_current_user
@@ -25,12 +28,38 @@ from app.services.db import (
     fetch_scalar,
     new_id,
     run_on_connection,
+    serialize_row,
     serialize_rows,
 )
 from app.services.custody_clocks import list_case_clocks
+from app.services.job_store import fir_jobs
 from app.services.warning_engine import refresh_hotspot_warnings
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
+
+DEFAULT_CASE_PAGE_SIZE = 50
+MAX_CASE_PAGE_SIZE = 100
+
+
+def _encode_case_cursor(row: dict) -> str:
+    reported_date = row.get("reportedDate")
+    if isinstance(reported_date, datetime):
+        reported_date = reported_date.isoformat()
+    raw = json.dumps({"reportedDate": reported_date, "id": row["id"]}, separators=(",", ":"))
+    return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def _decode_case_cursor(value: str) -> tuple[datetime, str]:
+    try:
+        padded = value + "=" * (-len(value) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+        reported_date = datetime.fromisoformat(str(payload["reportedDate"]).replace("Z", "+00:00"))
+        case_id = str(payload["id"]).strip()
+        if not case_id:
+            raise ValueError("missing case id")
+        return reported_date, case_id
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid case-page cursor") from exc
 
 
 class CreateCaseRequest(BaseModel):
@@ -45,6 +74,7 @@ class CreateCaseRequest(BaseModel):
     location: str | None = None
     stationId: str | None = None
     possibleMatches: list[dict] = Field(default_factory=list)
+    firJobId: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class DraftRequest(BaseModel):
@@ -134,6 +164,72 @@ def _find_or_create_person(name: str, role: str) -> dict:
     ) or {}
 
 
+def _fir_document_storage_ready() -> bool:
+    return bool(fetch_scalar("SELECT to_regclass('public.\"CaseFirDocument\"')"))
+
+
+def _insert_case_with_optional_document(
+    case_params: dict,
+    document: dict | None,
+    officer_id: str,
+) -> dict | None:
+    """Create a Case and its source FIR together, or create neither."""
+
+    def _insert(conn):
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    '''
+                    INSERT INTO "Case" (
+                        id, "firNumber", "stationId", "crimeType", status, "incidentDate",
+                        summary, "rawExtractedText", "createdFromScan", latitude, longitude
+                    )
+                    VALUES (
+                        %(id)s, %(firNumber)s, %(stationId)s, %(crimeType)s, 'OPEN', %(incidentDate)s,
+                        %(summary)s, %(rawText)s, %(createdFromScan)s, %(latitude)s, %(longitude)s
+                    )
+                    RETURNING *
+                    ''',
+                    case_params,
+                )
+                case_row = serialize_row(cur.fetchone())
+                if not case_row:
+                    conn.rollback()
+                    return None
+
+                if document:
+                    content = document["content"]
+                    cur.execute(
+                        '''
+                        INSERT INTO "CaseFirDocument" (
+                            id, "caseId", filename, "contentType", "sizeBytes",
+                            sha256, "documentData", "uploadedById"
+                        )
+                        VALUES (
+                            %(documentId)s, %(caseId)s, %(filename)s, %(contentType)s,
+                            %(sizeBytes)s, %(sha256)s, %(documentData)s, %(uploadedById)s
+                        )
+                        ''',
+                        {
+                            "documentId": new_id(),
+                            "caseId": case_row["id"],
+                            "filename": document["filename"],
+                            "contentType": document["contentType"],
+                            "sizeBytes": len(content),
+                            "sha256": hashlib.sha256(content).hexdigest(),
+                            "documentData": content,
+                            "uploadedById": officer_id,
+                        },
+                    )
+            conn.commit()
+            return case_row
+        except Exception:
+            conn.rollback()
+            raise
+
+    return run_on_connection(_insert)
+
+
 @router.get("")
 def list_cases(
     crimeType: str | None = None,
@@ -142,6 +238,8 @@ def list_cases(
     date: str | None = None,
     q: str | None = None,
     hasPendingMatches: str | None = None,
+    cursor: str | None = None,
+    limit: int = Query(default=DEFAULT_CASE_PAGE_SIZE, ge=1, le=MAX_CASE_PAGE_SIZE),
     current_user: dict = Depends(get_current_user),
 ) -> dict:
     officer = current_user["officer"]
@@ -155,7 +253,19 @@ def list_cases(
         params["crimeType"] = crimeType
 
     if stationId and stationId != "all" and wide_scope:
-        filters += ' AND c."stationId" = %(filterStationId)s'
+        # A few imported test datasets contain duplicate station rows with the
+        # same district/name. Treat them as one logical filter so an officer
+        # does not see duplicate choices or only half of that station's cases.
+        filters += '''
+            AND c."stationId" IN (
+                SELECT candidate.id
+                FROM "PoliceStation" candidate
+                JOIN "PoliceStation" selected
+                  ON selected.id = %(filterStationId)s
+                WHERE candidate."districtId" = selected."districtId"
+                  AND LOWER(BTRIM(candidate.name)) = LOWER(BTRIM(selected.name))
+            )
+        '''
         params["filterStationId"] = stationId
 
     if status and status not in ("All Statuses", "all"):
@@ -176,12 +286,34 @@ def list_cases(
                 c."firNumber" ILIKE %(q)s
                 OR COALESCE(c.summary, '') ILIKE %(q)s
                 OR c."crimeType" ILIKE %(q)s
+                OR COALESCE(ps.name, '') ILIKE %(q)s
+                OR EXISTS (
+                    SELECT 1
+                    FROM "CasePerson" cp
+                    JOIN "Person" p ON p.id = cp."personId"
+                    WHERE cp."caseId" = c.id
+                      AND (
+                        p.name ILIKE %(q)s
+                        OR COALESCE(p.phone, '') ILIKE %(q)s
+                      )
+                )
             )
         '''
         params["q"] = f"%{q.strip()}%"
 
     if hasPendingMatches == "true":
         filters += ' AND EXISTS (SELECT 1 FROM "CaseMatch" cm WHERE cm."caseId" = c.id AND cm.status = \'PENDING\')'
+
+    if cursor:
+        cursor_date, cursor_id = _decode_case_cursor(cursor)
+        filters += '''
+            AND (
+              c."reportedDate" < %(cursorReportedDate)s
+              OR (c."reportedDate" = %(cursorReportedDate)s AND c.id < %(cursorCaseId)s)
+            )
+        '''
+        params["cursorReportedDate"] = cursor_date
+        params["cursorCaseId"] = cursor_id
 
     def _load(conn):
         with conn.cursor() as cur:
@@ -195,29 +327,54 @@ def list_cases(
                 LEFT JOIN "PoliceStation" ps ON c."stationId" = ps.id
                 WHERE 1=1{scope_sql}{filters}
                 ORDER BY c."reportedDate" DESC
-                LIMIT 100
+                LIMIT %(pageLimit)s
                 ''',
-                params,
+                {**params, "pageLimit": limit + 1},
             )
             cases = serialize_rows(cur.fetchall())
+
+            cur.execute(
+                f'''
+                SELECT DISTINCT c."crimeType"
+                FROM "Case" c
+                WHERE c."crimeType" IS NOT NULL
+                  AND BTRIM(c."crimeType") <> ''{scope_sql}
+                ORDER BY c."crimeType"
+                ''',
+                scope_params,
+            )
+            crime_types = [row["crimeType"] for row in serialize_rows(cur.fetchall())]
 
             station_scope_sql, station_scope_params = jurisdiction_station_filter_sql(officer, alias="ps")
             cur.execute(
                 f'''
-                SELECT ps.id, ps.name
+                SELECT MIN(ps.id) AS id, MIN(ps.name) AS name,
+                       ps."districtId", MIN(d.name) AS "districtName"
                 FROM "PoliceStation" ps
+                LEFT JOIN "District" d ON d.id = ps."districtId"
                 WHERE 1=1{station_scope_sql}
-                ORDER BY ps.name
+                GROUP BY ps."districtId", LOWER(BTRIM(ps.name))
+                ORDER BY MIN(ps.name), MIN(d.name)
                 ''',
                 station_scope_params,
             )
             stations = serialize_rows(cur.fetchall())
-            return cases, stations
+            return cases, stations, crime_types
 
-    cases, stations = run_on_connection(_load)
+    cases, stations, crime_types = run_on_connection(_load)
+    has_more = len(cases) > limit
+    cases = cases[:limit]
+    next_cursor = _encode_case_cursor(cases[-1]) if has_more and cases else None
     for case in cases:
         case["station"] = case.pop("stationName", None) or "Station"
-    return {"cases": cases, "stations": stations}
+    return {
+        "cases": cases,
+        "stations": stations,
+        "crimeTypes": crime_types,
+        "nextCursor": next_cursor,
+        "hasMore": has_more,
+        "pageSize": limit,
+    }
 
 
 @router.post("")
@@ -230,6 +387,26 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
             status_code=400,
             detail="stationId is required when your account is not assigned to a station",
         )
+
+    source_document: dict | None = None
+    if payload.firJobId:
+        job = fir_jobs.get(payload.firJobId, officer["id"])
+        if job is None:
+            raise HTTPException(status_code=404, detail="FIR intake job not found")
+        if job.status != "done":
+            raise HTTPException(
+                status_code=409,
+                detail="FIR extraction must finish before the case can be saved",
+            )
+        source_document = fir_jobs.get_document(payload.firJobId, officer["id"])
+        if source_document is None:
+            raise HTTPException(status_code=409, detail="Original FIR scan is no longer available")
+        if not _fir_document_storage_ready():
+            raise HTTPException(
+                status_code=503,
+                detail="FIR document storage is not set up. Apply database migration 0016_case_fir_documents.sql first.",
+            )
+
     year = datetime.now(timezone.utc).year
     count = fetch_scalar(
         'SELECT COUNT(*) FROM "Case" WHERE "stationId" = %(stationId)s',
@@ -248,18 +425,7 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
     summary = intake_intel.pack_summary_with_mo(narrative, payload.modusOperandi)
     latitude, longitude = geocoder.geocode_location(payload.location, officer.get("stationName"))
 
-    case_row = execute_returning(
-        '''
-        INSERT INTO "Case" (
-            id, "firNumber", "stationId", "crimeType", status, "incidentDate",
-            summary, "rawExtractedText", "createdFromScan", latitude, longitude
-        )
-        VALUES (
-            %(id)s, %(firNumber)s, %(stationId)s, %(crimeType)s, 'OPEN', %(incidentDate)s,
-            %(summary)s, %(rawText)s, %(createdFromScan)s, %(latitude)s, %(longitude)s
-        )
-        RETURNING *
-        ''',
+    case_row = _insert_case_with_optional_document(
         {
             "id": new_id(),
             "firNumber": fir_number,
@@ -272,6 +438,8 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
             "latitude": latitude,
             "longitude": longitude,
         },
+        source_document,
+        officer["id"],
     )
     if not case_row:
         raise HTTPException(status_code=500, detail="Failed to create case")
@@ -337,6 +505,14 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
         case_row["id"],
         f"Created via FIR Scan: {fir_number}",
     )
+    if source_document:
+        create_audit_log(
+            officer["id"],
+            "ATTACH_FIR_DOCUMENT",
+            "CASE",
+            case_row["id"],
+            f"Stored original FIR scan ({source_document['contentType']}, {len(source_document['content'])} bytes)",
+        )
 
     # A newly registered FIR must appear on the dashboard and network straight
     # away, so drop the cached aggregates rather than waiting out their TTL.

@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import jsPDF from "jspdf";
 import { Search, Layers, Activity, Route, Compass, Sparkles, CircleAlert, Link2 } from "lucide-react";
 import { apiRequest } from "@/api/client";
-import { Card, SectionLabel, Skeleton } from "@/components/scrb/primitives";
+import { Button, Card, SectionLabel, Skeleton } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
 import { NetworkCanvas, KIND_STYLE } from "@/components/scrb/network-canvas";
 import {
@@ -20,6 +20,7 @@ import {
 import {
   buildAdjacency,
   layoutGraph,
+  normalizeNetworkFocusId,
   shortestPath,
   type GraphEdge,
   type GraphNode,
@@ -37,6 +38,9 @@ type NetworkMeta = {
   sharedEntityCount: number;
   verifiedLinkCount: number;
   pendingLeadCount: number;
+  focused: boolean;
+  seedFound: boolean | null;
+  seedId: string | null;
 };
 
 const EMPTY_META: NetworkMeta = {
@@ -45,12 +49,15 @@ const EMPTY_META: NetworkMeta = {
   sharedEntityCount: 0,
   verifiedLinkCount: 0,
   pendingLeadCount: 0,
+  focused: false,
+  seedFound: null,
+  seedId: null,
 };
 
 export default function NetworkPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const queryFocusId = searchParams.get("focusId");
+  const queryFocusId = normalizeNetworkFocusId(searchParams.get("focusId"));
   const { t } = useI18n();
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -62,6 +69,7 @@ export default function NetworkPage() {
   const [meta, setMeta] = useState<NetworkMeta>(EMPTY_META);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [seeded, setSeeded] = useState(false);
 
   const [mode, setMode] = useState<Mode>("explore");
@@ -88,6 +96,7 @@ export default function NetworkPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError("");
     const url = queryFocusId ? `/api/network?seedId=${encodeURIComponent(queryFocusId)}` : "/api/network";
     apiRequest(url, { fresh: true })
       .then((payload) => {
@@ -111,7 +120,7 @@ export default function NetworkPage() {
     return () => {
       cancelled = true;
     };
-  }, [queryFocusId]);
+  }, [queryFocusId, reloadKey]);
 
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const adjacency = useMemo(() => buildAdjacency(edges), [edges]);
@@ -464,18 +473,30 @@ export default function NetworkPage() {
           <CircleAlert className="mx-auto h-6 w-6 text-danger" />
           <p className="mt-3 text-sm font-medium">The network could not be loaded.</p>
           <p className="mt-1 text-xs text-muted-foreground">{loadError}</p>
+          <Button className="mt-4" variant="outline" onClick={() => setReloadKey((value) => value + 1)}>
+            Try again
+          </Button>
         </Card>
       </div>
     );
   }
 
   if (nodes.length === 0) {
+    const requestedCaseUnavailable = Boolean(queryFocusId && meta.seedFound === false);
     return (
       <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
         <Card strong className="relative overflow-hidden p-5 flex flex-col items-center justify-center h-[calc(100vh-10rem)]">
           <Layers className="h-6 w-6 text-muted-foreground" />
-          <p className="mt-3 text-sm text-muted-foreground">No linked cases, persons, or vehicles found yet for your jurisdiction.</p>
-          <p className="mt-1 text-xs text-muted-foreground">Upload an FIR or confirm a lead to start building the network.</p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {requestedCaseUnavailable
+              ? "The requested case is unavailable in your jurisdiction."
+              : "No linked cases, persons, or vehicles found yet for your jurisdiction."}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {requestedCaseUnavailable
+              ? "Return to the case directory and choose a case you are authorised to view."
+              : "Upload an FIR or confirm a lead to start building the network."}
+          </p>
         </Card>
       </div>
     );
@@ -534,7 +555,7 @@ export default function NetworkPage() {
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 shrink-0">
           {[
-            { label: "Cases in scope", value: meta.caseCount },
+            { label: meta.focused ? "Focused cases" : "Cases in scope", value: meta.caseCount },
             { label: "Shared entities", value: meta.sharedEntityCount },
             { label: "Verified links", value: meta.verifiedLinkCount },
             { label: "Unverified leads", value: meta.pendingLeadCount },
@@ -545,6 +566,12 @@ export default function NetworkPage() {
             </div>
           ))}
         </div>
+
+        {meta.capped && (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            This is a bounded view of the first {meta.caseCount} relevant cases. Narrow the investigation from a case dossier for a more focused graph.
+          </p>
+        )}
 
         {/* Search (explore mode only) */}
         {mode === "explore" && (

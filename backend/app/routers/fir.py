@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from io import BytesIO
+from pathlib import Path
 from typing import Callable
 
 import fitz
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/fir", tags=["fir"])
 # both scripts in one pass recognises far more than English alone.
 OCR_LANGS = "eng+kan"
 MAX_FIR_UPLOAD_BYTES = 20 * 1024 * 1024
+ALLOWED_FIR_CONTENT_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 
 # pytesseract is only a wrapper around the `tesseract` CLI; the pip install does
 # not bring the binary. Without it every upload died as an unhandled 500, which
@@ -248,13 +250,21 @@ async def upload_fir(
     content = await file.read(MAX_FIR_UPLOAD_BYTES + 1)
     if len(content) > MAX_FIR_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="FIR scans must be 20 MB or smaller.")
-    content_type = file.content_type or ""
-    filename = file.filename or "scan"
+    content_type = (file.content_type or "").lower()
+    filename = Path(file.filename or "scan").name[:255] or "scan"
 
-    if not (content_type.startswith("image/") or content_type == "application/pdf"):
-        raise HTTPException(status_code=415, detail="Only image or PDF FIR scans are supported.")
+    if content_type not in ALLOWED_FIR_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail="Only PDF, JPEG, or PNG FIR scans are supported.",
+        )
 
-    job = fir_jobs.create(officer["id"], filename)
+    job = fir_jobs.create(
+        officer["id"],
+        filename,
+        document_content=content,
+        document_content_type=content_type,
+    )
     background_tasks.add_task(_run_job, job.id, content, content_type, filename, officer)
     return {"jobId": job.id, "filename": filename, "status": job.status}
 

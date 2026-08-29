@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiRequest } from "@/api/client";
-import { Card, SectionLabel, Badge, StatCard } from "@/components/scrb/primitives";
+import { Card, SectionLabel, Badge, StatCard, Skeleton } from "@/components/scrb/primitives";
 import { TrendingUp, AlertTriangle, ShieldCheck, PieChart, Activity, ActivitySquare, ArrowRight } from "lucide-react";
 import { CrimeTrendChart, PredictiveRadarChart, type TrendDatum, type TrendSeries, type ForecastAxis } from "@/components/scrb/trend-charts";
 import { EarlyWarningsFeed, type EarlyWarning } from "@/components/scrb/early-warnings";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/lib/i18n";
 import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
+import { DataLoadError } from "@/components/scrb/data-load-state";
 
 type AnalyticsPayload = {
   metrics: {
@@ -27,12 +28,31 @@ export default function Analytics() {
   const { user } = useAuth();
   const { t } = useI18n();
   const [payload, setPayload] = useState<AnalyticsPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    apiRequest("/api/analytics").then(setPayload).catch(console.error);
+  const load = useCallback(async (initial = false) => {
+    if (initial) setLoading(true);
+    else setRefreshing(true);
+    try {
+      const next = await apiRequest("/api/analytics");
+      setPayload(next);
+      setError("");
+    } catch (loadError) {
+      console.error(loadError);
+      setError("Analytics could not be refreshed.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  useVisibilityRefetch(() => apiRequest("/api/analytics").then(setPayload).catch(console.error));
+  useEffect(() => {
+    void load(true);
+  }, [load]);
+
+  useVisibilityRefetch(() => load(false));
 
   // Composition of the current caseload. This was already computed server-side
   // and thrown away; it answers "what am I actually dealing with?", which the
@@ -57,10 +77,34 @@ export default function Analytics() {
             Real-time analytics and predictive intelligence for {user?.role === "SP" ? "the entire district" : "your station"}.
           </p>
         </div>
-        <Badge tone="teal" className="gap-2 px-3 py-1.5">
-          <Activity className="h-4 w-4" /> {t("analytics.liveSync")}
+        <Badge tone={error ? "danger" : "teal"} className="gap-2 px-3 py-1.5">
+          <Activity className="h-4 w-4" /> {refreshing ? "Refreshing…" : error ? "Refresh failed" : t("analytics.liveSync")}
         </Badge>
       </div>
+
+      {error && (
+        <DataLoadError
+          message={error}
+          showingStaleData={Boolean(payload)}
+          onRetry={() => void load(!payload)}
+        />
+      )}
+
+      {loading && !payload ? (
+        <>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-32 rounded-2xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-[360px] rounded-2xl" />
+            ))}
+          </div>
+        </>
+      ) : !payload ? null : (
+        <>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <Card accent="teal" className="p-5">
@@ -174,6 +218,8 @@ export default function Analytics() {
           </div>
         </Card>
       </div>
+        </>
+      )}
     </div>
   );
 }

@@ -5,12 +5,18 @@ from app.services import analytics
 from app.services.case_access import jurisdiction_filter_sql
 from app.services.db import fetch_all
 from app.services.parallel import analytics_cache, gather
+from app.services.warning_engine import WARNING_SOURCE
 
 router = APIRouter(prefix="/api", tags=["hotspots"])
 
 
-def _load_alerts(officer: dict) -> list[dict]:
+def _load_alerts(officer: dict, *, statistical: bool) -> list[dict]:
     scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="a")
+    source_sql = (
+        'AND a.source = %(warningSource)s'
+        if statistical
+        else 'AND (a.source IS NULL OR a.source <> %(warningSource)s)'
+    )
     alerts = fetch_all(
         f'''
         SELECT a.*, ps.name AS "stationName"
@@ -18,14 +24,32 @@ def _load_alerts(officer: dict) -> list[dict]:
         LEFT JOIN "PoliceStation" ps ON a."stationId" = ps.id
         WHERE a.status = 'ACTIVE'
           AND (a."expiresAt" IS NULL OR a."expiresAt" > NOW())
+          {source_sql}
           {scope_sql}
         ORDER BY a."riskScore" DESC
         ''',
-        scope_params,
+        {"warningSource": WARNING_SOURCE, **scope_params},
     )
-    for alert in alerts:
+    for alert in sorted(alerts, key=lambda row: float(row.get("riskScore") or 0), reverse=True):
         alert["station"] = {"name": alert.pop("stationName", None)}
     return alerts
+
+
+def _dedupe_operational_alerts(alerts: list[dict]) -> list[dict]:
+    """Collapse repeated legacy/manual rows while retaining the highest-risk row."""
+    seen: set[tuple[str, str, str]] = set()
+    result: list[dict] = []
+    for alert in alerts:
+        key = (
+            str(alert.get("stationId") or ""),
+            str(alert.get("zoneLabel") or "").strip().casefold(),
+            str(alert.get("crimeType") or alert.get("type") or "").strip().casefold(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(alert)
+    return result
 
 
 @router.get("/hotspots")
@@ -36,7 +60,10 @@ def hotspots(current_user: dict = Depends(get_current_user)) -> dict:
     def build() -> dict:
         parts = gather(
             {
-                "alerts": lambda: _load_alerts(officer),
+                "alerts": lambda: _load_alerts(officer, statistical=True),
+                "operationalAlerts": lambda: _dedupe_operational_alerts(
+                    _load_alerts(officer, statistical=False)
+                ),
                 "clusters": lambda: analytics.get_hotspot_clusters(officer),
                 "dailyVolume": lambda: analytics.get_daily_case_volume(officer, days=7),
                 "summary": lambda: analytics.get_high_risk_summary(officer),
@@ -45,6 +72,7 @@ def hotspots(current_user: dict = Depends(get_current_user)) -> dict:
         daily = parts.get("dailyVolume") or []
         return {
             "alerts": parts.get("alerts") or [],
+            "operationalAlerts": parts.get("operationalAlerts") or [],
             "clusters": parts.get("clusters") or [],
             "dailyVolume": daily,
             "sparklinePath": analytics.sparkline_paths(daily),

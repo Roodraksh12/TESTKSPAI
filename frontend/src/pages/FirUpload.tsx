@@ -31,6 +31,7 @@ export default function FIRUploadPage() {
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [sourceJobId, setSourceJobId] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const seedIntakeBrief = useCopilotStore((s) => s.seedIntakeBrief);
@@ -54,6 +55,7 @@ export default function FIRUploadPage() {
       setExtractedData(activeJob.result.extractedData);
       setRawText(activeJob.result.rawText || "");
       setPossibleMatches(activeJob.result.possibleMatches || []);
+      setSourceJobId(activeJob.jobId);
       setPhase("done");
     }
     if (activeJob?.status === "error") {
@@ -77,6 +79,8 @@ export default function FIRUploadPage() {
 
   const handleMagicDraft = async () => {
     if (!magicNotes.trim()) return;
+    setSourceJobId(null);
+    setActiveJob(null);
     setPhase("running");
     setError("");
 
@@ -113,6 +117,7 @@ export default function FIRUploadPage() {
   const handleUpload = async () => {
     if (!file) return;
     setError("");
+    setSourceJobId(null);
     const jobId = await enqueue(file);
     setFile(null);
     if (jobId) setActiveJob(jobId);
@@ -128,13 +133,14 @@ export default function FIRUploadPage() {
         body: JSON.stringify({
           ...extractedData,
           rawText,
-          possibleMatches
+          possibleMatches,
+          firJobId: sourceJobId || undefined,
         })
       });
 
       // The scan has become a Case; it no longer belongs in the pending queue.
-      if (activeJobId) {
-        void discardJob(activeJobId);
+      if (sourceJobId) {
+        void discardJob(sourceJobId);
         setActiveJob(null);
       }
 
@@ -162,8 +168,8 @@ export default function FIRUploadPage() {
   };
 
   const resetForm = () => {
-    if (activeJobId) {
-      void discardJob(activeJobId);
+    if (sourceJobId) {
+      void discardJob(sourceJobId);
       setActiveJob(null);
     }
     setFile(null);
@@ -173,6 +179,7 @@ export default function FIRUploadPage() {
     setError("");
     setPhase("idle");
     setCurrentStep(-1);
+    setSourceJobId(null);
   };
 
   return (
@@ -184,6 +191,7 @@ export default function FIRUploadPage() {
           setExtractedData(job.result.extractedData);
           setRawText(job.result.rawText || "");
           setPossibleMatches(job.result.possibleMatches || []);
+          setSourceJobId(jobId);
           setPhase("done");
           setError("");
         }}

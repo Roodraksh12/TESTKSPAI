@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Briefcase, TrendingUp, AlertTriangle, ShieldAlert, ShieldCheck, Clock, GitMerge,
@@ -11,6 +11,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { DashboardOfficer, DashboardAttention } from "./DashboardClient";
 import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
+import { DataLoadError } from "@/components/scrb/data-load-state";
 
 type RecentCase = {
   id: string;
@@ -216,43 +217,34 @@ export default function Overview() {
     { stationId: string; stationName: string; caseCount: number; openCount: number }[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
+  const loadDashboard = useCallback(async (initial = false) => {
     if (isIt) return;
-    let cancelled = false;
-    const load = () =>
-      apiRequest("/api/dashboard")
-        .then((payload) => {
-          if (cancelled) return;
-          setOfficer(payload.officer ?? null);
-          setAttention(payload.attention ?? null);
-          setStats(payload.stats ?? stats);
-          setRecentCases(payload.recentCases || []);
-          setStationBreakdown(payload.stationBreakdown || []);
-        })
-        .catch(console.error)
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-    load();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (initial) setLoading(true);
+    try {
+      const payload = await apiRequest("/api/dashboard");
+      setOfficer(payload.officer ?? null);
+      setAttention(payload.attention ?? null);
+      if (payload.stats) setStats(payload.stats);
+      setRecentCases(payload.recentCases || []);
+      setStationBreakdown(payload.stationBreakdown || []);
+      setLoadedOnce(true);
+      setError("");
+    } catch (loadError) {
+      console.error(loadError);
+      setError("Dashboard information could not be refreshed.");
+    } finally {
+      setLoading(false);
+    }
   }, [isIt]);
 
-  useVisibilityRefetch(() => {
-    if (isIt) return;
-    return apiRequest("/api/dashboard")
-      .then((payload) => {
-        setOfficer(payload.officer ?? null);
-        setAttention(payload.attention ?? null);
-        setStats(payload.stats ?? stats);
-        setRecentCases(payload.recentCases || []);
-        setStationBreakdown(payload.stationBreakdown || []);
-      })
-      .catch(console.error);
-  }, !isIt);
+  useEffect(() => {
+    void loadDashboard(true);
+  }, [loadDashboard]);
+
+  useVisibilityRefetch(() => loadDashboard(false), !isIt);
 
   if (isIt) {
     return <PoliceItOverview />;
@@ -269,6 +261,15 @@ export default function Overview() {
 
   return (
     <div className="max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
+      {error && (
+        <div className="mb-6">
+          <DataLoadError
+            message={error}
+            showingStaleData={loadedOnce}
+            onRetry={() => void loadDashboard(!loadedOnce)}
+          />
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Main Column */}
         <div className="lg:col-span-2 space-y-6">

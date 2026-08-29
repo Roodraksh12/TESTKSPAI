@@ -39,3 +39,17 @@ def test_rejected_match_is_excluded_from_edges(sp_officer) -> None:
 def test_network_respects_case_cap(sp_officer) -> None:
     graph = network_builder.build_crime_network(sp_officer)
     assert graph["meta"]["caseCount"] <= network_builder.GRAPH_CASE_CAP
+
+
+def test_raw_case_id_focus_matches_typed_network_node(sp_officer) -> None:
+    full_graph = network_builder.build_crime_network(sp_officer)
+    case_node = next(node for node in full_graph["nodes"] if node["kind"] == "Case")
+    raw_case_id = case_node["id"].removeprefix("case:")
+
+    raw_focus = network_builder.build_crime_network(sp_officer, seed_id=raw_case_id)
+    typed_focus = network_builder.build_crime_network(sp_officer, seed_id=case_node["id"])
+
+    raw_ids = {node["id"] for node in raw_focus["nodes"]}
+    typed_ids = {node["id"] for node in typed_focus["nodes"]}
+    assert case_node["id"] in raw_ids
+    assert raw_ids == typed_ids

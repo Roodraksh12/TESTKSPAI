@@ -13,9 +13,9 @@ import { ModeToggle } from "@/components/scrb/mode-toggle";
 import { EntryTransition } from "@/components/scrb/entry-transition";
 
 const FEATURES = [
-  { icon: Sparkles, label: "Source-cited copilot", copy: "Every answer cites the FIR, ledger or MO cluster it drew from." },
-  { icon: FileSearch, label: "Entity linkage", copy: "Names, plates and aliases reconciled across cases in seconds." },
-  { icon: Radio, label: "Live hotspots", copy: "Beat-level risk maps refreshed hourly for patrol planning." },
+  { icon: Sparkles, label: "Grounded copilot", copy: "Record-backed searches show the supporting case references used in the answer." },
+  { icon: FileSearch, label: "Officer-reviewed links", copy: "Shared names, plates and recorded relationships are surfaced for review." },
+  { icon: Radio, label: "Explainable alerts", copy: "Seven-day activity is compared with the preceding 28-day baseline." },
   { icon: Scale, label: "Human oversight", copy: "No coercive action on AI alone — confirmation is mandatory." },
 ];
 
@@ -71,7 +71,7 @@ export default function LoginPage() {
             <div className="leading-tight">
               <p className="text-[15px] font-semibold tracking-tight">SCRB Sahayak</p>
               <p className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                Karnataka Police
+                Hackathon prototype
               </p>
             </div>
           </div>
@@ -89,6 +89,10 @@ export default function LoginPage() {
                 </div>
                 <MagneticSeal />
               </div>
+
+              <p className="mt-4 rounded-xl border border-amber/20 bg-amber/5 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
+                Synthetic demo data only · Not connected to CCTNS, ICJS or a production police database
+              </p>
 
               <form
                 onSubmit={(e) => {
@@ -154,8 +158,8 @@ export default function LoginPage() {
               <div className="mt-6 flex items-start gap-2 rounded-2xl border border-hairline bg-surface-2 p-3">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Unauthorised access to police records is punishable under Sec. 66 IT Act and the
-                  Karnataka Police Manual. All activity is logged.
+                  Access is restricted to authorised demo accounts. Important activity in this
+                  prototype is recorded for review.
                 </p>
               </div>
             </div>
@@ -236,7 +240,7 @@ function HeroPanel() {
           <div className="leading-tight">
             <p className="text-[16px] font-semibold tracking-tight">SCRB Sahayak</p>
             <p className="text-[10px] tracking-widest text-muted-foreground uppercase">
-              Karnataka Police · State Crime Records Bureau
+              KSP Hackathon · SCRB challenge prototype
             </p>
           </div>
         </div>
@@ -244,11 +248,11 @@ function HeroPanel() {
         <h2 className="mt-10 max-w-lg text-[44px] leading-[1.05] font-normal tracking-tight text-display">
           An investigation copilot,
           <br />
-          <span className="italic text-amber-soft">purpose-built for KSP.</span>
+          <span className="italic text-amber-soft">designed for the KSP challenge.</span>
         </h2>
         <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
-          Link cases, spot hotspots and draft dossiers with source-cited answers —
-          calm, auditable and always officer-in-the-loop.
+          Search synthetic case records, trace links and prepare officer-reviewed
+          drafts with visible sources and human oversight.
         </p>
 
         <div className="mt-8 grid max-w-lg grid-cols-2 gap-3">

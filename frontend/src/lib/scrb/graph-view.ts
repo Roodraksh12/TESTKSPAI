@@ -6,6 +6,18 @@
 
 export type NodeKind = "Case" | "Person" | "Vehicle" | "Location";
 
+const NETWORK_NODE_PREFIX = /^(case|person|vehicle|loc):/;
+
+/**
+ * Dossier routes use a database case ID, while network nodes use a typed
+ * `case:<database-id>` ID. Existing typed graph links remain unchanged.
+ */
+export function normalizeNetworkFocusId(value: string | null | undefined): string | null {
+  const focusId = value?.trim();
+  if (!focusId) return null;
+  return NETWORK_NODE_PREFIX.test(focusId) ? focusId : `case:${focusId}`;
+}
+
 export type GraphNode = {
   id: string;
   label: string;

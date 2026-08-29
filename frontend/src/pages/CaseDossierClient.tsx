@@ -18,6 +18,7 @@ import {
   BookOpen,
   ClipboardList,
   ListChecks,
+  FileSearch,
 } from "lucide-react";
 import { Card, Badge, Button, IconOrb, SectionLabel } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
@@ -34,9 +35,12 @@ import { CustodyClockPanel } from "@/components/scrb/CustodyClockPanel";
 import { useAuth } from "@/context/AuthContext";
 import { ReportDataTab } from "@/components/scrb/ReportDataTab";
 import { InvestigationPlanTab } from "@/components/scrb/InvestigationPlanTab";
+import { normalizeNetworkFocusId } from "@/lib/scrb/graph-view";
+import { FirDocumentTab } from "@/components/scrb/FirDocumentTab";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: FileText },
+  { id: "fir-document", label: "Original FIR", icon: FileSearch },
   { id: "timeline", label: "Timeline", icon: GitBranch },
   { id: "diary", label: "Case Diary", icon: BookOpen },
   { id: "investigation-plan", label: "Investigation Plan", icon: ListChecks },
@@ -247,6 +251,7 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
             caseId={c.id}
             casePersons={c.casePersons}
             canEdit={canEditInvestigationLog}
+            openRemandOnMount={searchParams.get("action") === "remand"}
           />
         </div>
 
@@ -276,6 +281,7 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           {tab === "overview" && (
             <Overview c={c} rawExtractedText={caseData.rawExtractedText} highlight={highlight} />
           )}
+          {tab === "fir-document" && <FirDocumentTab caseId={c.id} />}
           {tab === "timeline" && <Timeline caseData={caseData} />}
           {tab === "diary" && (
             <CaseDiaryTab caseId={c.id} canEdit={canEditInvestigationLog} />
@@ -379,12 +385,14 @@ function Timeline({ caseData }: { caseData: any }) {
 }
 
 function Connections({ caseId }: { caseId: string }) {
+  const focusId = normalizeNetworkFocusId(caseId);
+  const networkUrl = `/network?${new URLSearchParams({ focusId: focusId || caseId }).toString()}`;
   return (
     <div className="glass rounded-3xl p-4">
       <p className="text-sm text-muted-foreground">
         Interactive graph available on the Network canvas.
       </p>
-      <Link to={`/network?focusId=${caseId}`} className="mt-3 inline-flex">
+      <Link to={networkUrl} className="mt-3 inline-flex">
         <Button variant="secondary" size="sm">
           Open network canvas
         </Button>

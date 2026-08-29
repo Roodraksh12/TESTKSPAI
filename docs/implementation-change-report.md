@@ -340,12 +340,16 @@ foreign or unapproved model provider is not acceptable for a real deployment.
 
 #### C. Zero Data Retention routing
 
-- Every OpenRouter request includes `provider: {"zdr": true}`.
+- By default, every OpenRouter request includes `provider: {"zdr": true}`.
 - If the chosen model has no ZDR route, the request fails closed. It does not
   retry through a retaining provider.
 - OpenRouter documents that request-level ZDR restricts routing to ZDR endpoints
   and publishes a live endpoint list. Endpoint availability is external and can
   change.
+- `OPENROUTER_ZDR_REQUIRED=false` is available only for a synthetic hackathon
+  demo when no suitable free ZDR model is available. In that mode, local
+  tokenisation and metadata-only auditing continue, but OpenRouter's normal
+  provider retention policy applies. The UI labels this mode explicitly.
 
 #### D. Read-only AI tools
 

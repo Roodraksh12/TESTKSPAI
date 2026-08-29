@@ -5,7 +5,7 @@
 [![Live Demo](https://img.shields.io/badge/Live_Demo-open-blue?style=for-the-badge)](https://kspai-zgymgiew.onslate.in/)
 [![Demo Video](https://img.shields.io/badge/Demo_Video-YouTube-red?style=for-the-badge&logo=youtube)](https://youtu.be/_UJdQK79kRM)
 
-![Status](https://img.shields.io/badge/status-production_ready-brightgreen)
+![Status](https://img.shields.io/badge/status-hackathon_demo-orange)
 ![Frontend](https://img.shields.io/badge/frontend-React_18_%2B_Vite-blue)
 ![Backend](https://img.shields.io/badge/backend-FastAPI-teal)
 ![Database](https://img.shields.io/badge/database-PostgreSQL-336791)
@@ -13,6 +13,10 @@
 </div>
 
 **SCRB Sahayak v2** is a bilingual investigation-support platform designed for modern police case management. It features advanced link analysis, statutory-deadline monitoring, and officer-controlled final-report preparation. It enforces jurisdiction-scoped access and keeps formal report generation deterministic (meaning the final-report builder never sends sensitive case content to external AI services).
+
+> **Demo boundary:** this is a hackathon prototype using synthetic test data. It
+> is not an official KSP system and is not connected to CCTNS, ICJS or a
+> production police/criminal database.
 
 ### 🚀 Quick Links
 - **Live Deployment:** [https://kspai-zgymgiew.onslate.in/](https://kspai-zgymgiew.onslate.in/)
@@ -26,6 +30,8 @@ The current `main` branch includes:
 
 - persistent, jurisdiction-scoped case directory and case dossiers;
 - FIR/OCR intake and optional OpenRouter-assisted extraction/copilot workflows;
+- protected original-FIR retention with jurisdiction-checked viewing, downloads,
+  audit events and an OCR-only fallback for older cases;
 - date-wise case diary pages with per-day numbering and date-range PDF export;
 - evidence and document linking with assigned-IO write controls;
 - pan, zoom, drag and focus controls for dense cross-case network graphs;
@@ -42,8 +48,9 @@ The current `main` branch includes:
 - jurisdiction-scoped conversational case search and verified crime-statistics
   breakdowns by crime, status, station, district, month, weekday or hour;
 - a provider-neutral AI gateway with backend-only sensitive-data tokenisation,
-  per-request Zero Data Retention enforcement for OpenRouter, private-model
-  routing, read-only AI tools and metadata-only privacy audit records;
+  default-on per-request Zero Data Retention enforcement for OpenRouter,
+  private-model routing, read-only AI tools and metadata-only privacy audit
+  records;
 - command analytics, hotspots and early-warning indicators; and
 - English/Kannada UI and speech support.
 
@@ -93,6 +100,8 @@ The Network canvas supports:
 - draggable nodes;
 - fit-to-view and reset controls;
 - search and focused exploration;
+- seed-first case neighbourhoods, so a dossier always opens its own bounded
+  evidence-linked graph even when it is older than the recent network window;
 - key-player and detected-cluster panels; and
 - jurisdiction-scoped source records.
 
@@ -222,15 +231,22 @@ default and continues to use `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`:
 AI_PROVIDER=openrouter
 OPENROUTER_API_KEY=...
 OPENROUTER_MODEL=openrouter/free
+OPENROUTER_ZDR_REQUIRED=true
 AI_EXTERNAL_MODE=redacted_only
 ```
 
-OpenRouter requests are tokenised on the backend and include
-`provider.zdr=true`. The configured model therefore needs a current,
-tool-capable Zero Data Retention endpoint. Free endpoint availability is not
-guaranteed; an incompatible or rate-limited route fails closed instead of
-falling back to a provider with weaker retention. Check the current endpoint
-list at [OpenRouter's ZDR endpoint](https://openrouter.ai/api/v1/endpoints/zdr).
+OpenRouter requests are tokenised on the backend. With the default
+`OPENROUTER_ZDR_REQUIRED=true`, they also include `provider.zdr=true`. The
+configured model therefore needs a current, tool-capable Zero Data Retention
+endpoint. Free endpoint availability is not guaranteed; an incompatible or
+rate-limited route fails closed instead of falling back to a provider with
+weaker retention. Check the current endpoint list at
+[OpenRouter's ZDR endpoint](https://openrouter.ai/api/v1/endpoints/zdr).
+
+For a synthetic-data-only hackathon demo, ZDR routing can be temporarily paused
+with `OPENROUTER_ZDR_REQUIRED=false`. Redaction and privacy audit metadata remain
+active, but the external provider's ordinary retention policy then applies. Do
+not use that mode with real police, personal, or sensitive case data.
 
 To use a private or self-hosted API that implements the OpenAI-compatible chat
 completions contract, switch only the backend configuration:
@@ -291,6 +307,9 @@ The canonical order and base-schema notes are in
 0012 reusable case report sources
 0013 provisional investigation plans and routine-document drafts
 0014 AI request privacy audit metadata and chat privacy metadata
+0015 scalable case-directory indexes
+0016 protected original-FIR documents
+0017 seed-first network-focus indexes
 ```
 
 For a test database that already has migrations through 0008, run from
@@ -303,10 +322,13 @@ PYTHONPATH=. python -m scripts.apply_0011
 PYTHONPATH=. python -m scripts.apply_0012
 PYTHONPATH=. python -m scripts.apply_0013
 PYTHONPATH=. python -m scripts.apply_0014
+PYTHONPATH=. python -m scripts.apply_0015
+PYTHONPATH=. python -m scripts.apply_0016
+PYTHONPATH=. python -m scripts.apply_0017
 ```
 
-Migrations 0010–0014 are currently intended for the isolated development/test
-database while the reporting and provisional playbook workflows are reviewed.
+Migrations 0010–0017 are currently intended for the isolated development/test
+database while the reporting, playbook and document-retention workflows are reviewed.
 
 ### 3. Run the backend
 
