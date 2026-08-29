@@ -69,7 +69,7 @@ export default function LoginPage() {
               <SealMark size={24} />
             </div>
             <div className="leading-tight">
-              <p className="text-[15px] font-semibold tracking-tight">Anvesha</p>
+              <p className="text-[15px] font-semibold tracking-tight">SCRB Sahayak</p>
             </div>
           </div>
 
@@ -235,7 +235,7 @@ function HeroPanel() {
             <SealMark size={28} />
           </div>
           <div className="leading-tight">
-            <p className="text-[16px] font-semibold tracking-tight">Anvesha</p>
+            <p className="text-[16px] font-semibold tracking-tight">SCRB Sahayak</p>
           </div>
         </div>
 
