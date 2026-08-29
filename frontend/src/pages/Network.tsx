@@ -20,6 +20,7 @@ import {
 import {
   buildAdjacency,
   layoutGraph,
+  normalizeNetworkFocusId,
   shortestPath,
   type GraphEdge,
   type GraphNode,
@@ -50,7 +51,7 @@ const EMPTY_META: NetworkMeta = {
 export default function NetworkPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const queryFocusId = searchParams.get("focusId");
+  const queryFocusId = normalizeNetworkFocusId(searchParams.get("focusId"));
   const { t } = useI18n();
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);

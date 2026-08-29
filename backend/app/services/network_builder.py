@@ -212,9 +212,16 @@ def build_crime_network(
     hubs = graph_engine.compute_key_players(node_list, analytical_edges, limit=8)
     brokers = graph_engine.compute_brokers(node_list, analytical_edges, limit=8)
 
+    # Dossier links historically sent a raw database case ID, while graph
+    # nodes use `case:<id>`. Accept both forms so old links focus the requested
+    # case instead of silently falling back to the default hub.
+    resolved_seed_id = seed_id
+    if seed_id and seed_id not in nodes and f"case:{seed_id}" in nodes:
+        resolved_seed_id = f"case:{seed_id}"
+
     visible_nodes, visible_edges = node_list, edges
-    if seed_id and seed_id in nodes:
-        visible_ids = graph_engine.neighborhood(edges, seed_id, hops)
+    if resolved_seed_id and resolved_seed_id in nodes:
+        visible_ids = graph_engine.neighborhood(edges, resolved_seed_id, hops)
         visible_nodes = [n for n in node_list if n["id"] in visible_ids]
         visible_edges = [e for e in edges if e["from"] in visible_ids and e["to"] in visible_ids]
 

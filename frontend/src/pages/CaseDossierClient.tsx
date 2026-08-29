@@ -34,6 +34,7 @@ import { CustodyClockPanel } from "@/components/scrb/CustodyClockPanel";
 import { useAuth } from "@/context/AuthContext";
 import { ReportDataTab } from "@/components/scrb/ReportDataTab";
 import { InvestigationPlanTab } from "@/components/scrb/InvestigationPlanTab";
+import { normalizeNetworkFocusId } from "@/lib/scrb/graph-view";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: FileText },
@@ -380,12 +381,14 @@ function Timeline({ caseData }: { caseData: any }) {
 }
 
 function Connections({ caseId }: { caseId: string }) {
+  const focusId = normalizeNetworkFocusId(caseId);
+  const networkUrl = `/network?${new URLSearchParams({ focusId: focusId || caseId }).toString()}`;
   return (
     <div className="glass rounded-3xl p-4">
       <p className="text-sm text-muted-foreground">
         Interactive graph available on the Network canvas.
       </p>
-      <Link to={`/network?focusId=${caseId}`} className="mt-3 inline-flex">
+      <Link to={networkUrl} className="mt-3 inline-flex">
         <Button variant="secondary" size="sm">
           Open network canvas
         </Button>
