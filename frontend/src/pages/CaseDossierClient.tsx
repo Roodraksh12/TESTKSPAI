@@ -18,6 +18,7 @@ import {
   BookOpen,
   ClipboardList,
   ListChecks,
+  FileSearch,
 } from "lucide-react";
 import { Card, Badge, Button, IconOrb, SectionLabel } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
@@ -35,9 +36,11 @@ import { useAuth } from "@/context/AuthContext";
 import { ReportDataTab } from "@/components/scrb/ReportDataTab";
 import { InvestigationPlanTab } from "@/components/scrb/InvestigationPlanTab";
 import { normalizeNetworkFocusId } from "@/lib/scrb/graph-view";
+import { FirDocumentTab } from "@/components/scrb/FirDocumentTab";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: FileText },
+  { id: "fir-document", label: "Original FIR", icon: FileSearch },
   { id: "timeline", label: "Timeline", icon: GitBranch },
   { id: "diary", label: "Case Diary", icon: BookOpen },
   { id: "investigation-plan", label: "Investigation Plan", icon: ListChecks },
@@ -278,6 +281,7 @@ export default function CaseDossierClient({ caseData }: { caseData: any }) {
           {tab === "overview" && (
             <Overview c={c} rawExtractedText={caseData.rawExtractedText} highlight={highlight} />
           )}
+          {tab === "fir-document" && <FirDocumentTab caseId={c.id} />}
           {tab === "timeline" && <Timeline caseData={caseData} />}
           {tab === "diary" && (
             <CaseDiaryTab caseId={c.id} canEdit={canEditInvestigationLog} />

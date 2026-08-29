@@ -26,6 +26,8 @@ The current `main` branch includes:
 
 - persistent, jurisdiction-scoped case directory and case dossiers;
 - FIR/OCR intake and optional OpenRouter-assisted extraction/copilot workflows;
+- protected original-FIR retention with jurisdiction-checked viewing, downloads,
+  audit events and an OCR-only fallback for older cases;
 - date-wise case diary pages with per-day numbering and date-range PDF export;
 - evidence and document linking with assigned-IO write controls;
 - pan, zoom, drag and focus controls for dense cross-case network graphs;
@@ -291,6 +293,8 @@ The canonical order and base-schema notes are in
 0012 reusable case report sources
 0013 provisional investigation plans and routine-document drafts
 0014 AI request privacy audit metadata and chat privacy metadata
+0015 scalable case-directory indexes
+0016 protected original-FIR documents
 ```
 
 For a test database that already has migrations through 0008, run from
@@ -303,10 +307,12 @@ PYTHONPATH=. python -m scripts.apply_0011
 PYTHONPATH=. python -m scripts.apply_0012
 PYTHONPATH=. python -m scripts.apply_0013
 PYTHONPATH=. python -m scripts.apply_0014
+PYTHONPATH=. python -m scripts.apply_0015
+PYTHONPATH=. python -m scripts.apply_0016
 ```
 
-Migrations 0010–0014 are currently intended for the isolated development/test
-database while the reporting and provisional playbook workflows are reviewed.
+Migrations 0010–0016 are currently intended for the isolated development/test
+database while the reporting, playbook and document-retention workflows are reviewed.
 
 ### 3. Run the backend
 

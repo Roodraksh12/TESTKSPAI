@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -27,9 +28,11 @@ from app.services.db import (
     fetch_scalar,
     new_id,
     run_on_connection,
+    serialize_row,
     serialize_rows,
 )
 from app.services.custody_clocks import list_case_clocks
+from app.services.job_store import fir_jobs
 from app.services.warning_engine import refresh_hotspot_warnings
 
 router = APIRouter(prefix="/api/cases", tags=["cases"])
@@ -71,6 +74,7 @@ class CreateCaseRequest(BaseModel):
     location: str | None = None
     stationId: str | None = None
     possibleMatches: list[dict] = Field(default_factory=list)
+    firJobId: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class DraftRequest(BaseModel):
@@ -158,6 +162,72 @@ def _find_or_create_person(name: str, role: str) -> dict:
         ''',
         {"id": new_id(), "name": name, "role": role},
     ) or {}
+
+
+def _fir_document_storage_ready() -> bool:
+    return bool(fetch_scalar("SELECT to_regclass('public.\"CaseFirDocument\"')"))
+
+
+def _insert_case_with_optional_document(
+    case_params: dict,
+    document: dict | None,
+    officer_id: str,
+) -> dict | None:
+    """Create a Case and its source FIR together, or create neither."""
+
+    def _insert(conn):
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    '''
+                    INSERT INTO "Case" (
+                        id, "firNumber", "stationId", "crimeType", status, "incidentDate",
+                        summary, "rawExtractedText", "createdFromScan", latitude, longitude
+                    )
+                    VALUES (
+                        %(id)s, %(firNumber)s, %(stationId)s, %(crimeType)s, 'OPEN', %(incidentDate)s,
+                        %(summary)s, %(rawText)s, %(createdFromScan)s, %(latitude)s, %(longitude)s
+                    )
+                    RETURNING *
+                    ''',
+                    case_params,
+                )
+                case_row = serialize_row(cur.fetchone())
+                if not case_row:
+                    conn.rollback()
+                    return None
+
+                if document:
+                    content = document["content"]
+                    cur.execute(
+                        '''
+                        INSERT INTO "CaseFirDocument" (
+                            id, "caseId", filename, "contentType", "sizeBytes",
+                            sha256, "documentData", "uploadedById"
+                        )
+                        VALUES (
+                            %(documentId)s, %(caseId)s, %(filename)s, %(contentType)s,
+                            %(sizeBytes)s, %(sha256)s, %(documentData)s, %(uploadedById)s
+                        )
+                        ''',
+                        {
+                            "documentId": new_id(),
+                            "caseId": case_row["id"],
+                            "filename": document["filename"],
+                            "contentType": document["contentType"],
+                            "sizeBytes": len(content),
+                            "sha256": hashlib.sha256(content).hexdigest(),
+                            "documentData": content,
+                            "uploadedById": officer_id,
+                        },
+                    )
+            conn.commit()
+            return case_row
+        except Exception:
+            conn.rollback()
+            raise
+
+    return run_on_connection(_insert)
 
 
 @router.get("")
@@ -317,6 +387,26 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
             status_code=400,
             detail="stationId is required when your account is not assigned to a station",
         )
+
+    source_document: dict | None = None
+    if payload.firJobId:
+        job = fir_jobs.get(payload.firJobId, officer["id"])
+        if job is None:
+            raise HTTPException(status_code=404, detail="FIR intake job not found")
+        if job.status != "done":
+            raise HTTPException(
+                status_code=409,
+                detail="FIR extraction must finish before the case can be saved",
+            )
+        source_document = fir_jobs.get_document(payload.firJobId, officer["id"])
+        if source_document is None:
+            raise HTTPException(status_code=409, detail="Original FIR scan is no longer available")
+        if not _fir_document_storage_ready():
+            raise HTTPException(
+                status_code=503,
+                detail="FIR document storage is not set up. Apply database migration 0016_case_fir_documents.sql first.",
+            )
+
     year = datetime.now(timezone.utc).year
     count = fetch_scalar(
         'SELECT COUNT(*) FROM "Case" WHERE "stationId" = %(stationId)s',
@@ -335,18 +425,7 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
     summary = intake_intel.pack_summary_with_mo(narrative, payload.modusOperandi)
     latitude, longitude = geocoder.geocode_location(payload.location, officer.get("stationName"))
 
-    case_row = execute_returning(
-        '''
-        INSERT INTO "Case" (
-            id, "firNumber", "stationId", "crimeType", status, "incidentDate",
-            summary, "rawExtractedText", "createdFromScan", latitude, longitude
-        )
-        VALUES (
-            %(id)s, %(firNumber)s, %(stationId)s, %(crimeType)s, 'OPEN', %(incidentDate)s,
-            %(summary)s, %(rawText)s, %(createdFromScan)s, %(latitude)s, %(longitude)s
-        )
-        RETURNING *
-        ''',
+    case_row = _insert_case_with_optional_document(
         {
             "id": new_id(),
             "firNumber": fir_number,
@@ -359,6 +438,8 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
             "latitude": latitude,
             "longitude": longitude,
         },
+        source_document,
+        officer["id"],
     )
     if not case_row:
         raise HTTPException(status_code=500, detail="Failed to create case")
@@ -424,6 +505,14 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
         case_row["id"],
         f"Created via FIR Scan: {fir_number}",
     )
+    if source_document:
+        create_audit_log(
+            officer["id"],
+            "ATTACH_FIR_DOCUMENT",
+            "CASE",
+            case_row["id"],
+            f"Stored original FIR scan ({source_document['contentType']}, {len(source_document['content'])} bytes)",
+        )
 
     # A newly registered FIR must appear on the dashboard and network straight
     # away, so drop the cached aggregates rather than waiting out their TTL.

@@ -14,7 +14,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Apply DB migrations in order (see `database/README.md`). The isolated hackathon
-test database currently progresses through migration **0014**; never apply the
+test database currently progresses through migration **0016**; never apply the
 experimental reporting/playbook migrations to the original shared round-one
 database.
 
@@ -24,6 +24,8 @@ database.
 .\.venv\Scripts\python.exe -m scripts.apply_0006
 .\.venv\Scripts\python.exe -m scripts.apply_0013
 .\.venv\Scripts\python.exe -m scripts.apply_0014
+.\.venv\Scripts\python.exe -m scripts.apply_0015
+.\.venv\Scripts\python.exe -m scripts.apply_0016
 .\.venv\Scripts\python.exe -m scripts.refresh_early_warnings
 ```
 
