@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "@/api/client";
 import { Card, SectionLabel, Skeleton } from "@/components/scrb/primitives";
 import { ShieldAlert } from "lucide-react";
@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { DeadlineRiskList, DeadlineSummaryTiles, type DeadlineRow, type DeadlineSummary } from "@/components/scrb/deadline-board";
 import { ChargesheetEditor } from "@/components/scrb/ChargesheetEditor";
 import { useVisibilityRefetch } from "@/hooks/useVisibilityRefetch";
+import { DataLoadError } from "@/components/scrb/data-load-state";
 
 export default function Deadlines() {
   const { t } = useI18n();
@@ -14,22 +15,31 @@ export default function Deadlines() {
   const [loading, setLoading] = useState(true);
   const [storageReady, setStorageReady] = useState(true);
   const [editorCaseId, setEditorCaseId] = useState<string | null>(null);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [error, setError] = useState("");
 
-  const load = () =>
-    apiRequest("/api/deadlines")
-      .then((payload) => {
+  const load = useCallback(async (initial = false) => {
+    if (initial) setLoading(true);
+    try {
+      const payload = await apiRequest("/api/deadlines");
         setBoard(payload.board || []);
         setSummary(payload.summary || {});
         setStorageReady(payload.storageReady !== false);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-
-  useEffect(() => {
-    load();
+        setLoadedOnce(true);
+        setError("");
+    } catch (loadError) {
+      console.error(loadError);
+      setError("Deadline information could not be refreshed.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useVisibilityRefetch(load);
+  useEffect(() => {
+    void load(true);
+  }, [load]);
+
+  useVisibilityRefetch(() => load(false));
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto p-4 sm:p-6 lg:p-8">
@@ -47,6 +57,14 @@ export default function Deadlines() {
           </div>
         </div>
       </Card>
+
+      {error && (
+        <DataLoadError
+          message={error}
+          showingStaleData={loadedOnce}
+          onRetry={() => void load(!loadedOnce)}
+        />
+      )}
 
       {loading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

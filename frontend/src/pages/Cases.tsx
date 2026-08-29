@@ -4,6 +4,7 @@ import { apiRequest } from "@/api/client";
 import { CaseCard } from "@/components/scrb/case-ledger";
 import { CasesFilter } from "@/components/scrb/cases-filter";
 import { useAuth } from "@/context/AuthContext";
+import { DataLoadError } from "@/components/scrb/data-load-state";
 
 export default function Cases() {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export default function Cases() {
   const [stations, setStations] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   const crimeType = searchParams.get("crimeType") || "";
   const stationId = searchParams.get("stationId") || "";
@@ -55,7 +57,7 @@ export default function Cases() {
       });
 
     return () => controller.abort();
-  }, [crimeType, stationId, status, date, q, hasPendingMatches, user?.id]);
+  }, [crimeType, stationId, status, date, q, hasPendingMatches, user?.id, reloadKey]);
 
   return (
     <div className="flex h-full flex-col gap-6">
@@ -66,9 +68,14 @@ export default function Cases() {
 
       <CasesFilter stations={stations} />
 
-      {error ? (
-        <div className="flex h-40 items-center justify-center text-sm text-destructive">{error}</div>
-      ) : loading ? (
+      {error && (
+        <DataLoadError
+          message={error}
+          onRetry={() => setReloadKey((value) => value + 1)}
+        />
+      )}
+
+      {!error && loading ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
@@ -77,20 +84,20 @@ export default function Cases() {
             />
           ))}
         </div>
-      ) : cases.length === 0 ? (
+      ) : !error && cases.length === 0 ? (
         <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-hairline bg-surface-2 shadow-sm">
           <div className="text-center space-y-2">
             <p className="text-sm text-muted-foreground">No cases found matching your filters.</p>
             <p className="text-xs text-muted-foreground/60">Try adjusting your search or filter criteria.</p>
           </div>
         </div>
-      ) : (
+      ) : !error ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
           {cases.map((c) => (
             <CaseCard key={c.id} c={c} />
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

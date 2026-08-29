@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import jsPDF from "jspdf";
 import { Search, Layers, Activity, Route, Compass, Sparkles, CircleAlert, Link2 } from "lucide-react";
 import { apiRequest } from "@/api/client";
-import { Card, SectionLabel, Skeleton } from "@/components/scrb/primitives";
+import { Button, Card, SectionLabel, Skeleton } from "@/components/scrb/primitives";
 import { cn } from "@/lib/utils";
 import { NetworkCanvas, KIND_STYLE } from "@/components/scrb/network-canvas";
 import {
@@ -62,6 +62,7 @@ export default function NetworkPage() {
   const [meta, setMeta] = useState<NetworkMeta>(EMPTY_META);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [seeded, setSeeded] = useState(false);
 
   const [mode, setMode] = useState<Mode>("explore");
@@ -88,6 +89,7 @@ export default function NetworkPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError("");
     const url = queryFocusId ? `/api/network?seedId=${encodeURIComponent(queryFocusId)}` : "/api/network";
     apiRequest(url, { fresh: true })
       .then((payload) => {
@@ -111,7 +113,7 @@ export default function NetworkPage() {
     return () => {
       cancelled = true;
     };
-  }, [queryFocusId]);
+  }, [queryFocusId, reloadKey]);
 
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const adjacency = useMemo(() => buildAdjacency(edges), [edges]);
@@ -464,6 +466,9 @@ export default function NetworkPage() {
           <CircleAlert className="mx-auto h-6 w-6 text-danger" />
           <p className="mt-3 text-sm font-medium">The network could not be loaded.</p>
           <p className="mt-1 text-xs text-muted-foreground">{loadError}</p>
+          <Button className="mt-4" variant="outline" onClick={() => setReloadKey((value) => value + 1)}>
+            Try again
+          </Button>
         </Card>
       </div>
     );
