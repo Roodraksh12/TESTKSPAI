@@ -372,7 +372,7 @@ export function InvestigationPlanTab({ caseId, canEdit }: { caseId: string; canE
 
           {groupedTasks.map(([phase, tasks]) => (
             <section key={phase} className="space-y-3">
-              <SectionLabel>{PHASE_LABELS[phase] || phase.replaceAll("_", " ")}</SectionLabel>
+              <SectionLabel>{PHASE_LABELS[phase] || phase.replace(/_/g, " ")}</SectionLabel>
               {tasks.map((task) => (
                 <div key={task.id} className="rounded-2xl border border-hairline bg-surface p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">

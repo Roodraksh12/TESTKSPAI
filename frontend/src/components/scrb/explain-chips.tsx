@@ -44,7 +44,7 @@ export function ExplainChips({
             </p>
             {privacy.redaction.categories.length > 0 && (
               <p className="mt-1">
-                Categories: {privacy.redaction.categories.map((item) => `${item.category.replaceAll("_", " ")} (${item.count})`).join(", ")}.
+                Categories: {privacy.redaction.categories.map((item) => `${item.category.replace(/_/g, " ")} (${item.count})`).join(", ")}.
               </p>
             )}
             <p className="mt-1">Privacy processing: {privacy.privacyProcessingMs} ms · model request: {privacy.durationMs} ms.</p>
