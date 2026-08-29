@@ -69,10 +69,7 @@ export default function LoginPage() {
               <SealMark size={24} />
             </div>
             <div className="leading-tight">
-              <p className="text-[15px] font-semibold tracking-tight">SCRB Sahayak</p>
-              <p className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                Hackathon prototype
-              </p>
+              <p className="text-[15px] font-semibold tracking-tight">Anvesha</p>
             </div>
           </div>
 
@@ -238,10 +235,7 @@ function HeroPanel() {
             <SealMark size={28} />
           </div>
           <div className="leading-tight">
-            <p className="text-[16px] font-semibold tracking-tight">SCRB Sahayak</p>
-            <p className="text-[10px] tracking-widest text-muted-foreground uppercase">
-              KSP Hackathon · SCRB challenge prototype
-            </p>
+            <p className="text-[16px] font-semibold tracking-tight">Anvesha</p>
           </div>
         </div>
 

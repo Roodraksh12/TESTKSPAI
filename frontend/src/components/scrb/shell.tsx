@@ -275,7 +275,7 @@ export function Sidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-bold leading-none tracking-tight text-white">SCRB Sahayak</span>
+              <span className="text-sm font-bold leading-none tracking-tight text-white">Anvesha</span>
             </div>
           )}
         </Link>
