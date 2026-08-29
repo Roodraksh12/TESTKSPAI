@@ -14,7 +14,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Apply DB migrations in order (see `database/README.md`). The isolated hackathon
-test database currently progresses through migration **0016**; never apply the
+test database currently progresses through migration **0017**; never apply the
 experimental reporting/playbook migrations to the original shared round-one
 database.
 
@@ -26,6 +26,7 @@ database.
 .\.venv\Scripts\python.exe -m scripts.apply_0014
 .\.venv\Scripts\python.exe -m scripts.apply_0015
 .\.venv\Scripts\python.exe -m scripts.apply_0016
+.\.venv\Scripts\python.exe -m scripts.apply_0017
 .\.venv\Scripts\python.exe -m scripts.refresh_early_warnings
 ```
 
@@ -75,10 +76,13 @@ If `SMTP_HOST` is empty, invite bodies are logged to the server console. Restart
 ## AI provider
 
 The default remains OpenRouter, using `OPENROUTER_API_KEY` and
-`OPENROUTER_MODEL`. Every OpenRouter request is locally tokenised and enforces a
-Zero Data Retention route. A selected model without a current ZDR-capable
-endpoint fails closed. To route AI calls to an approved private deployment that
-supports the OpenAI-compatible chat-completions contract, set:
+`OPENROUTER_MODEL`. Every OpenRouter request is locally tokenised. By default,
+`OPENROUTER_ZDR_REQUIRED=true` also enforces a Zero Data Retention route, and a
+selected model without a current ZDR-capable endpoint fails closed. A synthetic
+demo environment may temporarily set `OPENROUTER_ZDR_REQUIRED=false`; this must
+never be used with real police, personal, or sensitive case data. To route AI
+calls to an approved private deployment that supports the OpenAI-compatible
+chat-completions contract, set:
 
 ```dotenv
 AI_PROVIDER=openai_compatible

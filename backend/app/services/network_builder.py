@@ -26,8 +26,19 @@ EMPTY_GRAPH: dict[str, Any] = {
         "sharedEntityCount": 0,
         "verifiedLinkCount": 0,
         "pendingLeadCount": 0,
+        "focused": False,
+        "seedFound": None,
+        "seedId": None,
     },
 }
+
+CASE_SELECT = '''
+    SELECT c.id, c."firNumber", c."crimeType", c."incidentDate", c.summary,
+           c."rawExtractedText", c."stationId", c."reportedDate",
+           ps.name AS "stationName"
+    FROM "Case" c
+    LEFT JOIN "PoliceStation" ps ON c."stationId" = ps.id
+'''
 
 
 def _extract_plates(text: str) -> set[str]:
@@ -36,27 +47,177 @@ def _extract_plates(text: str) -> set[str]:
     return {re.sub(r"[\s-]+", "-", m.upper()) for m in KA_PLATE_RE.findall(text)}
 
 
+def _case_seed_id(seed_id: str | None) -> str | None:
+    """Return a database case ID when the requested graph seed is a case."""
+    if not seed_id:
+        return None
+    if ":" not in seed_id:
+        return seed_id
+    kind, value = seed_id.split(":", 1)
+    return value if kind == "case" and value else None
+
+
+def _load_recent_cases(
+    scope_sql: str,
+    scope_params: dict[str, Any],
+) -> tuple[list[dict[str, Any]], bool]:
+    fetched = fetch_all(
+        f'''
+        {CASE_SELECT}
+        WHERE 1=1{scope_sql}
+        ORDER BY c."reportedDate" DESC, c.id DESC
+        LIMIT %(graphLimit)s
+        ''',
+        {**scope_params, "graphLimit": GRAPH_CASE_CAP + 1},
+    )
+    return fetched[:GRAPH_CASE_CAP], len(fetched) > GRAPH_CASE_CAP
+
+
+def _load_seeded_cases(
+    scope_sql: str,
+    scope_params: dict[str, Any],
+    seed_case_id: str,
+    hops: int,
+) -> tuple[list[dict[str, Any]], bool, bool]:
+    """Load an accessible case first, then a bounded evidence-linked neighbourhood.
+
+    A focused dossier request must never depend on the case being among the most
+    recently reported records. Case expansion uses stored people, case-match
+    records and explicit person-to-person connections; station context is added
+    only after the relevant cases have been selected.
+    """
+    seed_rows = fetch_all(
+        f'''
+        {CASE_SELECT}
+        WHERE c.id = %(seedCaseId)s{scope_sql}
+        LIMIT 1
+        ''',
+        {"seedCaseId": seed_case_id, **scope_params},
+    )
+    if not seed_rows:
+        return [], False, False
+
+    cases = list(seed_rows)
+    selected_ids = {seed_case_id}
+    frontier_ids = [seed_case_id]
+    capped = False
+
+    # One case-expansion round corresponds to roughly two visual graph hops
+    # (case -> shared entity -> case). Keep the work bounded for URL input.
+    expansion_rounds = max(1, min(2, (max(hops, 1) + 1) // 2))
+    for _ in range(expansion_rounds):
+        remaining = GRAPH_CASE_CAP - len(cases)
+        if remaining <= 0 or not frontier_ids:
+            capped = True
+            break
+
+        neighbours = fetch_all(
+            f'''
+            {CASE_SELECT}
+            WHERE 1=1{scope_sql}
+              AND NOT (c.id = ANY(%(selectedCaseIds)s))
+              AND (
+                EXISTS (
+                  SELECT 1
+                  FROM "CasePerson" source_cp
+                  JOIN "CasePerson" target_cp
+                    ON target_cp."personId" = source_cp."personId"
+                  WHERE source_cp."caseId" = ANY(%(frontierCaseIds)s)
+                    AND target_cp."caseId" = c.id
+                )
+                OR EXISTS (
+                  SELECT 1
+                  FROM "CaseMatch" cm
+                  WHERE cm.status != 'REJECTED'
+                    AND (
+                      (cm."caseId" = ANY(%(frontierCaseIds)s) AND cm."matchedCaseId" = c.id)
+                      OR
+                      (cm."matchedCaseId" = ANY(%(frontierCaseIds)s) AND cm."caseId" = c.id)
+                    )
+                )
+                OR EXISTS (
+                  SELECT 1
+                  FROM "CaseMatch" cm
+                  JOIN "CasePerson" target_cp
+                    ON target_cp."personId" = cm."matchedPersonId"
+                  WHERE cm.status != 'REJECTED'
+                    AND cm."caseId" = ANY(%(frontierCaseIds)s)
+                    AND target_cp."caseId" = c.id
+                )
+                OR EXISTS (
+                  SELECT 1
+                  FROM "CaseMatch" cm
+                  JOIN "CasePerson" source_cp
+                    ON source_cp."personId" = cm."matchedPersonId"
+                  WHERE cm.status != 'REJECTED'
+                    AND cm."caseId" = c.id
+                    AND source_cp."caseId" = ANY(%(frontierCaseIds)s)
+                )
+                OR EXISTS (
+                  SELECT 1
+                  FROM "CasePerson" source_cp
+                  JOIN "Connection" con
+                    ON con."personAId" = source_cp."personId"
+                    OR con."personBId" = source_cp."personId"
+                  JOIN "CasePerson" target_cp
+                    ON target_cp."personId" = CASE
+                      WHEN con."personAId" = source_cp."personId" THEN con."personBId"
+                      ELSE con."personAId"
+                    END
+                  WHERE source_cp."caseId" = ANY(%(frontierCaseIds)s)
+                    AND target_cp."caseId" = c.id
+                )
+              )
+            ORDER BY c."reportedDate" DESC, c.id DESC
+            LIMIT %(neighbourLimit)s
+            ''',
+            {
+                **scope_params,
+                "frontierCaseIds": frontier_ids,
+                "selectedCaseIds": list(selected_ids),
+                "neighbourLimit": remaining + 1,
+            },
+        )
+        if len(neighbours) > remaining:
+            capped = True
+            neighbours = neighbours[:remaining]
+        if not neighbours:
+            break
+
+        frontier_ids = [row["id"] for row in neighbours]
+        selected_ids.update(frontier_ids)
+        cases.extend(neighbours)
+
+    return cases, capped, True
+
+
 def build_crime_network(
     officer: dict[str, Any], seed_id: str | None = None, hops: int = 2
 ) -> dict[str, Any]:
     scope_sql, scope_params = jurisdiction_filter_sql(officer, alias="c")
-    fetched = fetch_all(
-        f'''
-        SELECT c.id, c."firNumber", c."crimeType", c."incidentDate", c.summary,
-               c."rawExtractedText", c."stationId", ps.name AS "stationName"
-        FROM "Case" c
-        LEFT JOIN "PoliceStation" ps ON c."stationId" = ps.id
-        WHERE 1=1{scope_sql}
-        ORDER BY c."reportedDate" DESC
-        LIMIT {GRAPH_CASE_CAP + 1}
-        ''',
-        scope_params,
-    )
-    if not fetched:
-        return {**EMPTY_GRAPH, "meta": dict(EMPTY_GRAPH["meta"])}
+    seed_case_id = _case_seed_id(seed_id)
+    seed_found: bool | None = None
+    if seed_case_id:
+        cases, capped, seed_found = _load_seeded_cases(
+            scope_sql,
+            scope_params,
+            seed_case_id,
+            hops,
+        )
+    else:
+        cases, capped = _load_recent_cases(scope_sql, scope_params)
 
-    capped = len(fetched) > GRAPH_CASE_CAP
-    cases = fetched[:GRAPH_CASE_CAP]
+    if not cases:
+        empty = {**EMPTY_GRAPH, "meta": dict(EMPTY_GRAPH["meta"])}
+        empty["meta"].update(
+            {
+                "focused": bool(seed_case_id),
+                "seedFound": seed_found,
+                "seedId": seed_id,
+            }
+        )
+        return empty
+
     case_ids = [c["id"] for c in cases]
 
     case_persons = fetch_all(
@@ -206,8 +367,9 @@ def build_crime_network(
     analytical_edges = [
         edge for edge in edges if edge["category"] in {"record", "confirmed"}
     ]
-    # Rings/hubs/brokers are always computed over the full scoped graph, not
-    # whatever subset is currently in view, so the panels stay jurisdiction-complete.
+    # When a dossier supplies a case seed these panels describe that bounded,
+    # evidence-linked neighbourhood. Without a seed they describe the bounded
+    # recent jurisdiction view.
     rings = graph_engine.find_rings(node_list, analytical_edges)
     hubs = graph_engine.compute_key_players(node_list, analytical_edges, limit=8)
     brokers = graph_engine.compute_brokers(node_list, analytical_edges, limit=8)
@@ -241,6 +403,9 @@ def build_crime_network(
             "sharedEntityCount": len(hubs),
             "verifiedLinkCount": len(analytical_edges),
             "pendingLeadCount": len(leads),
+            "focused": bool(seed_case_id and seed_found),
+            "seedFound": resolved_seed_id in nodes if seed_id else None,
+            "seedId": resolved_seed_id if seed_id else None,
         },
     }
 

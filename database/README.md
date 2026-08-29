@@ -60,6 +60,9 @@ protected original PDF/JPEG/PNG FIR per confirmed case. Binary access is always
 jurisdiction checked and audited. The prototype stores up to 20 MB in Postgres;
 a police-scale deployment should use an approved encrypted document/object store
 while keeping the same metadata and API access boundary.
+Then apply **`database/migrations/0017_network_focus_indexes.sql`** to support
+bounded, seed-first case-network traversal through shared people, active case
+matches and recorded person relationships.
 
 `0001_initial_schema.sql` + `0002_rls_policies.sql` describe an earlier, unused design
 (snake_case tables, Supabase-Auth-linked via `auth.users`/`auth.uid()`). The running
@@ -89,11 +92,13 @@ app authenticates with its own FastAPI JWT (badge ID + bcrypt), not Supabase Aut
     test database only.
 16. From `backend/`, run `python -m scripts.apply_0016` against that same isolated
     test database only.
-17. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
+17. From `backend/`, run `python -m scripts.apply_0017` against that same isolated
+    test database only.
+18. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
    a criminal network with a
    detectable ring) — or create demo officers by hand.
-18. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
-19. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
+19. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
+20. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
 
 ## Demo login (after seed + 0004)
 

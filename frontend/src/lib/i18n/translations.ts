@@ -78,7 +78,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Header
     "header.searchPlaceholder": "Search cases, entities, hotspots...",
     "header.notifications": "Notifications",
-    "brand.subtitle": "Karnataka Police",
+    "brand.subtitle": "Hackathon Prototype",
 
     // Predictive early warnings
     "warnings.label": "Predictive intelligence",
@@ -342,7 +342,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Header
     "header.searchPlaceholder": "ಪ್ರಕರಣ, ವ್ಯಕ್ತಿ, ಅಪಾಯದ ತಾಣ ಹುಡುಕಿ...",
     "header.notifications": "ಅಧಿಸೂಚನೆಗಳು",
-    "brand.subtitle": "ಕರ್ನಾಟಕ ಪೊಲೀಸ್",
+    "brand.subtitle": "ಹ್ಯಾಕಥಾನ್ ಮಾದರಿ",
 
     // Predictive early warnings
     "warnings.label": "ಮುನ್ಸೂಚನಾ ಗುಪ್ತಚರ",

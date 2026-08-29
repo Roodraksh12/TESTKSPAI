@@ -16,7 +16,7 @@ export type AiPrivacyMetadata = {
   provider: string;
   model: string;
   external: boolean;
-  retentionPolicy: 'ZDR_REQUIRED' | 'PRIVATE_BOUNDARY';
+  retentionPolicy: 'ZDR_REQUIRED' | 'PROVIDER_DEFAULT' | 'PRIVATE_BOUNDARY';
   redaction: {
     applied: boolean;
     total: number;

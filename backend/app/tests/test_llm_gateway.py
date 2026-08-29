@@ -205,6 +205,47 @@ def test_openrouter_low_level_request_enforces_zero_data_retention() -> None:
     assert captured["payload"]["provider"] == {"zdr": True}
 
 
+def test_openrouter_can_pause_zero_data_retention_for_synthetic_demo() -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["payload"] = json.loads(request.content)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "Answer"}}]})
+
+    provider = resolve_provider_config(
+        make_settings(OPENROUTER_ZDR_REQUIRED=False)
+    )
+    result = asyncio.run(
+        _chat_completion_with_provider(
+            [{"role": "user", "content": "Synthetic demo question"}],
+            provider=provider,
+            transport=httpx.MockTransport(handler),
+        )
+    )
+
+    assert result == "Answer"
+    assert "provider" not in captured["payload"]
+
+
+def test_paused_zdr_is_reported_in_privacy_metadata() -> None:
+    async def fake_provider(messages, **kwargs):
+        return "Answer"
+
+    settings = make_settings(OPENROUTER_ZDR_REQUIRED=False)
+    with patch("app.services.llm_gateway.get_settings", return_value=settings), patch(
+        "app.services.llm_gateway._chat_completion_with_provider",
+        new=AsyncMock(side_effect=fake_provider),
+    ), patch("app.services.llm_gateway.ai_privacy_audit.begin_request", return_value=None):
+        envelope = asyncio.run(
+            chat_completion_with_metadata(
+                [{"role": "user", "content": "Synthetic demo question"}],
+                privacy_context=PrivacyContext(purpose="TEST"),
+            )
+        )
+
+    assert envelope.privacy["retentionPolicy"] == "PROVIDER_DEFAULT"
+
+
 def test_external_gateway_tokenises_request_and_restores_response() -> None:
     captured: dict[str, object] = {}
 

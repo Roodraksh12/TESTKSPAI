@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 
 
@@ -26,7 +26,7 @@ def network(
 
     seedId: str | None = None,
 
-    hops: int = 2,
+    hops: int = Query(default=2, ge=1, le=4),
 
     current_user: dict = Depends(get_current_user),
 
@@ -41,4 +41,3 @@ def network(
         lambda: network_builder.build_crime_network(officer, seed_id=seedId, hops=hops),
 
     )
-
