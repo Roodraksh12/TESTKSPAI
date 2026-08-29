@@ -1,0 +1,29 @@
+{
+  "defaults": {
+    "project": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "42204000000038007",
+      "name": "Anvesha",
+      "domain": {
+        "id": "50044271908",
+        "name": "anvesha-60078982098.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "60078982098",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}
