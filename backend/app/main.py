@@ -47,13 +47,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="KSP Portal API", lifespan=lifespan)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.allowed_origin_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # CORSMiddleware is intentionally omitted because Zoho Catalyst AppSail 
+    # automatically injects its own CORS headers. Adding it here causes duplicates.
 
     app.include_router(health.router)
     app.include_router(auth.router)

@@ -70,9 +70,6 @@ export default function LoginPage() {
             </div>
             <div className="leading-tight">
               <p className="text-[15px] font-semibold tracking-tight">SCRB Sahayak</p>
-              <p className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                Hackathon prototype
-              </p>
             </div>
           </div>
 
@@ -239,9 +236,6 @@ function HeroPanel() {
           </div>
           <div className="leading-tight">
             <p className="text-[16px] font-semibold tracking-tight">SCRB Sahayak</p>
-            <p className="text-[10px] tracking-widest text-muted-foreground uppercase">
-              KSP Hackathon · SCRB challenge prototype
-            </p>
           </div>
         </div>
 

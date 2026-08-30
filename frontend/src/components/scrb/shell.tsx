@@ -276,9 +276,6 @@ export function Sidebar() {
           {!collapsed && (
             <div className="flex flex-col min-w-0">
               <span className="text-sm font-bold leading-none tracking-tight text-white">SCRB Sahayak</span>
-              <span className="mt-0.5 text-[9px] font-medium tracking-[0.2em] text-teal/80 uppercase">
-                {t("brand.subtitle")}
-              </span>
             </div>
           )}
         </Link>
