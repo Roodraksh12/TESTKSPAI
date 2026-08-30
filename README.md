@@ -26,14 +26,19 @@
 
 ## Current test-build checkpoint
 
-The current `main` branch includes:
+The working test build described by this checkout includes:
 
 - persistent, jurisdiction-scoped case directory and case dossiers;
 - FIR/OCR intake and optional OpenRouter-assisted extraction/copilot workflows;
 - protected original-FIR retention with jurisdiction-checked viewing, downloads,
   audit events and an OCR-only fallback for older cases;
+- distinct person records on intake, with no name-only merging and only
+  corroborated, officer-reviewable identity leads;
+- atomic, database-controlled yearly FIR serial allocation that cannot issue the
+  same number to two simultaneous case creations;
 - date-wise case diary pages with per-day numbering and date-range PDF export;
-- evidence and document linking with assigned-IO write controls;
+- evidence and document linking with assigned-IO write controls and
+  database-backed diary attachments for the test deployment;
 - pan, zoom, drag and focus controls for dense cross-case network graphs;
 - per-accused BNSS section 187(3) custody/remand clocks;
 - a statutory deadline board that distinguishes remand clocks from FIR-age
@@ -53,6 +58,11 @@ The current `main` branch includes:
   records;
 - command analytics, hotspots and early-warning indicators; and
 - English/Kannada UI and speech support.
+
+Frontend routes are loaded on demand, and FIR queue state/results are shared in
+the test database so a browser reload or a different backend process does not
+erase the visible job record. A backend interruption may still require the
+officer to retry processing; production deployment needs a managed worker queue.
 
 The former per-case Tactical View has been removed. Network investigation is
 handled by the Network canvas.
@@ -185,7 +195,7 @@ silently changing the snapshot already attached to existing cases.
 
 ```text
 backend/                 FastAPI application, services, tests and migration helpers
-database/                SQL migrations, Prisma reference schema and demo seed
+database/                Canonical SQL migrations and synthetic demo seed
 docs/                    Final-report implementation notes
 frontend/                React/Vite application
 ```
@@ -310,6 +320,8 @@ The canonical order and base-schema notes are in
 0015 scalable case-directory indexes
 0016 protected original-FIR documents
 0017 seed-first network-focus indexes
+0018 atomic FIR-number counter
+0019 durable FIR-job and diary-document storage
 ```
 
 For a test database that already has migrations through 0008, run from
@@ -325,9 +337,11 @@ PYTHONPATH=. python -m scripts.apply_0014
 PYTHONPATH=. python -m scripts.apply_0015
 PYTHONPATH=. python -m scripts.apply_0016
 PYTHONPATH=. python -m scripts.apply_0017
+PYTHONPATH=. python -m scripts.apply_0018
+PYTHONPATH=. python -m scripts.apply_0019
 ```
 
-Migrations 0010–0017 are currently intended for the isolated development/test
+Migrations 0010–0019 are currently intended for the isolated development/test
 database while the reporting, playbook and document-retention workflows are reviewed.
 
 ### 3. Run the backend
@@ -391,11 +405,14 @@ Frontend checks:
 ```bash
 cd frontend
 npm run lint
+npm run typecheck
+npm test
 npm run build
 ```
 
-The latest local checkpoint passed 169 backend tests, frontend lint and the
-production build. The privacy gateway also passed isolated tokenisation, ZDR,
+The latest local checkpoint passed the backend suite plus frontend route/state
+tests, lint, type checking and the production build. The privacy gateway also
+passed isolated tokenisation, ZDR,
 private-endpoint, egress-limit and metadata-audit tests. Live free-model capacity
 is external state and is not covered by deterministic tests.
 

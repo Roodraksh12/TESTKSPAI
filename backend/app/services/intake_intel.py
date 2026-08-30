@@ -283,13 +283,15 @@ def find_identity_matches(
     address_list = [a.lower().strip() for a in (addresses or []) if a]
 
     for person in persons:
-        best_score = 0
+        name_score = 0
+        phone_score = 0
+        address_score = 0
         reasons: list[str] = []
 
         for name in names:
             sim = name_similarity(name, person["name"])
             if sim >= 0.55:
-                best_score = max(best_score, round(sim * 100))
+                name_score = max(name_score, round(sim * 100))
                 reasons.append(
                     f'Name similarity {round(sim * 100)}% ("{name}" ↔ "{person["name"]}")'
                 )
@@ -303,7 +305,7 @@ def find_identity_matches(
                     or ph.endswith(p_digits[-8:])
                     or p_digits.endswith(ph[-8:])
                 ):
-                    best_score = max(best_score, 95)
+                    phone_score = 100 if ph == p_digits else 90
                     reasons.append(f"Same phone pattern: {person_phone}")
 
         person_address = person.get("address")
@@ -312,11 +314,8 @@ def find_identity_matches(
             for addr in address_list:
                 sim = jaccard(tokenize(addr), tokenize(pa))
                 if sim >= 0.4:
-                    best_score = max(best_score, round(70 + sim * 25))
+                    address_score = max(address_score, round(sim * 100))
                     reasons.append(f'Address overlap with "{person_address}"')
-
-        if best_score < 55 or not reasons:
-            continue
 
         prior_cases = [
             {
@@ -328,6 +327,25 @@ def find_identity_matches(
             for cp in person.get("casePersons", [])
             if cp["caseIdRef"] != exclude_case_id
         ]
+        # A name alone is not identity. Require at least one independent
+        # corroborator and a real record outside the case being assessed.
+        # Officer confirmation remains mandatory before a PENDING lead becomes
+        # a confirmed cross-case connection.
+        corroborators = sum(score > 0 for score in (name_score, phone_score, address_score))
+        if corroborators < 2 or not prior_cases:
+            continue
+
+        if name_score and phone_score and address_score:
+            combined_score = (name_score * 0.40) + (phone_score * 0.40) + (address_score * 0.20)
+        elif name_score and phone_score:
+            combined_score = (name_score * 0.50) + (phone_score * 0.50)
+        elif name_score and address_score:
+            combined_score = (name_score * 0.65) + (address_score * 0.35)
+        else:
+            combined_score = (phone_score * 0.65) + (address_score * 0.35)
+        best_score = min(99, round(combined_score))
+        if best_score < 70:
+            continue
         if station_id:
             prior_cases.sort(key=lambda c: 0 if c["stationId"] == station_id else 1)
 

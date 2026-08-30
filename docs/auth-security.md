@@ -1,23 +1,40 @@
-# Authentication & Security Module
+# Authentication, jurisdiction and audit boundaries
 
-## Overview
-Because the SCRB Sahayak platform handles highly sensitive criminal data and intelligence, it is built on a strict, role-based security architecture. This module ensures that only authorized personnel can access the system and that they only see the data they are legally permitted to view.
+## Current implementation
 
-## Key Features
+SCRB Sahayak is a React/Vite frontend backed by FastAPI and PostgreSQL. Officers
+sign in with a service/badge ID and password. FastAPI issues a signed JWT and
+validates it on every protected API request.
 
-### 1. Role-Based Access Control (RBAC)
-- **Hierarchical Access:** The system differentiates between standard Investigating Officers (IO) and high-ranking officials like Superintendents of Police (SP).
-- **Data Siloing:** An IO can only view cases, analytics, and entities related to their assigned police station. Conversely, an SP has jurisdiction-wide access, allowing them to view macro-level analytics across all stations in the district.
+Frontend route guards improve navigation, but they are not the security
+boundary. Every case, person, analytics, network and document endpoint applies
+server-side role and jurisdiction checks before returning data.
 
-### 2. Secure Authentication
-- **NextAuth Integration:** The platform uses industry-standard authentication mechanisms to verify officer credentials before granting access to the `/dashboard` or any protected routes.
-- **Session Management:** Secure, encrypted session tokens ensure that data requests to the API are authenticated on every single call.
+## Jurisdiction model
 
-### 3. Explainable AI & Audit Trails
-- **System Logs:** Every query made to the AI Chatbot and every file exported is logged. This ensures accountability. 
-- **Read-Only by Default:** The AI copilot operates in a read-only state. It can query the database to provide insights, but it cannot alter or delete official FIR records, ensuring the integrity of the core criminal database remains pristine.
+- Police IT and state leadership: statewide administrative/read scope.
+- IGP: configured command range.
+- DIG: assigned districts.
+- SP/ASP: district.
+- DySP: subdivision.
+- SHO/Inspector and lower ranks: station.
 
-## Technical Implementation
-- **Middleware:** Uses Next.js Middleware (`src/middleware.ts`) to forcefully redirect any unauthenticated requests away from protected routes like `/network` or `/cases`.
-- **API Security:** API routes (e.g., `src/app/api/chat/route.ts`) manually verify the session context on the server-side before executing database queries or contacting the LLM.
-- **Database Filtering:** Prisma queries are dynamically constructed using the user's role. For example, `where: session.user.role === 'SP' ? {} : { stationId: session.user.stationId }`.
+Write permissions are checked separately from visibility. Assigned-IO checks
+protect diary, investigation-plan, custody-clock and document changes.
+
+## Audit and AI boundaries
+
+- Case actions and protected document views create audit events.
+- AI tools are read-only and receive only the requesting officer's permitted
+  records.
+- External AI requests pass through backend tokenisation and metadata-only
+  privacy auditing.
+- Zero Data Retention routing is configurable. Disabling it is permitted only
+  for synthetic hackathon data and is shown truthfully in the UI.
+
+## Prototype limitations
+
+The browser currently stores the JWT in local storage and logout does not revoke
+an already issued token. A production deployment should use short-lived tokens,
+secure refresh/session handling, revocation and departmental identity systems.
+The hackathon environment must not contain operational police data.

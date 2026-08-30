@@ -97,7 +97,7 @@ export function useAuth() {
   return value
 }
 
-/** Compatibility shim for ported Next.js components */
+/** Session-shaped adapter used by the shared application shell. */
 export function useSession() {
   const { user, loading } = useAuth()
   return {

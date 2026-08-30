@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import html
+import hashlib
 import io
 import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -47,9 +49,15 @@ class IOUpdateRequest(BaseModel):
 # Resolve from the backend directory so the process working directory cannot
 # scatter sensitive uploads elsewhere in the repository.
 UPLOAD_DIR = Path(__file__).resolve().parents[2] / "uploads" / "documents"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
 DIARY_TIMEZONE = ZoneInfo("Asia/Kolkata")
+ALLOWED_DOCUMENT_CONTENT_TYPES = {
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -72,6 +80,20 @@ def _diary_date_for(value: datetime) -> date:
 def _diary_date_sql(column: str) -> str:
     """SQL expression for a UTC timestamp-without-TZ rendered in Karnataka time."""
     return f"(({column} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')::date"
+
+
+def _durable_document_storage_ready() -> bool:
+    return bool(
+        fetch_scalar(
+            '''
+            SELECT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'Document'
+                AND column_name = 'documentData'
+            )
+            ''',
+        )
+    )
 
 
 def _reindex_diary_date(case_id: str, diary_date: date) -> None:
@@ -122,7 +144,7 @@ def list_diary_entries(case_id: str, current_user: dict = Depends(get_current_us
                  FROM "DiaryEntryPerson" dep
                  JOIN "Person" p ON dep."personId" = p.id
                  WHERE dep."diaryEntryId" = de.id) AS persons,
-                (SELECT json_agg(json_build_object('id', d.id, 'name', d.name, 'path', d.path))
+                (SELECT json_agg(json_build_object('id', d.id, 'name', d.name))
                  FROM "Document" d
                  WHERE d."diaryEntryId" = de.id) AS documents
             FROM "CaseDiaryEntry" de
@@ -263,29 +285,48 @@ async def upload_document(
     if case.get("currentIoId") and case["currentIoId"] != officer["id"]:
         raise HTTPException(status_code=403, detail="Only the assigned Investigating Officer can upload documents.")
 
+    if not _durable_document_storage_ready():
+        raise HTTPException(
+            status_code=503,
+            detail="Durable diary-document storage is not set up. Apply database migration 0019_durable_upload_storage.sql first.",
+        )
+
     content = await file.read(MAX_DOCUMENT_BYTES + 1)
     if len(content) > MAX_DOCUMENT_BYTES:
         raise HTTPException(status_code=413, detail="Documents must be 20 MB or smaller.")
     if not content:
         raise HTTPException(status_code=400, detail="Document is empty.")
 
+    content_type = (file.content_type or "").lower()
+    if content_type not in ALLOWED_DOCUMENT_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail="Only PDF, JPEG, PNG, DOC, and DOCX documents are supported.",
+        )
+
     doc_id = new_id()
     safe_name = Path(file.filename or "Unnamed Document").name
-    file_extension = Path(safe_name).suffix[:16]
-    local_path = UPLOAD_DIR / f"{doc_id}{file_extension}"
-    local_path.write_bytes(content)
 
-    # Insert into database
     execute(
         '''
-        INSERT INTO "Document" (id, "caseId", name, path, "createdAt")
-        VALUES (%(id)s, %(case_id)s, %(name)s, %(path)s, %(now)s)
+        INSERT INTO "Document" (
+          id, "caseId", name, path, "contentType", "sizeBytes", sha256,
+          "documentData", "uploadedById", "createdAt"
+        )
+        VALUES (
+          %(id)s, %(case_id)s, %(name)s, NULL, %(content_type)s, %(size_bytes)s,
+          %(sha256)s, %(document_data)s, %(uploaded_by)s, %(now)s
+        )
         ''',
         {
             "id": doc_id,
             "case_id": case_id,
             "name": safe_name,
-            "path": str(local_path),
+            "content_type": content_type,
+            "size_bytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "document_data": content,
+            "uploaded_by": officer["id"],
             "now": datetime.now(timezone.utc)
         }
     )
@@ -293,6 +334,98 @@ async def upload_document(
     create_audit_log(officer["id"], "UPLOAD_DOCUMENT", "CASE", case_id, f"Uploaded document: {safe_name}")
 
     return {"success": True, "documentId": doc_id, "name": safe_name}
+
+
+@router.get("/documents/{document_id}/content")
+def get_document_content(
+    case_id: str,
+    document_id: str,
+    download: bool = False,
+    current_user: dict = Depends(get_current_user),
+):
+    officer = current_user["officer"]
+    case = get_case_with_relations(case_id, officer)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found or access denied")
+
+    document = fetch_one(
+        '''
+        SELECT id, name, path, "contentType", "documentData"
+        FROM "Document"
+        WHERE id = %(document_id)s AND "caseId" = %(case_id)s
+        ''',
+        {"document_id": document_id, "case_id": case_id},
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    content = document.get("documentData")
+    if content is None and document.get("path"):
+        legacy_path = Path(document["path"]).resolve()
+        upload_root = UPLOAD_DIR.resolve()
+        if upload_root not in legacy_path.parents or not legacy_path.is_file():
+            raise HTTPException(status_code=404, detail="Legacy document file is unavailable")
+        content = legacy_path.read_bytes()
+    if content is None:
+        raise HTTPException(status_code=404, detail="Document content is unavailable")
+
+    disposition = "attachment" if download else "inline"
+    encoded_name = quote(document["name"], safe="")
+    create_audit_log(
+        officer["id"],
+        "DOWNLOAD_DIARY_DOCUMENT" if download else "VIEW_DIARY_DOCUMENT",
+        "CASE",
+        case_id,
+        f'{disposition.title()} diary document {document_id}',
+    )
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type=document.get("contentType") or "application/octet-stream",
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f"{disposition}; filename*=UTF-8''{encoded_name}",
+        },
+    )
+
+
+@router.delete("/documents/{document_id}")
+def delete_unlinked_document(
+    case_id: str,
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    officer = current_user["officer"]
+    require_case_write(officer)
+    case = get_case_with_relations(case_id, officer)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found or access denied")
+    if case.get("currentIoId") and case["currentIoId"] != officer["id"]:
+        raise HTTPException(status_code=403, detail="Only the assigned Investigating Officer can delete documents.")
+
+    document = fetch_one(
+        '''
+        SELECT id, path, "diaryEntryId", "evidenceId"
+        FROM "Document"
+        WHERE id = %(document_id)s AND "caseId" = %(case_id)s
+        ''',
+        {"document_id": document_id, "case_id": case_id},
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.get("diaryEntryId") or document.get("evidenceId"):
+        raise HTTPException(status_code=409, detail="A linked document cannot be deleted from the upload draft")
+
+    execute(
+        'DELETE FROM "Document" WHERE id = %(document_id)s AND "caseId" = %(case_id)s',
+        {"document_id": document_id, "case_id": case_id},
+    )
+    if document.get("path"):
+        legacy_path = Path(document["path"]).resolve()
+        if UPLOAD_DIR.resolve() in legacy_path.parents and legacy_path.is_file():
+            legacy_path.unlink()
+    create_audit_log(officer["id"], "DELETE_UNLINKED_DIARY_DOCUMENT", "CASE", case_id, document_id)
+    return {"deleted": True}
 
 
 @router.put("/io")

@@ -38,12 +38,17 @@ export default function FIRUploadPage() {
 
   const jobs = useFirQueue((s) => s.jobs);
   const enqueue = useFirQueue((s) => s.upload);
+  const hydrateQueue = useFirQueue((s) => s.hydrate);
   const activeJobId = useFirQueue((s) => s.activeJobId);
   const setActiveJob = useFirQueue((s) => s.setActiveJob);
   const startPolling = useFirQueue((s) => s.startPolling);
   const discardJob = useFirQueue((s) => s.discard);
 
   // Resume tracking when returning to this page with work still running.
+  useEffect(() => {
+    void hydrateQueue();
+  }, [hydrateQueue]);
+
   useEffect(() => {
     if (jobs.some((j) => j.status === "queued" || j.status === "processing")) startPolling();
   }, [jobs, startPolling]);

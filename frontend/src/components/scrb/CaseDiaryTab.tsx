@@ -27,6 +27,20 @@ function formatDiaryTime(timestamp: string) {
   }).format(new Date(timestamp));
 }
 
+async function downloadDiaryDocument(caseId: string, file: { id: string; name: string }) {
+  const response = await apiFetchResponse(
+    `/api/cases/${caseId}/diary/documents/${file.id}/content?download=true`,
+  );
+  const blobUrl = window.URL.createObjectURL(await response.blob());
+  const anchor = window.document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.download = file.name;
+  window.document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(blobUrl);
+}
+
 export function CaseDiaryTab({ caseId, canEdit }: { caseId: string; canEdit: boolean }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -237,7 +251,17 @@ export function CaseDiaryTab({ caseId, canEdit }: { caseId: string; canEdit: boo
                         <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1"><Paperclip className="w-3 h-3"/> Attached Documents</p>
                         <div className="flex flex-wrap gap-2">
                           {entry.documents.map((doc: any) => (
-                            <Badge key={doc.id} tone="muted">{doc.name}</Badge>
+                            <button
+                              key={doc.id}
+                              type="button"
+                              onClick={() => void downloadDiaryDocument(caseId, doc).catch((error) => toast.error(error?.message || "Failed to download document"))}
+                              className="rounded-full focus:outline-none focus:ring-2 focus:ring-teal/40"
+                              title={`Download ${doc.name}`}
+                            >
+                              <Badge tone="muted" className="cursor-pointer hover:bg-surface-3">
+                                <Download className="mr-1 h-3 w-3" /> {doc.name}
+                              </Badge>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -390,6 +414,24 @@ function AddEntryForm({ caseId, initialData, onCancel, onSuccess }: { caseId: st
     }
   };
 
+  const removeUploadedDocument = async (documentId: string) => {
+    try {
+      await apiRequest(`/api/cases/${caseId}/diary/documents/${documentId}`, { method: "DELETE" });
+      setDocuments((current) => current.filter((item) => item.id !== documentId));
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to remove document");
+    }
+  };
+
+  const cancelEntry = async () => {
+    if (documents.length > 0) {
+      await Promise.allSettled(
+        documents.map((item) => apiRequest(`/api/cases/${caseId}/diary/documents/${item.id}`, { method: "DELETE" })),
+      );
+    }
+    onCancel();
+  };
+
   const handleSave = async () => {
     if (!narrative.trim()) {
       toast.error("Narrative cannot be empty");
@@ -424,7 +466,12 @@ function AddEntryForm({ caseId, initialData, onCancel, onSuccess }: { caseId: st
     <Card className="p-5 border-amber/30 shadow-lg">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-medium text-lg">{initialData ? "Edit Diary Entry" : "New Diary Entry"}</h3>
-        <button onClick={onCancel} className="text-muted-foreground hover:text-foreground">
+        <button
+          type="button"
+          onClick={() => void cancelEntry()}
+          disabled={busy || uploading}
+          className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -494,10 +541,10 @@ function AddEntryForm({ caseId, initialData, onCancel, onSuccess }: { caseId: st
           </div>
           {documents.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {documents.map((doc, idx) => (
-                <Badge key={idx} tone="muted" className="flex items-center gap-1">
+              {documents.map((doc) => (
+                <Badge key={doc.id} tone="muted" className="flex items-center gap-1">
                   {doc.name}
-                  <button onClick={() => setDocuments(prev => prev.filter((_, i) => i !== idx))} className="ml-1 hover:text-red-500">
+                  <button onClick={() => void removeUploadedDocument(doc.id)} className="ml-1 hover:text-red-500">
                     <X className="w-3 h-3" />
                   </button>
                 </Badge>
@@ -507,8 +554,8 @@ function AddEntryForm({ caseId, initialData, onCancel, onSuccess }: { caseId: st
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
-          <Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>
-          <Button variant="primary" onClick={handleSave} disabled={busy}>
+          <Button variant="secondary" onClick={() => void cancelEntry()} disabled={busy || uploading}>Cancel</Button>
+          <Button variant="primary" onClick={handleSave} disabled={busy || uploading}>
             {busy ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
             Save Entry
           </Button>

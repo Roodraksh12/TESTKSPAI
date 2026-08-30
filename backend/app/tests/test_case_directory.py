@@ -60,6 +60,10 @@ def test_case_directory_cursor_has_no_overlap(sp_headers: dict[str, str]) -> Non
     second_ids = {row["id"] for row in second.json()["cases"]}
     assert first_ids.isdisjoint(second_ids)
 
+    combined = first_payload["cases"] + second.json()["cases"]
+    ordering = [(row["reportedDate"], row["id"]) for row in combined]
+    assert ordering == sorted(ordering, reverse=True)
+
 
 def test_case_directory_filters_come_from_scoped_records(sp_headers: dict[str, str]) -> None:
     payload = TestClient(app).get("/api/cases", headers=sp_headers).json()

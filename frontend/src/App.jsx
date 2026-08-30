@@ -1,31 +1,45 @@
+import { lazy, Suspense } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 import Login from "./pages/Login.tsx"
-import ForgotPassword from "./pages/ForgotPassword.tsx"
-import ChangePassword from "./pages/ChangePassword.tsx"
 import ProtectedRoute from "./routes/ProtectedRoute.jsx"
 import RoleRoute from "./routes/RoleRoute.jsx"
-import ProtectedLayout from "./layouts/ProtectedLayout.tsx"
-import Dashboard from "./pages/Dashboard.tsx"
-import Overview from "./pages/Overview.tsx"
-import Analytics from "./pages/Analytics.tsx"
-import Hotspots from "./pages/Hotspots.tsx"
-import Cases from "./pages/Cases.tsx"
-import CaseDetail from "./pages/CaseDetail.tsx"
-import Chargesheet from "./pages/Chargesheet.tsx"
-import Network from "./pages/Network.tsx"
-import FirUpload from "./pages/FirUpload.tsx"
-import Settings from "./pages/Settings.tsx"
-import Deadlines from "./pages/Deadlines.tsx"
-import Audit from "./pages/Audit.tsx"
-import Profile from "./pages/Profile.tsx"
-import Administration from "./pages/Administration.tsx"
-import InviteOfficers from "./pages/InviteOfficers.tsx"
-import PasswordResets from "./pages/PasswordResets.tsx"
-import EarlyWarnings from "./pages/EarlyWarnings.tsx"
+
+const ProtectedLayout = lazy(() => import("./layouts/ProtectedLayout.tsx"))
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword.tsx"))
+const ChangePassword = lazy(() => import("./pages/ChangePassword.tsx"))
+const Dashboard = lazy(() => import("./pages/Dashboard.tsx"))
+const Overview = lazy(() => import("./pages/Overview.tsx"))
+const Analytics = lazy(() => import("./pages/Analytics.tsx"))
+const Hotspots = lazy(() => import("./pages/Hotspots.tsx"))
+const Cases = lazy(() => import("./pages/Cases.tsx"))
+const CaseDetail = lazy(() => import("./pages/CaseDetail.tsx"))
+const Chargesheet = lazy(() => import("./pages/Chargesheet.tsx"))
+const Network = lazy(() => import("./pages/Network.tsx"))
+const FirUpload = lazy(() => import("./pages/FirUpload.tsx"))
+const Settings = lazy(() => import("./pages/Settings.tsx"))
+const Deadlines = lazy(() => import("./pages/Deadlines.tsx"))
+const Audit = lazy(() => import("./pages/Audit.tsx"))
+const Profile = lazy(() => import("./pages/Profile.tsx"))
+const Administration = lazy(() => import("./pages/Administration.tsx"))
+const InviteOfficers = lazy(() => import("./pages/InviteOfficers.tsx"))
+const PasswordResets = lazy(() => import("./pages/PasswordResets.tsx"))
+const EarlyWarnings = lazy(() => import("./pages/EarlyWarnings.tsx"))
+
+function RouteFallback() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-background text-foreground">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-hairline border-t-ink" />
+        <p className="text-sm text-muted-foreground">Loading workspace...</p>
+      </div>
+    </main>
+  )
+}
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -56,6 +70,7 @@ export default function App() {
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   )
 }

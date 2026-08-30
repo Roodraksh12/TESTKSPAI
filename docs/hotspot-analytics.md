@@ -1,22 +1,25 @@
-# Analytics & Predictive Intelligence Module
+# Analytics, hotspots and early warnings
 
-## Overview
-The Analytics Command Center (located in the `/analytics` route) provides station-level and district-level commanders with a comprehensive, real-time overview of crime dynamics. It combines historical trend analysis with AI-powered predictive intelligence to shift policing from reactive to proactive.
+## What the prototype calculates
 
-## Key Features
+Analytics and early warnings are deterministic summaries of permitted case
+records. They are not AI crime predictions.
 
-### 1. Crime Trend & Hotspot Detection
-- **Interactive Hotspot Map:** Utilizes live GPS data to plot crime clusters across the jurisdiction. High-density zones are marked with varying intensity indicators (Red, Amber, Teal), allowing rapid deployment of resources to active hotspots.
-- **6-Month Crime Trend Chart:** An interactive line chart that tracks the historical frequency of major crimes (e.g., Vehicle Theft, Burglary, Cyber Crime) month-over-month. This helps command staff instantly identify whether specific crime categories are surging or declining over time.
+- Six-month trend charts group recorded incidents by month and crime type.
+- Hotspot grids compare the latest seven days with the preceding 28-day weekly
+  baseline.
+- Warning severity combines observed volume, baseline growth, recency and
+  concentration using visible rules.
+- Operational notices are displayed separately from statistical warnings.
 
-### 2. Predictive Analytics & Early Warnings
-- **7-Day Risk Forecast (Radar Chart):** A forward-looking visualization that plots the AI's predicted risk levels for various crime categories against the historical baseline. This enables preemptive awareness of which crimes are most likely to spike in the coming week.
-- **Early Warning System Feed:** An actionable, live-updating alert feed. Instead of just displaying raw data, the AI generates direct tactical warnings based on pattern recognition (e.g., "78% probability of a Vehicle Theft Spike"). Each alert includes:
-  - **Location & Timeframe:** Where and when the threat is expected.
-  - **AI Reasoning:** The historical pattern or trigger that prompted the alert.
-  - **Recommended Action:** Actionable advice such as "Increase Night Patrol (22:00 - 02:00)".
+The UI explains the observed count and baseline. These indicators support
+deployment review and do not identify a likely offender or justify coercive
+action.
 
-## Technical Implementation
-- **Data Visualization:** Built using the `recharts` library for responsive, high-fidelity SVG charts (`src/components/scrb/trend-charts.tsx`).
-- **Geospatial Mapping:** Implemented via `react-leaflet` (`src/components/scrb/hotspot-map.tsx`). The map component is dynamically imported with `ssr: false` in Next.js to ensure client-side rendering compatibility.
-- **Modularity:** The analytics dashboard is broken down into modular React components, allowing for easy updates and live-data integration in the future.
+## Current architecture and scale boundary
+
+FastAPI applies jurisdiction filters and returns prepared chart/map payloads to
+React, Recharts and React Leaflet. The current demo calculation reads bounded
+date windows and groups some rows in application memory. Before multi-million
+case deployment, aggregation must move into indexed SQL/materialized summaries
+and be validated with representative query plans.

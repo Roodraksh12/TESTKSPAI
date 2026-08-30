@@ -32,7 +32,7 @@ export function CaseLedger({ compact = false, cases = [] }: { compact?: boolean,
 }
 
 export function CaseCard({ c, compact }: { c: any; compact?: boolean }) {
-  // Handle both Mock CaseRecord and Prisma Case
+  // Dashboard and case-directory responses share these display fields.
   const firNumber = c.firNumber;
   const title = c.title || (c.summary ? c.summary.split('.')[0] : "Investigation Case");
   const crimeType = c.crimeType;

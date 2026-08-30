@@ -1,19 +1,29 @@
-# Cross-Case Linkage Module
+# Cross-case linkage canvas
 
-## Overview
-The Cross-Case Linkage Canvas (located in the `/network` route) is an advanced visual analytics tool that allows investigators to detect hidden relationships between seemingly isolated crimes. It shifts the paradigm from reading text-heavy FIRs to visually mapping extracted entities across the entire jurisdiction.
+## Current implementation
 
-## Key Features
-- **Entity Network Mapping:** Visually plots four core node types:
-  1. **Cases / FIRs**
-  2. **Persons** (Suspects, Victims, Witnesses, Aliases)
-  3. **Vehicles** (License plates, Models)
-  4. **Locations** (Hotspots, Addresses)
-- **Visual Linkages:** If a shared entity (e.g., a specific suspect or partial license plate) appears in two different cases, the canvas physically draws edges connecting those nodes, instantly highlighting organized crime networks or serial offenders.
-- **Interactive Isolation Mode:** By clicking on a specific Case or Entity node, the canvas filters out all unrelated noise, showing only the selected node and its direct web of connections.
-- **Search and Filter:** Quickly search for specific FIR numbers or names to locate them on the expansive canvas.
+The `/network` React page renders a movable, zoomable SVG graph supplied by the
+FastAPI network service. Nodes represent cases, people, vehicles and reporting
+locations.
 
-## Technical Implementation
-- **Frontend Visualization:** Implemented in `src/app/(protected)/network/page.tsx`. It uses standard SVG rendering to draw nodes and edges efficiently, avoiding the overhead of heavy canvas libraries while maintaining crisp resolution.
-- **Data Structure:** The graph depends on a defined Node and Edge data structure (`NETWORK.nodes` and `NETWORK.edges`), linking IDs together. 
-- **Dynamic Filtering:** Utilizes React's `useMemo` to dynamically compute `visibleNodes` and `visibleEdges` based on search queries, active category filters, and user selection (Isolation Mode).
+Recorded case-person links and officer-confirmed matches can contribute to
+clusters, hubs and bridge analysis. Machine-generated similarity matches remain
+separate leads until an officer confirms them.
+
+## Case-focused navigation
+
+Opening the canvas from a dossier sends the selected case as a seed. The backend
+loads that accessible case first and then expands a bounded neighbourhood through
+shared recorded people, active case matches and explicit person relationships.
+It does not require the case to appear in the newest 60 records and never falls
+back to an unrelated hub when the requested case is outside the officer's scope.
+
+The unseeded jurisdiction view remains capped for a readable hackathon demo. A
+production graph should use indexed server-side entity search and paginated
+neighbourhood expansion instead of attempting to load the full criminal graph.
+
+## Boundary
+
+The canvas uses only records in the isolated test database. It is not connected
+to CCTNS, ICJS or a live criminal database, and a displayed relationship is not
+proof of association or guilt.

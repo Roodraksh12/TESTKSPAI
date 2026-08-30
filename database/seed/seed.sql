@@ -1,5 +1,5 @@
 -- SCRB Sahayak demo seed data
--- Targets the Prisma-compatible (PascalCase) schema in 0003_prisma_compatible_schema.sql,
+-- Targets the active PascalCase SQL schema in 0003_prisma_compatible_schema.sql,
 -- which is the schema the FastAPI backend actually queries against. 0001/0002 describe an
 -- earlier Supabase-Auth-linked design that the running app does not use — apply 0003, not 0001+0002.
 --

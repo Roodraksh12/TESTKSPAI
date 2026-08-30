@@ -1,16 +1,34 @@
-# AI Chatbot Module
+# Investigation Copilot
 
-## Overview
-The AI Chatbot (Investigation Copilot) is a natural language interface designed to assist investigators in retrieving and analyzing data from the KSP Crime Database. By moving away from complex search filters, officers can interact with the system using everyday conversational language in both English and Kannada.
+## Purpose
 
-## Key Features
-- **Natural Language Processing:** Understands complex conversational queries like "Show me all chain snatching cases from last week".
-- **Bilingual Support:** Full support for both English and Kannada input and output, catering to local operational needs.
-- **Voice-Enabled Interaction:** Built-in Speech Recognition allows officers to dictate their queries hands-free.
-- **Context-Aware Memory:** The system retains the context of the active session. If an officer asks about a specific FIR, follow-up questions do not require repeating the FIR number.
-- **File Attachments:** Users can attach documents directly to the chat for the AI to analyze in context.
+The Copilot lets an officer search permitted synthetic case records using
+English or Kannada questions. It can run read-only case-search and statistical
+tools, carry an active-case context, expose supporting case references, and
+export a conversation transcript.
 
-## Technical Implementation
-- **Frontend:** Built using React/Next.js client components (`src/components/scrb/chat.tsx`). It maintains conversation state via `sessionStorage` to persist context across page navigations.
-- **Backend:** Powered by an API route (`src/app/api/chat/route.ts`) integrating with the OpenRouter API. It parses the conversational history and passes it to the LLM (e.g., `google/gemini-1.5-pro` or other configurable models) to maintain state and generate intelligent responses.
-- **Speech API:** Utilizes the native browser `window.SpeechRecognition` API with fallback error handling.
+## Current architecture
+
+- React components render the main Copilot and quick-ask surfaces.
+- Zustand retains the active conversation state in the browser.
+- FastAPI owns prompts, tool selection, jurisdiction checks and audit events.
+- PostgreSQL stores saved chat sessions and messages.
+- A provider-neutral gateway supports OpenRouter or an approved private
+  OpenAI-compatible endpoint without changing the frontend.
+
+External requests are tokenised on the backend. OpenRouter ZDR enforcement is
+default-on in configuration, but a synthetic-only demo may explicitly pause it
+when free ZDR capacity is unavailable. The response privacy chip reports which
+mode was actually used.
+
+## Truthful failure states
+
+Provider errors are shown as unavailable with a retry action. A privacy-policy
+shutdown is shown as intentionally disabled, and a valid empty response is
+shown separately. The product must never present provider failure as evidence
+that a case has no relevant information.
+
+## Boundaries
+
+The Copilot cannot confirm identities, modify FIRs, file reports or initiate a
+coercive action. Uncited output is unverified and requires officer review.

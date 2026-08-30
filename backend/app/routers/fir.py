@@ -15,7 +15,7 @@ from app.deps import get_current_user
 from app.services import intake_intel
 from app.services.ai_privacy import PrivacyContext
 from app.services.case_access import create_audit_log, require_case_write, require_fir_upload
-from app.services.job_store import fir_jobs
+from app.services.job_store import JobCapacityError, fir_jobs
 from app.services.openrouter import chat_completion
 
 router = APIRouter(prefix="/api/fir", tags=["fir"])
@@ -259,12 +259,15 @@ async def upload_fir(
             detail="Only PDF, JPEG, or PNG FIR scans are supported.",
         )
 
-    job = fir_jobs.create(
-        officer["id"],
-        filename,
-        document_content=content,
-        document_content_type=content_type,
-    )
+    try:
+        job = fir_jobs.create(
+            officer["id"],
+            filename,
+            document_content=content,
+            document_content_type=content_type,
+        )
+    except JobCapacityError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     background_tasks.add_task(_run_job, job.id, content, content_type, filename, officer)
     return {"jobId": job.id, "filename": filename, "status": job.status}
 

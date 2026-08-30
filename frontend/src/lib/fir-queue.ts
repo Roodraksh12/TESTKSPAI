@@ -32,15 +32,17 @@ type FirQueueState = {
   /** Job the officer is currently reviewing in the form, if any. */
   activeJobId: string | null;
   upload: (file: File) => Promise<string | null>;
+  hydrate: () => Promise<void>;
   startPolling: () => void;
   stopPolling: () => void;
   refresh: () => Promise<void>;
   setActiveJob: (jobId: string | null) => void;
   discard: (jobId: string) => Promise<void>;
-  clearFinished: () => void;
+  clearFinished: () => Promise<void>;
 };
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let hydration: Promise<void> | null = null;
 
 export const useFirQueue = create<FirQueueState>((set, get) => ({
   jobs: [],
@@ -80,6 +82,43 @@ export const useFirQueue = create<FirQueueState>((set, get) => ({
       }));
       return null;
     }
+  },
+
+  hydrate: async () => {
+    if (hydration) return hydration;
+    const hydrationStartedAt = Date.now();
+    hydration = (async () => {
+      try {
+        const payload = await apiRequest("/api/fir/jobs", { fresh: true });
+        const summaries: FirJob[] = Array.isArray(payload.jobs) ? payload.jobs : [];
+        const restored: FirJob[] = await Promise.all(
+          summaries.map(async (summary) => {
+            try {
+              return await apiRequest(`/api/fir/jobs/${summary.jobId}`, { fresh: true });
+            } catch {
+              return summary;
+            }
+          }),
+        );
+        set((state) => {
+          // Do not overwrite a job uploaded while the hydration request was in
+          // flight. Existing server rows are replaced by the authoritative
+          // list; only new local work and local-only failures are preserved.
+          const createdDuringHydration = state.jobs.filter(
+            (job) => job.jobId.startsWith("local-") || (job.createdAt || 0) >= hydrationStartedAt,
+          );
+          const merged = new Map<string, FirJob>(restored.map((job) => [job.jobId, job]));
+          for (const job of createdDuringHydration) merged.set(job.jobId, job);
+          return { jobs: Array.from(merged.values()) };
+        });
+        if (restored.some((job) => job.status === "queued" || job.status === "processing")) {
+          get().startPolling();
+        }
+      } finally {
+        hydration = null;
+      }
+    })();
+    return hydration;
   },
 
   refresh: async () => {
@@ -149,6 +188,8 @@ export const useFirQueue = create<FirQueueState>((set, get) => ({
     }
   },
 
-  clearFinished: () =>
-    set((s) => ({ jobs: s.jobs.filter((j) => j.status === "queued" || j.status === "processing") })),
+  clearFinished: async () => {
+    const finished = get().jobs.filter((job) => job.status === "done" || job.status === "error");
+    await Promise.allSettled(finished.map((job) => get().discard(job.jobId)));
+  },
 }));

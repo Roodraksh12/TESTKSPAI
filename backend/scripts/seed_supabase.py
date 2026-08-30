@@ -1,4 +1,4 @@
-"""Apply Prisma-compatible schema + demo seed to Supabase."""
+"""Apply the canonical SQL base schema and demo seed to Supabase."""
 
 from __future__ import annotations
 

@@ -28,7 +28,7 @@ export function FirQueuePanel({ onReview }: { onReview?: (jobId: string) => void
           {running > 0 && <Badge tone="amber">{running} running</Badge>}
           {jobs.some((j) => j.status === "done" || j.status === "error") && (
             <button
-              onClick={clearFinished}
+              onClick={() => void clearFinished()}
               className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
             >
               Clear finished
@@ -38,8 +38,8 @@ export function FirQueuePanel({ onReview }: { onReview?: (jobId: string) => void
       </div>
 
       <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
-        Scans are processed on the server. You can move to another tab or queue more scans — nothing
-        is lost while these run.
+        Scans are processed on the server. The queue and completed results remain visible after a
+        page reload; an interrupted server task is shown as needing a retry.
       </p>
 
       <div className="space-y-1.5">

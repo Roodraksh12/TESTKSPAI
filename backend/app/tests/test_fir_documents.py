@@ -121,7 +121,7 @@ def test_case_creation_associates_only_the_confirmed_job_document(
     monkeypatch.setattr(cases, "fir_jobs", FakeJobs())
     monkeypatch.setattr(cases, "require_case_write", lambda _officer: None)
     monkeypatch.setattr(cases, "_fir_document_storage_ready", lambda: True)
-    monkeypatch.setattr(cases, "fetch_scalar", lambda *_args, **_kwargs: 0)
+    monkeypatch.setattr(cases, "_allocate_fir_number", lambda _year: "FIR/2026/0001")
     monkeypatch.setattr(cases.geocoder, "geocode_location", lambda *_args: (None, None))
 
     def fake_insert(case_params, document, officer_id):

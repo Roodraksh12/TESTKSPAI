@@ -4,6 +4,10 @@ The deployment target is **Supabase Postgres**. The backend talks to it with raw
 `psycopg` over `DATABASE_URL` (no Supabase SDK, no RLS dependency), so any Postgres
 reachable at that URL works for local dev too — including a local Docker Postgres.
 
+The ordered SQL migrations are the only active schema definition. The application
+does not use Prisma or a generated ORM client; the historical word
+`prisma_compatible` remains only in migration `0003`'s filename.
+
 ## Env wiring
 
 Put DB secrets only in `backend/.env`. See `backend/.env.example`. The frontend never
@@ -63,6 +67,15 @@ while keeping the same metadata and API access boundary.
 Then apply **`database/migrations/0017_network_focus_indexes.sql`** to support
 bounded, seed-first case-network traversal through shared people, active case
 matches and recorded person relationships.
+Then apply **`database/migrations/0018_fir_number_counter.sql`** for atomic,
+non-reusable FIR serial allocation. Newly entered names are stored as distinct
+people in application logic; identity linkage remains an officer-reviewed match.
+Then apply **`database/migrations/0019_durable_upload_storage.sql`** for shared
+transient FIR jobs and database-backed diary attachments. This removes reliance
+on one backend process for job visibility/results and on one local filesystem for
+diary attachments in the hackathon deployment. Interrupted processing is retained
+as a retryable job record; a police-scale deployment should use a managed worker
+queue and approved encrypted object storage.
 
 `0001_initial_schema.sql` + `0002_rls_policies.sql` describe an earlier, unused design
 (snake_case tables, Supabase-Auth-linked via `auth.users`/`auth.uid()`). The running
@@ -94,11 +107,15 @@ app authenticates with its own FastAPI JWT (badge ID + bcrypt), not Supabase Aut
     test database only.
 17. From `backend/`, run `python -m scripts.apply_0017` against that same isolated
     test database only.
-18. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
+18. From `backend/`, run `python -m scripts.apply_0018` against that same isolated
+    test database only.
+19. From `backend/`, run `python -m scripts.apply_0019` against that same isolated
+    test database only.
+20. Run `database/seed/seed.sql` for a demo-ready dataset (30 cases across ~6 months,
    a criminal network with a
    detectable ring) — or create demo officers by hand.
-19. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
-20. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
+21. From `backend/`, run `python -m scripts.refresh_early_warnings` to backfill active warnings.
+22. Fill `backend/.env` (`DATABASE_URL` + `SUPABASE_JWT_SECRET` at minimum; optional SMTP_*).
 
 ## Demo login (after seed + 0004)
 

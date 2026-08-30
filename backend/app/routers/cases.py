@@ -147,13 +147,13 @@ def _display_date(value: object) -> str:
     return text[:10] if len(text) >= 10 else text or "Unknown date"
 
 
-def _find_or_create_person(name: str, role: str) -> dict:
-    person = fetch_one(
-        'SELECT * FROM "Person" WHERE LOWER(name) = LOWER(%(name)s) LIMIT 1',
-        {"name": name},
-    )
-    if person:
-        return person
+def _create_unverified_person(name: str, role: str) -> dict:
+    """Create a distinct person record until an officer verifies identity.
+
+    Names are not identifiers. Reusing a Person solely because the spelling
+    matches can manufacture cross-case links between unrelated people. The
+    intake matcher still creates reviewable identity leads separately.
+    """
     return execute_returning(
         '''
         INSERT INTO "Person" (id, name, role)
@@ -162,6 +162,29 @@ def _find_or_create_person(name: str, role: str) -> dict:
         ''',
         {"id": new_id(), "name": name, "role": role},
     ) or {}
+
+
+def _allocate_fir_number(year: int) -> str:
+    """Reserve a non-reusable FIR serial with one atomic database statement."""
+    if not fetch_scalar('SELECT to_regclass(\'public."FirNumberCounter"\')'):
+        raise HTTPException(
+            status_code=503,
+            detail="FIR number allocation is not set up. Apply database migration 0018_fir_number_counter.sql first.",
+        )
+    row = execute_returning(
+        '''
+        INSERT INTO "FirNumberCounter" ("registerYear", "lastNumber", "updatedAt")
+        VALUES (%(registerYear)s, 1, NOW())
+        ON CONFLICT ("registerYear") DO UPDATE
+        SET "lastNumber" = "FirNumberCounter"."lastNumber" + 1,
+            "updatedAt" = NOW()
+        RETURNING "lastNumber"
+        ''',
+        {"registerYear": year},
+    )
+    if not row:
+        raise HTTPException(status_code=500, detail="Failed to allocate FIR number")
+    return f'FIR/{year}/{int(row["lastNumber"]):04d}'
 
 
 def _fir_document_storage_ready() -> bool:
@@ -326,7 +349,7 @@ def list_cases(
                 FROM "Case" c
                 LEFT JOIN "PoliceStation" ps ON c."stationId" = ps.id
                 WHERE 1=1{scope_sql}{filters}
-                ORDER BY c."reportedDate" DESC
+                ORDER BY c."reportedDate" DESC, c.id DESC
                 LIMIT %(pageLimit)s
                 ''',
                 {**params, "pageLimit": limit + 1},
@@ -408,11 +431,7 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
             )
 
     year = datetime.now(timezone.utc).year
-    count = fetch_scalar(
-        'SELECT COUNT(*) FROM "Case" WHERE "stationId" = %(stationId)s',
-        {"stationId": station_id},
-    ) or 0
-    fir_number = f"FIR/{year}/{int(count) + 1:04d}"
+    fir_number = _allocate_fir_number(year)
 
     incident_date = datetime.now(timezone.utc)
     if payload.incidentDate and payload.incidentDate != "Unknown":
@@ -445,10 +464,16 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=500, detail="Failed to create case")
 
     accused_person_ids: list[str] = []
+    seen_accused_names: set[str] = set()
     for name in payload.accusedNames:
         if not name or not name.strip():
             continue
-        person = _find_or_create_person(name.strip(), "ACCUSED")
+        normalized_name = name.strip()
+        name_key = normalized_name.casefold()
+        if name_key in seen_accused_names:
+            continue
+        seen_accused_names.add(name_key)
+        person = _create_unverified_person(normalized_name, "ACCUSED")
         execute(
             '''
             INSERT INTO "CasePerson" (id, "caseId", "personId", role)
@@ -479,7 +504,7 @@ def create_case(payload: CreateCaseRequest, current_user: dict = Depends(get_cur
                 )
 
     if payload.victimName and payload.victimName != "null":
-        victim = _find_or_create_person(payload.victimName, "VICTIM")
+        victim = _create_unverified_person(payload.victimName.strip(), "VICTIM")
         execute(
             '''
             INSERT INTO "CasePerson" (id, "caseId", "personId", role)
@@ -584,7 +609,7 @@ def record_custody_clock(
     if payload.casePersonId == "ADD_CUSTOM":
         if not payload.newAccusedName or not payload.newAccusedName.strip():
             raise HTTPException(status_code=400, detail="Custom accused name required")
-        person = _find_or_create_person(payload.newAccusedName.strip(), "ACCUSED")
+        person = _create_unverified_person(payload.newAccusedName.strip(), "ACCUSED")
         case_person_id_to_use = new_id()
         execute(
             '''
