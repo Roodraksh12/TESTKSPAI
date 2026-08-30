@@ -2,8 +2,9 @@
 	"command": "python -m uvicorn app.main:app --host 0.0.0.0 --port 9000",
 	"build_path": ".",
 	"stack": "python_3_11",
-	"env_variables": {},
+	"env_variables": {
+		"PLATFORM_MANAGED_CORS": "true"
+	},
 	"memory": 512,
 	"scripts": {}
 }
-

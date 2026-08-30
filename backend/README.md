@@ -75,6 +75,14 @@ APP_PUBLIC_URL=http://localhost:5173
 
 If `SMTP_HOST` is empty, invite bodies are logged to the server console. Restart uvicorn after changing SMTP settings.
 
+## CORS by environment
+
+Local frontend and backend servers use different ports, so FastAPI CORS remains
+enabled by default using `ALLOWED_ORIGINS`. Zoho Catalyst AppSail supplies the
+edge headers itself; `app-config.json` therefore sets
+`PLATFORM_MANAGED_CORS=true` for that deployment. Do not copy that flag into the
+local `.env`, or browser requests from port 5173 to port 8000 will be blocked.
+
 ## AI provider
 
 The default remains OpenRouter, using `OPENROUTER_API_KEY` and
