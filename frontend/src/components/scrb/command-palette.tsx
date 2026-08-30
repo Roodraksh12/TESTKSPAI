@@ -27,6 +27,10 @@ export function OmniSearch({
         e.preventDefault();
         onOpenChange(!open);
       }
+      if (e.key === "Escape" && open) {
+        e.preventDefault();
+        onOpenChange(false);
+      }
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
@@ -70,7 +74,7 @@ export function OmniSearch({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] bg-ink/40 backdrop-blur-sm px-4">
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-[10vh] bg-ink/40 backdrop-blur-sm px-4">
       <div className="fixed inset-0" onClick={() => onOpenChange(false)} />
       
       <Command 

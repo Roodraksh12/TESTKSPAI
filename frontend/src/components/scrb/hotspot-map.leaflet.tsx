@@ -51,9 +51,7 @@ export default function HotspotMap({
   }
 
   const isDark = resolvedTheme === "dark";
-  const tileUrl = isDark
-    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+  const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   return (
     <div className="flex-1 w-full min-h-[16rem] overflow-hidden rounded-2xl border-none relative">
@@ -66,7 +64,8 @@ export default function HotspotMap({
         <FocusMap focus={focus} />
         <TileLayer
           url={tileUrl}
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          className={isDark ? "invert-[100%] hue-rotate-180 brightness-[0.8] contrast-[1.2]" : ""}
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         {clusters.map((cluster, i) => {
           const colors = INTENSITY_COLOR[cluster.intensity] || INTENSITY_COLOR.low;
